@@ -1,0 +1,1323 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "title": "Turtle Custom Block Definition",
+  "description": "Schema for a Turtle custom solid block definition. The primary design goal is that simple decorative or functional blocks can be created entirely in JSON with no adapter code, while adapters remain available for advanced logic. Shared root sections such as textures, sounds, and animations are intended to act like reusable libraries that individual blockstates point at.",
+  "required": ["id", "blockstates"],
+  "$defs": {
+    "assetId": {
+      "type": "string",
+      "pattern": "^[a-z0-9._-]+:[a-z0-9._./-]+$",
+      "description": "Namespaced asset id. Use this for textures, sound events, or backing item ids.",
+      "examples": [
+        "minecraft:paper",
+        "demo:block/text_block_front",
+        "minecraft:block.wood.place"
+      ]
+    },
+    "namedStateKey": {
+      "type": "string",
+      "pattern": "^[a-z0-9._-]+$",
+      "description": "Identifier used for named blockstates, texture states, sound states, animation chunks, or other reusable keyed definitions.",
+      "examples": ["default", "lit", "powered", "weathered", "pulse_loop"]
+    },
+    "miniMessage": {
+      "type": "string",
+      "pattern": "^(?:[^<>]|</?[A-Za-z0-9_!?#:-]+(?:[:][A-Za-z0-9_.-]+)?(?:\\s+[^<>]*)?\\s*/?>)*$",
+      "description": "MiniMessage-formatted text. This is intentionally a lightweight validation pass that catches obvious malformed angle-bracket usage, but it is not a full MiniMessage parser.",
+      "examples": [
+        "<gray>Simple block</gray>",
+        "<gold><bold>Bronze Crate</bold></gold>",
+        "<gray>Stores <yellow>64</yellow> items</gray>"
+      ]
+    },
+    "faceStrengthMap": {
+      "type": "object",
+      "description": "Strength by face. Use 'all' for one strength everywhere, 'side' for shared side strength, or explicit face keys. This is reused for redstone output or any future face-based numeric behavior.",
+      "properties": {
+        "all": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 15,
+          "default": 0,
+          "description": "Single strength applied to all faces."
+        },
+        "side": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 15,
+          "default": 0,
+          "description": "Strength applied to the four side faces unless overridden by explicit face keys."
+        },
+        "front": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 15,
+          "default": 0,
+          "description": "Front-facing strength for directional blocks."
+        },
+        "top": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 15,
+          "default": 0,
+          "description": "Top face strength."
+        },
+        "bottom": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 15,
+          "default": 0,
+          "description": "Bottom face strength."
+        },
+        "north": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 15,
+          "default": 0,
+          "description": "North face strength."
+        },
+        "south": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 15,
+          "default": 0,
+          "description": "South face strength."
+        },
+        "east": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 15,
+          "default": 0,
+          "description": "East face strength."
+        },
+        "west": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 15,
+          "default": 0,
+          "description": "West face strength."
+        }
+      },
+      "additionalProperties": false,
+      "minProperties": 1,
+      "allOf": [
+        {
+          "if": {
+            "required": ["all"]
+          },
+          "then": {
+            "maxProperties": 1
+          }
+        },
+        {
+          "if": {
+            "required": ["side"]
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                { "required": ["north"] },
+                { "required": ["south"] },
+                { "required": ["east"] },
+                { "required": ["west"] }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "required": ["front"]
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                { "required": ["north"] },
+                { "required": ["south"] },
+                { "required": ["east"] },
+                { "required": ["west"] }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "animationTrigger": {
+      "type": "string",
+      "enum": [
+        "always",
+        "manual",
+        "on_place",
+        "on_break",
+        "on_interact",
+        "on_powered",
+        "on_unpowered",
+        "on_light_changed",
+        "on_state_enter",
+        "on_state_exit"
+      ],
+      "description": "When the animation should begin. 'always' is the simplest no-code mode. 'manual' is intended for adapters or runtime systems that trigger animation by name."
+    },
+    "animationSync": {
+      "type": "string",
+      "enum": ["world", "chunk", "instance", "manual"],
+      "default": "world",
+      "description": "Synchronization model. 'world' keeps all blocks in lockstep, 'chunk' syncs within a chunk, 'instance' lets each placed block run independently, and 'manual' leaves timing to your runtime."
+    },
+    "animationSource": {
+      "type": "string",
+      "enum": ["explicit", "strip_vertical", "strip_horizontal", "atlas"],
+      "default": "explicit",
+      "description": "How frames are sourced from the texture asset. Use 'explicit' when you provide a frames array. Use strip modes for simple sprite sheets without listing every frame."
+    },
+    "textureAnimationFrame": {
+      "oneOf": [
+        {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Zero-based frame index."
+        },
+        {
+          "type": "object",
+          "description": "A frame with per-frame timing overrides.",
+          "properties": {
+            "index": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Zero-based frame index."
+            },
+            "time": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Ticks to display this frame."
+            }
+          },
+          "required": ["index"],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "animationChunk": {
+      "type": "object",
+      "description": "Reusable animation chunk. Think of this as a named clip your runtime can reference programmatically or your blockstates can attach declaratively. The chunk format is authoring-friendly rather than being a raw copy of vanilla .mcmeta.",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["loop", "ping_pong", "random", "hold", "oneshot"],
+          "default": "loop",
+          "description": "Playback style. 'loop' repeats, 'ping_pong' reverses at the ends, 'random' picks frames, 'hold' stays on one frame, and 'oneshot' plays once."
+        },
+        "trigger": {
+          "$ref": "#/$defs/animationTrigger"
+        },
+        "sync": {
+          "$ref": "#/$defs/animationSync"
+        },
+        "source": {
+          "$ref": "#/$defs/animationSource"
+        },
+        "frametime": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 1,
+          "description": "Default ticks per frame."
+        },
+        "frameCount": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Number of sequential frames to derive automatically when frames are not listed."
+        },
+        "frames": {
+          "type": "array",
+          "description": "Explicit frame order and optional per-frame timings. If omitted, your loader can derive frames from frameCount and source.",
+          "items": {
+            "$ref": "#/$defs/textureAnimationFrame"
+          },
+          "minItems": 1
+        },
+        "startDelay": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "description": "Delay in ticks before playback begins."
+        },
+        "reverse": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether playback should begin in reverse order."
+        },
+        "interpolate": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether frames should interpolate where supported by the runtime or pack pipeline."
+        },
+        "loop": {
+          "type": "boolean",
+          "description": "Optional explicit loop flag. If omitted, your runtime can infer looping from the animation type."
+        },
+        "duration": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Optional total animation duration in ticks, useful for manual or oneshot coordination."
+        },
+        "tags": {
+          "type": "array",
+          "description": "Optional labels for programmatic querying or grouping, for example ['power', 'ambient'] or ['machine', 'startup'].",
+          "items": {
+            "$ref": "#/$defs/namedStateKey"
+          },
+          "minItems": 1
+        }
+      },
+      "additionalProperties": false,
+      "examples": [
+        {
+          "type": "loop",
+          "trigger": "always",
+          "sync": "world",
+          "source": "strip_vertical",
+          "frameCount": 4,
+          "frametime": 2
+        },
+        {
+          "type": "oneshot",
+          "trigger": "on_powered",
+          "sync": "instance",
+          "frametime": 1,
+          "frames": [0, 1, { "index": 2, "time": 4 }, 3],
+          "tags": ["power", "startup"]
+        }
+      ]
+    },
+    "animationReference": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/namedStateKey"
+        },
+        {
+          "$ref": "#/$defs/animationChunk"
+        }
+      ],
+      "description": "Either the name of a shared animation chunk defined in the root animations section or an inline animation definition for one-off cases."
+    },
+    "animationStateMap": {
+      "type": "object",
+      "description": "Named animation chunks. This acts like a reusable library of clips that textures, blockstates, transitions, and adapters can reference programmatically by key.",
+      "properties": {
+        "default": {
+          "$ref": "#/$defs/animationChunk"
+        }
+      },
+      "patternProperties": {
+        "^[a-z0-9._-]+$": {
+          "$ref": "#/$defs/animationChunk"
+        }
+      },
+      "additionalProperties": false,
+      "minProperties": 1
+    },
+    "textureReference": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/assetId"
+        },
+        {
+          "type": "object",
+          "description": "Face texture configuration. Use this form when you need to attach animation or annotate the texture more explicitly.",
+          "properties": {
+            "texture": {
+              "$ref": "#/$defs/assetId"
+            },
+            "animation": {
+              "$ref": "#/$defs/animationReference"
+            }
+          },
+          "required": ["texture"],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "textureState": {
+      "type": "object",
+      "description": "Face-based texture assignment. Use 'all' for one texture everywhere, 'side' for shared side faces, or explicit face keys. A texture state can also define a shared animation for the whole state, with individual faces overriding it when needed.",
+      "properties": {
+        "animation": {
+          "$ref": "#/$defs/animationReference",
+          "description": "Optional default animation applied to the texture state as a whole."
+        },
+        "all": {
+          "$ref": "#/$defs/textureReference",
+          "description": "Single texture applied to all faces."
+        },
+        "side": {
+          "$ref": "#/$defs/textureReference",
+          "description": "Texture applied to the four side faces unless overridden by explicit face keys."
+        },
+        "front": {
+          "$ref": "#/$defs/textureReference",
+          "description": "Front-facing texture for directional blocks."
+        },
+        "top": {
+          "$ref": "#/$defs/textureReference",
+          "description": "Top face texture."
+        },
+        "bottom": {
+          "$ref": "#/$defs/textureReference",
+          "description": "Bottom face texture."
+        },
+        "north": {
+          "$ref": "#/$defs/textureReference",
+          "description": "North face texture."
+        },
+        "south": {
+          "$ref": "#/$defs/textureReference",
+          "description": "South face texture."
+        },
+        "east": {
+          "$ref": "#/$defs/textureReference",
+          "description": "East face texture."
+        },
+        "west": {
+          "$ref": "#/$defs/textureReference",
+          "description": "West face texture."
+        }
+      },
+      "additionalProperties": false,
+      "minProperties": 1,
+      "allOf": [
+        {
+          "if": {
+            "required": ["all"]
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                { "required": ["side"] },
+                { "required": ["front"] },
+                { "required": ["top"] },
+                { "required": ["bottom"] },
+                { "required": ["north"] },
+                { "required": ["south"] },
+                { "required": ["east"] },
+                { "required": ["west"] }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "required": ["side"]
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                { "required": ["north"] },
+                { "required": ["south"] },
+                { "required": ["east"] },
+                { "required": ["west"] }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "required": ["front"]
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                { "required": ["north"] },
+                { "required": ["south"] },
+                { "required": ["east"] },
+                { "required": ["west"] }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "textures": {
+      "type": "object",
+      "description": "Named texture states shared by this block definition. 'default' is conventional but not required by the schema so advanced content packs can choose their own state names. Most no-code blocks will only define one texture state named 'default'.",
+      "properties": {
+        "default": {
+          "$ref": "#/$defs/textureState"
+        }
+      },
+      "patternProperties": {
+        "^[a-z0-9._-]+$": {
+          "$ref": "#/$defs/textureState"
+        }
+      },
+      "additionalProperties": false,
+      "minProperties": 1
+    },
+    "soundReference": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/assetId"
+        },
+        {
+          "type": "object",
+          "description": "Detailed sound configuration for cases where volume or pitch should differ from the default.",
+          "properties": {
+            "sound": {
+              "$ref": "#/$defs/assetId"
+            },
+            "volume": {
+              "type": "number",
+              "minimum": 0,
+              "default": 1.0,
+              "description": "Playback volume multiplier for this sound."
+            },
+            "pitch": {
+              "type": "number",
+              "minimum": 0,
+              "default": 1.0,
+              "description": "Playback pitch multiplier for this sound."
+            }
+          },
+          "required": ["sound"],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "soundState": {
+      "type": "object",
+      "description": "Named sound set for block interactions. Use different sound states when a block should sound different while powered, lit, damaged, or otherwise transformed. Simple event keys cover the no-code path, while preset slots let you attach richer managed audio behaviors.",
+      "properties": {
+        "place": {
+          "$ref": "#/$defs/soundReference"
+        },
+        "break": {
+          "$ref": "#/$defs/soundReference"
+        },
+        "step": {
+          "$ref": "#/$defs/soundReference"
+        },
+        "hit": {
+          "$ref": "#/$defs/soundReference"
+        },
+        "fall": {
+          "$ref": "#/$defs/soundReference"
+        },
+        "interact": {
+          "$ref": "#/$defs/soundReference"
+        },
+        "ambient": {
+          "$ref": "#/$defs/soundReference"
+        },
+        "ambientLoop": {
+          "$ref": "#/$defs/soundPresetReference",
+          "description": "Managed looping ambience such as a machine hum, magical aura, or low furnace rumble."
+        },
+        "ambientRandom": {
+          "$ref": "#/$defs/soundPresetReference",
+          "description": "Occasional ambient one-shots such as creaks, crackles, or chimes."
+        },
+        "poweredOn": {
+          "$ref": "#/$defs/soundPresetReference",
+          "description": "Preset played when the block becomes powered."
+        },
+        "poweredOff": {
+          "$ref": "#/$defs/soundPresetReference",
+          "description": "Preset played when the block becomes unpowered."
+        },
+        "stateEnter": {
+          "$ref": "#/$defs/soundPresetReference",
+          "description": "Preset played when this sound state becomes active."
+        },
+        "stateExit": {
+          "$ref": "#/$defs/soundPresetReference",
+          "description": "Preset played when this sound state stops being active."
+        },
+        "open": {
+          "$ref": "#/$defs/soundPresetReference",
+          "description": "Preset for opening or unfolding style behaviors."
+        },
+        "close": {
+          "$ref": "#/$defs/soundPresetReference",
+          "description": "Preset for closing or folding style behaviors."
+        },
+        "failure": {
+          "$ref": "#/$defs/soundPresetReference",
+          "description": "Preset for blocked, denied, jammed, or failed interactions."
+        }
+      },
+      "additionalProperties": false,
+      "minProperties": 1
+    },
+    "sounds": {
+      "type": "object",
+      "description": "Named sound states shared by this block definition. This mirrors texture-state organization so a block can swap both visuals and sounds by changing blockstate references.",
+      "properties": {
+        "default": {
+          "$ref": "#/$defs/soundState"
+        }
+      },
+      "patternProperties": {
+        "^[a-z0-9._-]+$": {
+          "$ref": "#/$defs/soundState"
+        }
+      },
+      "additionalProperties": false,
+      "minProperties": 1
+    },
+    "soundTrigger": {
+      "type": "string",
+      "enum": [
+        "always",
+        "manual",
+        "on_place",
+        "on_break",
+        "on_step",
+        "on_hit",
+        "on_fall",
+        "on_interact",
+        "on_powered",
+        "on_unpowered",
+        "on_state_enter",
+        "on_state_exit"
+      ],
+      "description": "When a reusable audio preset should attempt to play."
+    },
+    "soundSync": {
+      "type": "string",
+      "enum": ["world", "chunk", "instance", "manual"],
+      "default": "instance",
+      "description": "Synchronization model for repeating or managed audio. 'instance' is usually the most natural default for placed blocks."
+    },
+    "soundPlaybackType": {
+      "type": "string",
+      "enum": ["single", "sequence", "random", "loop"],
+      "default": "single",
+      "description": "How a preset selects sounds. 'single' plays one cue, 'sequence' walks the list in order, 'random' chooses by weight, and 'loop' repeats."
+    },
+    "soundAttenuation": {
+      "type": "string",
+      "enum": ["linear", "none"],
+      "default": "linear",
+      "description": "Simple attenuation mode for the preset."
+    },
+    "soundCue": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/assetId"
+        },
+        {
+          "type": "object",
+          "description": "Detailed sound cue used inside a reusable preset.",
+          "properties": {
+            "sound": {
+              "$ref": "#/$defs/assetId"
+            },
+            "volume": {
+              "type": "number",
+              "minimum": 0,
+              "default": 1.0,
+              "description": "Playback volume multiplier for this cue."
+            },
+            "pitch": {
+              "type": "number",
+              "minimum": 0,
+              "default": 1.0,
+              "description": "Playback pitch multiplier for this cue."
+            },
+            "weight": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "description": "Relative selection weight when the preset type is 'random'."
+            }
+          },
+          "required": ["sound"],
+          "additionalProperties": false
+        }
+      ],
+      "description": "Single sound entry used by reusable presets."
+    },
+    "soundPreset": {
+      "type": "object",
+      "description": "Reusable audio preset. This is the sound equivalent of an animation chunk: a named behavior clip your runtime can trigger or that blockstates can reference declaratively. Use presets for ambience, startup/shutdown effects, looping hums, random creaks, or state enter/exit cues.",
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/soundPlaybackType"
+        },
+        "trigger": {
+          "$ref": "#/$defs/soundTrigger"
+        },
+        "sync": {
+          "$ref": "#/$defs/soundSync"
+        },
+        "attenuation": {
+          "$ref": "#/$defs/soundAttenuation"
+        },
+        "sounds": {
+          "type": "array",
+          "description": "One or more sound cues used by this preset.",
+          "items": {
+            "$ref": "#/$defs/soundCue"
+          },
+          "minItems": 1
+        },
+        "intervalTicks": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Repeat interval for looping or ambient playback."
+        },
+        "cooldownTicks": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "description": "Minimum ticks before this preset may play again."
+        },
+        "startDelay": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "description": "Delay before the preset begins playback."
+        },
+        "chance": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 1,
+          "description": "Chance from 0 to 1 that the preset plays when triggered."
+        },
+        "radius": {
+          "type": "number",
+          "minimum": 0,
+          "default": 16,
+          "description": "Suggested hearing radius for managed audio playback."
+        },
+        "tags": {
+          "type": "array",
+          "description": "Optional labels for runtime lookup or grouping, for example ['ambient', 'machine'] or ['power', 'startup'].",
+          "items": {
+            "$ref": "#/$defs/namedStateKey"
+          },
+          "minItems": 1
+        }
+      },
+      "required": ["sounds"],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "single"
+              }
+            },
+            "required": ["type"]
+          },
+          "then": {
+            "properties": {
+              "sounds": {
+                "maxItems": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "enum": ["loop", "random"]
+              }
+            },
+            "required": ["type"]
+          },
+          "then": {
+            "required": ["intervalTicks"]
+          }
+        }
+      ],
+      "examples": [
+        {
+          "type": "loop",
+          "trigger": "always",
+          "sync": "instance",
+          "intervalTicks": 40,
+          "sounds": [
+            {
+              "sound": "minecraft:block.beacon.ambient",
+              "volume": 0.2,
+              "pitch": 1.2
+            }
+          ],
+          "tags": ["ambient", "hum"]
+        },
+        {
+          "type": "random",
+          "trigger": "always",
+          "sync": "chunk",
+          "intervalTicks": 100,
+          "chance": 0.25,
+          "sounds": [
+            {
+              "sound": "minecraft:block.amethyst_block.chime",
+              "weight": 3
+            },
+            {
+              "sound": "minecraft:block.amethyst_cluster.hit",
+              "pitch": 1.4,
+              "weight": 1
+            }
+          ],
+          "tags": ["ambient", "random"]
+        }
+      ]
+    },
+    "soundPresetReference": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/namedStateKey"
+        },
+        {
+          "$ref": "#/$defs/soundPreset"
+        }
+      ],
+      "description": "Either the name of a shared sound preset defined in the root audioPresets section or an inline preset definition."
+    },
+    "soundPresetMap": {
+      "type": "object",
+      "description": "Named reusable audio presets. These are intended for programmatic access and for high-level blockstate wiring, similar to animation chunks.",
+      "properties": {
+        "default": {
+          "$ref": "#/$defs/soundPreset"
+        }
+      },
+      "patternProperties": {
+        "^[a-z0-9._-]+$": {
+          "$ref": "#/$defs/soundPreset"
+        }
+      },
+      "additionalProperties": false,
+      "minProperties": 1
+    },
+    "redstoneInputRule": {
+      "type": "object",
+      "description": "Switches to another blockstate when an input condition matches.",
+      "properties": {
+        "operator": {
+          "type": "string",
+          "enum": ["==", "!=", ">", ">=", "<", "<="],
+          "default": ">=",
+          "description": "Comparison operator used against the measured incoming redstone strength."
+        },
+        "strength": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 15,
+          "description": "Input strength to compare against."
+        },
+        "toBlockstate": {
+          "$ref": "#/$defs/namedStateKey",
+          "description": "Blockstate to switch to when the rule matches."
+        }
+      },
+      "required": ["strength", "toBlockstate"],
+      "additionalProperties": false
+    },
+    "lightReactivityRule": {
+      "type": "object",
+      "description": "Switches to another blockstate when nearby light matches a condition.",
+      "properties": {
+        "operator": {
+          "type": "string",
+          "enum": ["==", "!=", ">", ">=", "<", "<="],
+          "default": ">=",
+          "description": "Comparison operator used against the measured light level."
+        },
+        "level": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 15,
+          "description": "Light level to compare against."
+        },
+        "toBlockstate": {
+          "$ref": "#/$defs/namedStateKey",
+          "description": "Blockstate to switch to when the rule matches."
+        }
+      },
+      "required": ["level", "toBlockstate"],
+      "additionalProperties": false
+    },
+    "reactivity": {
+      "type": "object",
+      "description": "Simple environment-driven blockstate switching. This is intentionally no-code friendly so many reactive blocks can be authored without an adapter.",
+      "properties": {
+        "blockLight": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/lightReactivityRule"
+          },
+          "minItems": 1,
+          "description": "Rules using local block light."
+        },
+        "skyLight": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/lightReactivityRule"
+          },
+          "minItems": 1,
+          "description": "Rules using local sky light."
+        }
+      },
+      "additionalProperties": false,
+      "minProperties": 1
+    },
+    "blockProperties": {
+      "type": "object",
+      "description": "Core physical block properties. These are intended to cover the no-code path for most solid custom blocks.",
+      "properties": {
+        "lightLevel": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 15,
+          "default": 0,
+          "description": "Light level emitted by the block."
+        },
+        "washable": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether fluids can wash this block away."
+        },
+        "breakable": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether this block can be broken."
+        },
+        "hardness": {
+          "type": "number",
+          "minimum": 0,
+          "default": 0.5,
+          "description": "Hardness of the block."
+        },
+        "friction": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1.5,
+          "default": 0.6,
+          "description": "Movement friction/slipperiness. Vanilla-like blocks are usually around 0.6, with ice-like blocks higher."
+        },
+        "fire": {
+          "type": "object",
+          "description": "Fire-related behavior.",
+          "properties": {
+            "flammable": {
+              "type": "boolean",
+              "default": false,
+              "description": "Whether this block can catch fire."
+            },
+            "burnable": {
+              "type": "boolean",
+              "default": false,
+              "description": "Whether this block can be consumed by fire."
+            }
+          },
+          "additionalProperties": false
+        },
+        "redstone": {
+          "type": "object",
+          "description": "Redstone behavior for the block.",
+          "properties": {
+            "output": {
+              "$ref": "#/$defs/faceStrengthMap"
+            },
+            "input": {
+              "type": "object",
+              "description": "Simple redstone input behavior.",
+              "properties": {
+                "mode": {
+                  "type": "string",
+                  "enum": ["any", "direct", "weak"],
+                  "default": "any",
+                  "description": "How the block reads incoming power."
+                },
+                "rules": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/redstoneInputRule"
+                  },
+                  "minItems": 1,
+                  "description": "Rules checked against incoming redstone strength."
+                }
+              },
+              "required": ["rules"],
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false,
+          "minProperties": 1
+        },
+        "reactivity": {
+          "$ref": "#/$defs/reactivity"
+        }
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "breakable": {
+                "const": false
+              }
+            },
+            "required": ["breakable"]
+          },
+          "then": {
+            "not": {
+              "required": ["hardness"]
+            }
+          }
+        }
+      ]
+    },
+    "placement": {
+      "type": "object",
+      "description": "Placement/orientation behavior for the block. Keep this simple for no-code blocks: stone-like, chest-like, or log-like.",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["none", "horizontal_facing", "axis"],
+          "default": "none",
+          "description": "Placement behavior. 'none' is like stone, 'horizontal_facing' is like chest, and 'axis' is like logs.",
+          "examples": ["none", "horizontal_facing", "axis"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "stateTransition": {
+      "type": "object",
+      "description": "Animation used when leaving this blockstate and entering another one. This is useful for powered-up, opening, startup, or shutdown effects without needing custom code.",
+      "properties": {
+        "toBlockstate": {
+          "$ref": "#/$defs/namedStateKey",
+          "description": "Target blockstate for this transition."
+        },
+        "animation": {
+          "$ref": "#/$defs/animationReference",
+          "description": "Animation clip to play during the transition."
+        },
+        "keepFinalFrame": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether the transition should visually hold on its final frame until the target state takes over."
+        }
+      },
+      "required": ["toBlockstate", "animation"],
+      "additionalProperties": false
+    },
+    "blockState": {
+      "type": "object",
+      "description": "Template for a single blockstate variant. A state usually defines its physical properties and optionally points at shared texture, sound, and animation resources.",
+      "properties": {
+        "block": {
+          "$ref": "#/$defs/blockProperties"
+        },
+        "placement": {
+          "$ref": "#/$defs/placement"
+        },
+        "textureState": {
+          "$ref": "#/$defs/namedStateKey",
+          "description": "Name of the texture state to use for this blockstate. If your loader supports fallback, this will typically fall back to 'default'."
+        },
+        "soundState": {
+          "$ref": "#/$defs/namedStateKey",
+          "description": "Name of the sound state to use for this blockstate. If your loader supports fallback, this will typically fall back to 'default'."
+        },
+        "animationState": {
+          "$ref": "#/$defs/namedStateKey",
+          "description": "Optional shared animation chunk to associate with this state. This is useful when a state should start a named clip on entry or expose that clip to adapters/runtime code."
+        },
+        "transitions": {
+          "type": "array",
+          "description": "Optional state-to-state transition animations.",
+          "items": {
+            "$ref": "#/$defs/stateTransition"
+          },
+          "minItems": 1
+        }
+      },
+      "required": ["block"],
+      "additionalProperties": false,
+      "examples": [
+        {
+          "block": {
+            "hardness": 1.5,
+            "friction": 0.6
+          },
+          "placement": {
+            "type": "horizontal_facing"
+          },
+          "textureState": "default",
+          "soundState": "default",
+          "animationState": "default"
+        }
+      ]
+    },
+    "itemDefinition": {
+      "type": "object",
+      "description": "Creative/menu item representation for this custom block. This is the no-code entry shown to players, including MiniMessage display text.",
+      "properties": {
+        "material": {
+          "$ref": "#/$defs/assetId",
+          "description": "Backing vanilla item id, for example 'minecraft:paper'."
+        },
+        "name": {
+          "$ref": "#/$defs/miniMessage"
+        },
+        "lore": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/miniMessage"
+          },
+          "description": "MiniMessage-formatted lore lines."
+        },
+        "glint": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether the item should display the enchanted glint effect."
+        }
+      },
+      "additionalProperties": false,
+      "examples": [
+        {
+          "material": "minecraft:paper",
+          "name": "<gold><bold>Bronze Crate</bold></gold>",
+          "lore": [
+            "<gray>A simple decorative storage block.</gray>",
+            "<dark_gray>No adapter required.</dark_gray>"
+          ],
+          "glint": false
+        }
+      ]
+    }
+  },
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^(?!(minecraft|turtle):)[a-z0-9._-]+:[a-z0-9._/-]+$",
+      "title": "Block ID",
+      "description": "Unique namespaced block id. The namespace cannot be 'minecraft' or 'turtle' as these are reserved.",
+      "examples": ["my_plugin:oak_crate"]
+    },
+    "adapter": {
+      "type": "string",
+      "pattern": "^[a-z_][a-z0-9_]*(\\.[a-z_][a-z0-9_]*)*\\.[A-Z][A-Za-z0-9_]*$",
+      "title": "Adapter Class",
+      "description": "Fully qualified Java class name for the block adapter. Omit this for simple no-code blocks that only need data-driven behavior.",
+      "examples": ["dev.auto.xyz.blocks.BasicSolidBlockAdapter"]
+    },
+    "item": {
+      "$ref": "#/$defs/itemDefinition"
+    },
+    "audioPresets": {
+      "$ref": "#/$defs/soundPresetMap",
+      "description": "Shared reusable audio presets. These are intended for ambience, looping soundscapes, startup/shutdown stingers, random idle noises, and other higher-level managed audio behaviors."
+    },
+    "animations": {
+      "$ref": "#/$defs/animationStateMap"
+    },
+    "textures": {
+      "$ref": "#/$defs/textures"
+    },
+    "sounds": {
+      "$ref": "#/$defs/sounds"
+    },
+    "blockstates": {
+      "type": "object",
+      "description": "Named blockstate variants. 'default' is the required base state. Additional states can be used for powered, lit, weathered, open, or other simple data-driven transitions.",
+      "properties": {
+        "default": {
+          "$ref": "#/$defs/blockState"
+        }
+      },
+      "patternProperties": {
+        "^[a-z0-9._-]+$": {
+          "$ref": "#/$defs/blockState"
+        }
+      },
+      "required": ["default"],
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "examples": [
+    {
+      "id": "my_plugin:bronze_crate",
+      "item": {
+        "material": "minecraft:paper",
+        "name": "<gold><bold>Bronze Crate</bold></gold>",
+        "lore": [
+          "<gray>A no-code custom block.</gray>",
+          "<dark_gray>Directional, textured, and reactive.</dark_gray>"
+        ]
+      },
+      "audioPresets": {
+        "wood_room_tone": {
+          "type": "random",
+          "trigger": "always",
+          "sync": "chunk",
+          "intervalTicks": 120,
+          "chance": 0.15,
+          "sounds": [
+            "minecraft:block.wood.hit",
+            {
+              "sound": "minecraft:block.barrel.open",
+              "volume": 0.25,
+              "pitch": 0.8,
+              "weight": 1
+            }
+          ],
+          "tags": ["ambient", "wood"]
+        }
+      },
+      "textures": {
+        "default": {
+          "top": "my_plugin:block/bronze_crate_top",
+          "bottom": "my_plugin:block/bronze_crate_bottom",
+          "side": "my_plugin:block/bronze_crate_side",
+          "front": "my_plugin:block/bronze_crate_front"
+        }
+      },
+      "sounds": {
+        "default": {
+          "place": "minecraft:block.wood.place",
+          "break": "minecraft:block.wood.break",
+          "step": "minecraft:block.wood.step",
+          "ambientRandom": "wood_room_tone"
+        }
+      },
+      "blockstates": {
+        "default": {
+          "block": {
+            "hardness": 2.0,
+            "friction": 0.6
+          },
+          "placement": {
+            "type": "horizontal_facing"
+          },
+          "textureState": "default",
+          "soundState": "default"
+        }
+      }
+    },
+    {
+      "id": "demo:animated_machine",
+      "item": {
+        "material": "minecraft:paper",
+        "name": "<aqua><bold>Animated Machine</bold></aqua>",
+        "lore": [
+          "<gray>Demonstrates shared animation chunks.</gray>",
+          "<dark_gray>Textures, states, and transitions reuse named clips.</dark_gray>"
+        ]
+      },
+      "animations": {
+        "idle_loop": {
+          "type": "loop",
+          "trigger": "always",
+          "sync": "world",
+          "source": "strip_vertical",
+          "frameCount": 4,
+          "frametime": 2,
+          "tags": ["ambient", "idle"]
+        },
+        "power_startup": {
+          "type": "oneshot",
+          "trigger": "on_powered",
+          "sync": "instance",
+          "frametime": 1,
+          "frames": [0, 1, { "index": 2, "time": 4 }, 3],
+          "tags": ["power", "startup"]
+        }
+      },
+      "audioPresets": {
+        "machine_hum": {
+          "type": "loop",
+          "trigger": "always",
+          "sync": "instance",
+          "intervalTicks": 40,
+          "sounds": [
+            {
+              "sound": "minecraft:block.beacon.ambient",
+              "volume": 0.2,
+              "pitch": 1.1
+            }
+          ],
+          "tags": ["ambient", "machine"]
+        },
+        "machine_startup": {
+          "type": "sequence",
+          "trigger": "on_powered",
+          "sync": "instance",
+          "sounds": [
+            "minecraft:block.piston.extend",
+            {
+              "sound": "minecraft:block.amethyst_block.resonate",
+              "pitch": 1.2
+            }
+          ],
+          "tags": ["power", "startup"]
+        }
+      },
+      "textures": {
+        "default": {
+          "front": {
+            "texture": "demo:block/machine_front_idle",
+            "animation": "idle_loop"
+          },
+          "side": "demo:block/machine_side",
+          "top": "demo:block/machine_top",
+          "bottom": "demo:block/machine_bottom"
+        },
+        "powered": {
+          "animation": "power_startup",
+          "front": "demo:block/machine_front_powered",
+          "side": "demo:block/machine_side_powered",
+          "top": "demo:block/machine_top",
+          "bottom": "demo:block/machine_bottom"
+        }
+      },
+      "sounds": {
+        "default": {
+          "place": "minecraft:block.metal.place",
+          "break": "minecraft:block.metal.break",
+          "ambientLoop": "machine_hum"
+        },
+        "powered": {
+          "ambientLoop": "machine_hum",
+          "poweredOn": "machine_startup"
+        }
+      },
+      "blockstates": {
+        "default": {
+          "block": {
+            "hardness": 3.0
+          },
+          "textureState": "default"
+        },
+        "powered": {
+          "block": {
+            "hardness": 3.0,
+            "redstone": {
+              "output": {
+                "front": 15
+              }
+            }
+          },
+          "textureState": "powered",
+          "animationState": "power_startup",
+          "transitions": [
+            {
+              "toBlockstate": "default",
+              "animation": "idle_loop"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

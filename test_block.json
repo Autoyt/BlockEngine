@@ -1,0 +1,349 @@
+{
+  "id": "demo:text_block",
+  "item": {
+    "material": "minecraft:paper",
+    "name": "<gold><bold>Text Block</bold></gold>",
+    "lore": [
+      "<gray>A showcase block definition built entirely in JSON.</gray>",
+      "<yellow>Default</yellow><gray>: decorative crate-like block.</gray>",
+      "<red>Powered</red><gray>: emits redstone and uses startup animation.</gray>",
+      "<aqua>Lit</aqua><gray>: reacts to strong nearby light.</gray>",
+      "<dark_gray>Shared animations can also be triggered programmatically.</dark_gray>"
+    ],
+    "glint": false
+  },
+  "audioPresets": {
+    "crate_creaks": {
+      "type": "random",
+      "trigger": "always",
+      "sync": "chunk",
+      "intervalTicks": 100,
+      "chance": 0.18,
+      "sounds": [
+        {
+          "sound": "minecraft:block.wood.hit",
+          "volume": 0.25,
+          "pitch": 0.7,
+          "weight": 3
+        },
+        {
+          "sound": "minecraft:block.barrel.open",
+          "volume": 0.18,
+          "pitch": 0.6,
+          "weight": 1
+        }
+      ],
+      "tags": ["ambient", "wood", "crate"]
+    },
+    "machine_hum": {
+      "type": "loop",
+      "trigger": "always",
+      "sync": "instance",
+      "intervalTicks": 40,
+      "sounds": [
+        {
+          "sound": "minecraft:block.beacon.ambient",
+          "volume": 0.18,
+          "pitch": 1.15
+        }
+      ],
+      "tags": ["ambient", "machine", "loop"]
+    },
+    "power_startup_sound": {
+      "type": "sequence",
+      "trigger": "on_powered",
+      "sync": "instance",
+      "sounds": [
+        "minecraft:block.piston.extend",
+        {
+          "sound": "minecraft:block.amethyst_block.resonate",
+          "volume": 0.75,
+          "pitch": 1.25
+        }
+      ],
+      "tags": ["power", "startup"]
+    },
+    "power_shutdown_sound": {
+      "type": "sequence",
+      "trigger": "on_unpowered",
+      "sync": "instance",
+      "sounds": [
+        {
+          "sound": "minecraft:block.amethyst_cluster.break",
+          "volume": 0.6,
+          "pitch": 0.85
+        },
+        "minecraft:block.piston.contract"
+      ],
+      "tags": ["power", "shutdown"]
+    },
+    "lit_aura": {
+      "type": "loop",
+      "trigger": "always",
+      "sync": "chunk",
+      "intervalTicks": 30,
+      "sounds": [
+        {
+          "sound": "minecraft:block.respawn_anchor.ambient",
+          "volume": 0.15,
+          "pitch": 1.35
+        }
+      ],
+      "tags": ["ambient", "light", "magic"]
+    },
+    "failure_buzz": {
+      "type": "single",
+      "trigger": "manual",
+      "sync": "manual",
+      "sounds": [
+        {
+          "sound": "minecraft:block.note_block.basedrum",
+          "volume": 0.5,
+          "pitch": 0.6
+        }
+      ],
+      "tags": ["failure", "manual"]
+    }
+  },
+  "animations": {
+    "idle_glow": {
+      "type": "loop",
+      "trigger": "always",
+      "sync": "world",
+      "source": "strip_vertical",
+      "frameCount": 4,
+      "frametime": 2,
+      "tags": ["ambient", "idle"]
+    },
+    "power_startup": {
+      "type": "oneshot",
+      "trigger": "on_powered",
+      "sync": "instance",
+      "frametime": 1,
+      "frames": [0, 1, { "index": 2, "time": 5 }, 3],
+      "tags": ["power", "startup"]
+    },
+    "lit_pulse": {
+      "type": "ping_pong",
+      "trigger": "always",
+      "sync": "chunk",
+      "source": "strip_vertical",
+      "frameCount": 6,
+      "frametime": 1,
+      "interpolate": true,
+      "tags": ["light", "pulse"]
+    },
+    "manual_flash": {
+      "type": "oneshot",
+      "trigger": "manual",
+      "sync": "manual",
+      "frametime": 1,
+      "frames": [0, 1, 2, 3, 2, 1, 0],
+      "tags": ["manual", "debug"]
+    }
+  },
+  "textures": {
+    "default": {
+      "front": {
+        "texture": "demo:block/text_block_front",
+        "animation": "idle_glow"
+      },
+      "top": "demo:block/text_block_top",
+      "bottom": "demo:block/text_block_bottom",
+      "side": "demo:block/text_block_side"
+    },
+    "powered": {
+      "animation": "power_startup",
+      "top": "demo:block/text_block_top",
+      "bottom": "demo:block/text_block_bottom",
+      "side": {
+        "texture": "demo:block/text_block_powered_side",
+        "animation": {
+          "type": "loop",
+          "trigger": "always",
+          "sync": "instance",
+          "frametime": 2,
+          "frames": [0, 1, 2, 3]
+        }
+      },
+      "front": {
+        "texture": "demo:block/text_block_powered_front",
+        "animation": "power_startup"
+      }
+    },
+    "lit": {
+      "animation": "lit_pulse",
+      "all": {
+        "texture": "demo:block/text_block_lit"
+      }
+    }
+  },
+  "sounds": {
+    "default": {
+      "place": "minecraft:block.wood.place",
+      "break": "minecraft:block.wood.break",
+      "step": "minecraft:block.wood.step",
+      "hit": "minecraft:block.wood.hit",
+      "fall": "minecraft:block.wood.fall",
+      "ambientRandom": "crate_creaks",
+      "failure": "failure_buzz"
+    },
+    "powered": {
+      "place": {
+        "sound": "minecraft:block.amethyst_block.place",
+        "volume": 0.9,
+        "pitch": 1.1
+      },
+      "break": {
+        "sound": "minecraft:block.amethyst_block.break",
+        "volume": 0.9,
+        "pitch": 0.9
+      },
+      "ambient": {
+        "sound": "minecraft:block.beacon.ambient",
+        "volume": 0.35,
+        "pitch": 1.4
+      },
+      "ambientLoop": "machine_hum",
+      "poweredOn": "power_startup_sound",
+      "poweredOff": "power_shutdown_sound",
+      "stateEnter": "power_startup_sound",
+      "stateExit": "power_shutdown_sound"
+    },
+    "lit": {
+      "ambient": {
+        "sound": "minecraft:block.respawn_anchor.charge",
+        "volume": 0.2,
+        "pitch": 1.6
+      },
+      "interact": {
+        "sound": "minecraft:block.comparator.click",
+        "volume": 0.7,
+        "pitch": 1.8
+      },
+      "ambientLoop": "lit_aura",
+      "stateEnter": {
+        "type": "single",
+        "trigger": "on_state_enter",
+        "sounds": [
+          {
+            "sound": "minecraft:block.respawn_anchor.set_spawn",
+            "volume": 0.55,
+            "pitch": 1.25
+          }
+        ]
+      }
+    }
+  },
+  "blockstates": {
+    "default": {
+      "block": {
+        "lightLevel": 0,
+        "washable": false,
+        "breakable": true,
+        "hardness": 2.5,
+        "friction": 0.6,
+        "fire": {
+          "flammable": true,
+          "burnable": true
+        },
+        "reactivity": {
+          "blockLight": [
+            {
+              "operator": ">=",
+              "level": 15,
+              "toBlockstate": "lit"
+            }
+          ]
+        }
+      },
+      "placement": {
+        "type": "horizontal_facing"
+      },
+      "textureState": "default",
+      "soundState": "default",
+      "animationState": "idle_glow",
+      "transitions": [
+        {
+          "toBlockstate": "powered",
+          "animation": "power_startup",
+          "keepFinalFrame": true
+        }
+      ]
+    },
+    "powered": {
+      "block": {
+        "lightLevel": 6,
+        "breakable": true,
+        "hardness": 2.5,
+        "friction": 0.6,
+        "redstone": {
+          "output": {
+            "front": 15,
+            "side": 4,
+            "top": 2,
+            "bottom": 0
+          },
+          "input": {
+            "mode": "any",
+            "rules": [
+              {
+                "operator": "<=",
+                "strength": 0,
+                "toBlockstate": "default"
+              }
+            ]
+          }
+        }
+      },
+      "placement": {
+        "type": "horizontal_facing"
+      },
+      "textureState": "powered",
+      "soundState": "powered",
+      "animationState": "power_startup",
+      "transitions": [
+        {
+          "toBlockstate": "default",
+          "animation": "idle_glow"
+        }
+      ]
+    },
+    "lit": {
+      "block": {
+        "lightLevel": 12,
+        "breakable": true,
+        "hardness": 2.5,
+        "friction": 0.6,
+        "reactivity": {
+          "blockLight": [
+            {
+              "operator": "<",
+              "level": 15,
+              "toBlockstate": "default"
+            }
+          ],
+          "skyLight": [
+            {
+              "operator": ">=",
+              "level": 12,
+              "toBlockstate": "lit"
+            }
+          ]
+        }
+      },
+      "placement": {
+        "type": "horizontal_facing"
+      },
+      "textureState": "lit",
+      "soundState": "lit",
+      "animationState": "lit_pulse",
+      "transitions": [
+        {
+          "toBlockstate": "default",
+          "animation": "idle_glow"
+        }
+      ]
+    }
+  }
+}

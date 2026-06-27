@@ -1,0 +1,11 @@
+Create PDC serializable type that can be used to place blocks from inventory.
+Add Auto enchantment creation system for creative blocks.
+Send block break packets to client to simulate block breaking.
+Maybe create some small block breaking particles later.
+Add block breaking sounds.
+Add sounds packaging system that can tie to blockstates.
+
+Whenever the client changes its camera view or spawns etc then look for entities behind the player that are being removed for
+performance reasons and teleport them to the new position.
+
+Basically the listener updates the player's position and the manager will make requests to move the entities.

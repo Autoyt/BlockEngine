@@ -1,0 +1,16 @@
+name: Turtle
+prefix: Turtle
+version: '${version}'
+
+main: dev.auto.turtle.Main
+bootstrapper: dev.auto.turtle.MainBootstrap
+loader: dev.auto.turtle.MainLoader
+api-version: '26.2'
+load: STARTUP
+
+authors: [ AutoYT ]
+
+permissions:
+  turtle.debug:
+    description: Allows access to Turtle debug commands.
+    default: op
