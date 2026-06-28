@@ -1,5 +1,6 @@
 {
-  "id": "demo:text_block",
+  "$schema": "https://raw.githubusercontent.com/Autoyt/TurtleBlocks/blob/master/block.schema.json",
+  "name": "text_block",
   "item": {
     "material": "minecraft:paper",
     "name": "<gold><bold>Text Block</bold></gold>",
@@ -8,7 +9,7 @@
       "<yellow>Default</yellow><gray>: decorative crate-like block.</gray>",
       "<red>Powered</red><gray>: emits redstone and uses startup animation.</gray>",
       "<aqua>Lit</aqua><gray>: reacts to strong nearby light.</gray>",
-      "<dark_gray>Shared animations can also be triggered programmatically.</dark_gray>"
+      "<dark_gray>Shared animations can be reused across states.</dark_gray>"
     ],
     "glint": false
   },
@@ -108,46 +109,30 @@
   "animations": {
     "idle_glow": {
       "type": "loop",
-      "trigger": "always",
-      "sync": "world",
-      "source": "strip_vertical",
       "frameCount": 4,
-      "frametime": 2,
-      "tags": ["ambient", "idle"]
+      "frametime": 2
     },
     "power_startup": {
       "type": "oneshot",
-      "trigger": "on_powered",
-      "sync": "instance",
       "frametime": 1,
-      "frames": [0, 1, { "index": 2, "time": 5 }, 3],
-      "tags": ["power", "startup"]
+      "frames": [0, 1, { "index": 2, "time": 5 }, 3]
     },
     "lit_pulse": {
       "type": "ping_pong",
-      "trigger": "always",
-      "sync": "chunk",
-      "source": "strip_vertical",
       "frameCount": 6,
       "frametime": 1,
-      "interpolate": true,
-      "tags": ["light", "pulse"]
+      "interpolate": true
     },
     "manual_flash": {
       "type": "oneshot",
-      "trigger": "manual",
-      "sync": "manual",
       "frametime": 1,
-      "frames": [0, 1, 2, 3, 2, 1, 0],
-      "tags": ["manual", "debug"]
+      "frames": [0, 1, 2, 3, 2, 1, 0]
     }
   },
   "textures": {
     "default": {
-      "front": {
-        "texture": "demo:block/text_block_front",
-        "animation": "idle_glow"
-      },
+      "animation": "idle_glow",
+      "front": "demo:block/text_block_front",
       "top": "demo:block/text_block_top",
       "bottom": "demo:block/text_block_bottom",
       "side": "demo:block/text_block_side"
@@ -156,20 +141,8 @@
       "animation": "power_startup",
       "top": "demo:block/text_block_top",
       "bottom": "demo:block/text_block_bottom",
-      "side": {
-        "texture": "demo:block/text_block_powered_side",
-        "animation": {
-          "type": "loop",
-          "trigger": "always",
-          "sync": "instance",
-          "frametime": 2,
-          "frames": [0, 1, 2, 3]
-        }
-      },
-      "front": {
-        "texture": "demo:block/text_block_powered_front",
-        "animation": "power_startup"
-      }
+      "side": "demo:block/text_block_powered_side",
+      "front": "demo:block/text_block_powered_front"
     },
     "lit": {
       "animation": "lit_pulse",
@@ -242,13 +215,12 @@
         "washable": false,
         "breakable": true,
         "hardness": 2.5,
-        "friction": 0.6,
         "fire": {
           "flammable": true,
           "burnable": true
         },
         "reactivity": {
-          "blockLight": [
+          "light": [
             {
               "operator": ">=",
               "level": 15,
@@ -263,20 +235,13 @@
       "textureState": "default",
       "soundState": "default",
       "animationState": "idle_glow",
-      "transitions": [
-        {
-          "toBlockstate": "powered",
-          "animation": "power_startup",
-          "keepFinalFrame": true
-        }
-      ]
+      "exitAnimation": "power_startup"
     },
     "powered": {
       "block": {
         "lightLevel": 6,
         "breakable": true,
         "hardness": 2.5,
-        "friction": 0.6,
         "redstone": {
           "output": {
             "front": 15,
@@ -302,32 +267,20 @@
       "textureState": "powered",
       "soundState": "powered",
       "animationState": "power_startup",
-      "transitions": [
-        {
-          "toBlockstate": "default",
-          "animation": "idle_glow"
-        }
-      ]
+      "enterAnimation": "power_startup",
+      "exitAnimation": "idle_glow"
     },
     "lit": {
       "block": {
         "lightLevel": 12,
         "breakable": true,
         "hardness": 2.5,
-        "friction": 0.6,
         "reactivity": {
-          "blockLight": [
+          "light": [
             {
               "operator": "<",
               "level": 15,
               "toBlockstate": "default"
-            }
-          ],
-          "skyLight": [
-            {
-              "operator": ">=",
-              "level": 12,
-              "toBlockstate": "lit"
             }
           ]
         }
@@ -338,12 +291,7 @@
       "textureState": "lit",
       "soundState": "lit",
       "animationState": "lit_pulse",
-      "transitions": [
-        {
-          "toBlockstate": "default",
-          "animation": "idle_glow"
-        }
-      ]
+      "exitAnimation": "idle_glow"
     }
   }
 }

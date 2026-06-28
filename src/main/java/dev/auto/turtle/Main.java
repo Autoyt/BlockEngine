@@ -1,7 +1,7 @@
 package dev.auto.turtle;
 
 import com.github.retrooper.packetevents.PacketEvents;
-import dev.auto.turtle.api.TurtleAdapter;
+import dev.auto.turtle.api.CustomBlockSystem;
 import dev.auto.turtle.commands.DebugCommands;
 import dev.auto.turtle.listeners.BlockBreakListeners;
 import dev.auto.turtle.listeners.GameListener;
@@ -9,7 +9,7 @@ import io.github.retrooper.packetevents.factory.spigot.SpigotPacketEventsBuilder
 import lombok.Getter;
 import org.bukkit.plugin.java.JavaPlugin;
 
-public final class Main extends JavaPlugin implements TurtleAdapter {
+public final class Main extends JavaPlugin {
     @Getter
     public static Main instance;
 
@@ -34,10 +34,5 @@ public final class Main extends JavaPlugin implements TurtleAdapter {
     @Override
     public void onDisable() {
         PacketEvents.getAPI().terminate();
-    }
-
-    @Override
-    public String pluginVersion() {
-        return getPluginMeta().getVersion();
     }
 }
