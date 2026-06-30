@@ -56,23 +56,6 @@ public abstract class BlockContext {
     }
 
     /**
-     * @return the effective light level at the current block position
-     */
-    public abstract int lightLevel();
-
-    /**
-     * @return the effective incoming redstone power amount at the current block position
-     */
-    public abstract int powerLevel();
-
-    /**
-     * @return true if the block is receiving any redstone power
-     */
-    public boolean isPowered() {
-        return powerLevel() > 0;
-    }
-
-    /**
      * @return the player associated with the current interaction, if any
      */
     public abstract @Nullable Player player();

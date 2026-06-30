@@ -1,0 +1,5 @@
+{
+  "$schema": "./new.block.schema.json",
+  "name": "test",
+  "adapter": "dev.auto.test.MainGame"
+}

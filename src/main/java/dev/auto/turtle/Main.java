@@ -1,7 +1,8 @@
 package dev.auto.turtle;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import com.github.retrooper.packetevents.PacketEvents;
-import dev.auto.turtle.api.CustomBlockSystem;
 import dev.auto.turtle.commands.DebugCommands;
 import dev.auto.turtle.listeners.BlockBreakListeners;
 import dev.auto.turtle.listeners.GameListener;
@@ -12,6 +13,9 @@ import org.bukkit.plugin.java.JavaPlugin;
 public final class Main extends JavaPlugin {
     @Getter
     public static Main instance;
+    @Getter
+    private static final ObjectMapper jsonMapper = new ObjectMapper()
+            .enable(SerializationFeature.INDENT_OUTPUT);
 
     @Override
     public void onLoad() {

@@ -1,0 +1,267 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "title": "Turtle Custom Block Definition",
+  "description": "Minimal Turtle custom block schema. Blocks are primarily JSON-defined, use named blockstates, and rely on normal Minecraft texture .mcmeta files for animation. Advanced runtime behavior can be added through an optional adapter and root config object.",
+  "required": ["name", "states"],
+  "$defs": {
+    "assetId": {
+      "type": "string",
+      "pattern": "^[a-z0-9._-]+:[a-z0-9._./-]+$",
+      "description": "Namespaced asset id. Use this for textures or backing item ids.",
+      "examples": [
+        "minecraft:paper",
+        "demo:block/crusher_front",
+        "demo:block/machines/crusher_active"
+      ]
+    },
+    "stateKey": {
+      "type": "string",
+      "pattern": "^[a-z0-9._-]+$",
+      "description": "Identifier for a named Turtle blockstate.",
+      "examples": ["default", "active", "powered"]
+    },
+    "miniMessage": {
+      "type": "string",
+      "pattern": "^(?:[^<>]|</?[A-Za-z0-9_!?#:-]+(?:[:][A-Za-z0-9_.-]+)?(?:\\s+[^<>]*)?\\s*/?>)*$",
+      "description": "MiniMessage-formatted text."
+    },
+    "placementType": {
+      "type": "string",
+      "enum": ["none", "horizontal_facing", "axis"],
+      "default": "none",
+      "description": "Placement behavior. 'none' is stone-like, 'horizontal_facing' is chest-like, and 'axis' is log-like."
+    },
+    "faceTextures": {
+      "type": "object",
+      "description": "Per-face texture assignment. Use 'all' for one texture everywhere, 'side' for shared side faces, or explicit face keys. Any referenced texture may use a normal Minecraft .png.mcmeta file for animation.",
+      "properties": {
+        "all": {
+          "$ref": "#/$defs/assetId"
+        },
+        "side": {
+          "$ref": "#/$defs/assetId"
+        },
+        "front": {
+          "$ref": "#/$defs/assetId"
+        },
+        "top": {
+          "$ref": "#/$defs/assetId"
+        },
+        "bottom": {
+          "$ref": "#/$defs/assetId"
+        },
+        "north": {
+          "$ref": "#/$defs/assetId"
+        },
+        "south": {
+          "$ref": "#/$defs/assetId"
+        },
+        "east": {
+          "$ref": "#/$defs/assetId"
+        },
+        "west": {
+          "$ref": "#/$defs/assetId"
+        }
+      },
+      "additionalProperties": false,
+      "minProperties": 1,
+      "allOf": [
+        {
+          "if": {
+            "required": ["all"]
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                { "required": ["side"] },
+                { "required": ["front"] },
+                { "required": ["top"] },
+                { "required": ["bottom"] },
+                { "required": ["north"] },
+                { "required": ["south"] },
+                { "required": ["east"] },
+                { "required": ["west"] }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "required": ["side"]
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                { "required": ["north"] },
+                { "required": ["south"] },
+                { "required": ["east"] },
+                { "required": ["west"] }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "required": ["front"]
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                { "required": ["north"] },
+                { "required": ["south"] },
+                { "required": ["east"] },
+                { "required": ["west"] }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "itemDefinition": {
+      "type": "object",
+      "description": "Creative/menu item representation for this custom block.",
+      "properties": {
+        "material": {
+          "$ref": "#/$defs/assetId"
+        },
+        "name": {
+          "$ref": "#/$defs/miniMessage"
+        },
+        "lore": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/miniMessage"
+          }
+        },
+        "glint": {
+          "type": "boolean",
+          "default": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "stateDefinition": {
+      "type": "object",
+      "description": "A single Turtle blockstate. Switch between states in code or through your runtime logic, and let the referenced textures animate through normal Minecraft .mcmeta files.",
+      "properties": {
+        "textures": {
+          "$ref": "#/$defs/faceTextures"
+        },
+        "hardness": {
+          "type": "number",
+          "minimum": 0,
+          "default": 0.5
+        },
+        "washable": {
+          "type": "boolean",
+          "default": false
+        },
+        "breakable": {
+          "type": "boolean",
+          "default": true
+        }
+      },
+      "required": ["textures"],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "breakable": {
+                "const": false
+              }
+            },
+            "required": ["breakable"]
+          },
+          "then": {
+            "not": {
+              "required": ["hardness"]
+            }
+          }
+        }
+      ]
+    }
+  },
+  "properties": {
+    "name": {
+      "type": "string",
+      "pattern": "^[a-z0-9._-]+(?:/[a-z0-9._-]+)*$",
+      "description": "Unique block name within the owning plugin namespace. Supports virtual folders like 'machines/tier_1/crusher'. The namespace comes from CustomBlockSystem#getNamespace() on the registering plugin.",
+      "examples": ["oak_crate", "machines/tier_1/crusher"]
+    },
+    "adapter": {
+      "type": "string",
+      "pattern": "^[a-z_][a-z0-9_]*(\\.[a-z_][a-z0-9_]*)*\\.[A-Z][A-Za-z0-9_]*$",
+      "description": "Fully qualified Java class name for the optional block adapter."
+    },
+    "config": {
+      "type": "object",
+      "description": "Adapter-specific config map exposed through BlockAdapter#config().",
+      "additionalProperties": true
+    },
+    "item": {
+      "$ref": "#/$defs/itemDefinition"
+    },
+    "placement": {
+      "$ref": "#/$defs/placementType"
+    },
+    "states": {
+      "type": "object",
+      "description": "Named Turtle blockstates. 'default' is always required.",
+      "properties": {
+        "default": {
+          "$ref": "#/$defs/stateDefinition"
+        }
+      },
+      "patternProperties": {
+        "^[a-z0-9._-]+$": {
+          "$ref": "#/$defs/stateDefinition"
+        }
+      },
+      "required": ["default"],
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "examples": [
+    {
+      "name": "machines/crusher",
+      "adapter": "dev.auto.example.blocks.CrusherBlockAdapter",
+      "config": {
+        "processing_time_ticks": 80,
+        "requires_power": true,
+        "idle_sound": "machine_hum"
+      },
+      "item": {
+        "material": "minecraft:paper",
+        "name": "<gold><bold>Crusher</bold></gold>",
+        "lore": [
+          "<gray>A simple machine block.</gray>",
+          "<dark_gray>Animated through normal texture mcmeta files.</dark_gray>"
+        ]
+      },
+      "placement": "horizontal_facing",
+      "states": {
+        "default": {
+          "textures": {
+            "front": "demo:block/crusher_front",
+            "side": "demo:block/crusher_side",
+            "top": "demo:block/crusher_top",
+            "bottom": "demo:block/crusher_bottom"
+          },
+          "hardness": 2.0
+        },
+        "active": {
+          "textures": {
+            "front": "demo:block/crusher_front_active",
+            "side": "demo:block/crusher_side_active",
+            "top": "demo:block/crusher_top",
+            "bottom": "demo:block/crusher_bottom"
+          },
+          "hardness": 2.0
+        }
+      }
+    }
+  ]
+}

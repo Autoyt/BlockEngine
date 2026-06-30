@@ -24,18 +24,20 @@ public final class BlockDefinition {
 
     private @Nullable String namespace;
     private @NotNull String name;
-    private @NotNull String defaultStateId;
+    private final @NotNull Map<String, Object> config;
     private @NotNull ItemDefinition item;
     private @NotNull PlacementDefinition placement;
+    private @NotNull String defaultStateId;
     private final @NotNull Map<String, StateDefinition> states;
 
     public BlockDefinition(@NotNull String name) {
         this.name = Objects.requireNonNull(name, "name");
-        this.defaultStateId = "default";
+        this.config = new LinkedHashMap<>();
         this.item = new ItemDefinition();
         this.placement = new PlacementDefinition();
+        this.defaultStateId = "default";
         this.states = new LinkedHashMap<>();
-        this.states.put("default", new StateDefinition());
+        this.states.put(this.defaultStateId, new StateDefinition());
     }
 
     public @Nullable String namespace() {
@@ -63,12 +65,22 @@ public final class BlockDefinition {
         return namespace + ":" + name;
     }
 
-    public @NotNull String defaultStateId() {
-        return defaultStateId;
+    public @NotNull Map<String, Object> config() {
+        return config;
     }
 
-    public @NotNull BlockDefinition defaultStateId(@NotNull String defaultStateId) {
-        this.defaultStateId = Objects.requireNonNull(defaultStateId, "defaultStateId");
+    public @NotNull BlockDefinition config(@NotNull Map<String, Object> config) {
+        this.config.clear();
+        this.config.putAll(Objects.requireNonNull(config, "config"));
+        return this;
+    }
+
+    public @NotNull BlockDefinition putConfig(@NotNull String key, @Nullable Object value) {
+        if (value == null) {
+            this.config.remove(Objects.requireNonNull(key, "key"));
+            return this;
+        }
+        this.config.put(Objects.requireNonNull(key, "key"), value);
         return this;
     }
 
@@ -87,6 +99,15 @@ public final class BlockDefinition {
 
     public @NotNull BlockDefinition placement(@NotNull PlacementDefinition placement) {
         this.placement = Objects.requireNonNull(placement, "placement");
+        return this;
+    }
+
+    public @NotNull String defaultStateId() {
+        return defaultStateId;
+    }
+
+    public @NotNull BlockDefinition defaultStateId(@NotNull String defaultStateId) {
+        this.defaultStateId = Objects.requireNonNull(defaultStateId, "defaultStateId");
         return this;
     }
 
@@ -122,6 +143,9 @@ public final class BlockDefinition {
         }
         if (!states.containsKey(defaultStateId)) {
             throw new IllegalStateException("Default state '" + defaultStateId + "' is not defined.");
+        }
+        for (Map.Entry<String, StateDefinition> entry : states.entrySet()) {
+            entry.getValue().validate(entry.getKey());
         }
     }
 
@@ -198,13 +222,11 @@ public final class BlockDefinition {
 
     public static final class BlockPropertiesDefinition {
         private float hardness;
-        private int lightLevel;
         private boolean washable;
         private boolean breakable;
 
         public BlockPropertiesDefinition() {
             this.hardness = 0.5f;
-            this.lightLevel = 0;
             this.washable = false;
             this.breakable = true;
         }
@@ -215,15 +237,6 @@ public final class BlockDefinition {
 
         public @NotNull BlockPropertiesDefinition hardness(float hardness) {
             this.hardness = hardness;
-            return this;
-        }
-
-        public int lightLevel() {
-            return lightLevel;
-        }
-
-        public @NotNull BlockPropertiesDefinition lightLevel(int lightLevel) {
-            this.lightLevel = lightLevel;
             return this;
         }
 
@@ -246,14 +259,118 @@ public final class BlockDefinition {
         }
     }
 
+    public static final class FaceTexturesDefinition {
+        private @Nullable String all;
+        private @Nullable String side;
+        private @Nullable String front;
+        private @Nullable String top;
+        private @Nullable String bottom;
+        private @Nullable String north;
+        private @Nullable String south;
+        private @Nullable String east;
+        private @Nullable String west;
+
+        public @Nullable String all() {
+            return all;
+        }
+
+        public @NotNull FaceTexturesDefinition all(@Nullable String all) {
+            this.all = all;
+            return this;
+        }
+
+        public @Nullable String side() {
+            return side;
+        }
+
+        public @NotNull FaceTexturesDefinition side(@Nullable String side) {
+            this.side = side;
+            return this;
+        }
+
+        public @Nullable String front() {
+            return front;
+        }
+
+        public @NotNull FaceTexturesDefinition front(@Nullable String front) {
+            this.front = front;
+            return this;
+        }
+
+        public @Nullable String top() {
+            return top;
+        }
+
+        public @NotNull FaceTexturesDefinition top(@Nullable String top) {
+            this.top = top;
+            return this;
+        }
+
+        public @Nullable String bottom() {
+            return bottom;
+        }
+
+        public @NotNull FaceTexturesDefinition bottom(@Nullable String bottom) {
+            this.bottom = bottom;
+            return this;
+        }
+
+        public @Nullable String north() {
+            return north;
+        }
+
+        public @NotNull FaceTexturesDefinition north(@Nullable String north) {
+            this.north = north;
+            return this;
+        }
+
+        public @Nullable String south() {
+            return south;
+        }
+
+        public @NotNull FaceTexturesDefinition south(@Nullable String south) {
+            this.south = south;
+            return this;
+        }
+
+        public @Nullable String east() {
+            return east;
+        }
+
+        public @NotNull FaceTexturesDefinition east(@Nullable String east) {
+            this.east = east;
+            return this;
+        }
+
+        public @Nullable String west() {
+            return west;
+        }
+
+        public @NotNull FaceTexturesDefinition west(@Nullable String west) {
+            this.west = west;
+            return this;
+        }
+
+        public boolean isEmpty() {
+            return all == null
+                    && side == null
+                    && front == null
+                    && top == null
+                    && bottom == null
+                    && north == null
+                    && south == null
+                    && east == null
+                    && west == null;
+        }
+    }
+
     public static final class StateDefinition {
         private @NotNull BlockPropertiesDefinition properties;
-        private @Nullable String textureState;
-        private @Nullable String soundState;
-        private @Nullable String animationState;
+        private @NotNull FaceTexturesDefinition textures;
 
         public StateDefinition() {
             this.properties = new BlockPropertiesDefinition();
+            this.textures = new FaceTexturesDefinition();
         }
 
         public @NotNull BlockPropertiesDefinition properties() {
@@ -265,31 +382,19 @@ public final class BlockDefinition {
             return this;
         }
 
-        public @Nullable String textureState() {
-            return textureState;
+        public @NotNull FaceTexturesDefinition textures() {
+            return textures;
         }
 
-        public @NotNull StateDefinition textureState(@Nullable String textureState) {
-            this.textureState = textureState;
+        public @NotNull StateDefinition textures(@NotNull FaceTexturesDefinition textures) {
+            this.textures = Objects.requireNonNull(textures, "textures");
             return this;
         }
 
-        public @Nullable String soundState() {
-            return soundState;
-        }
-
-        public @NotNull StateDefinition soundState(@Nullable String soundState) {
-            this.soundState = soundState;
-            return this;
-        }
-
-        public @Nullable String animationState() {
-            return animationState;
-        }
-
-        public @NotNull StateDefinition animationState(@Nullable String animationState) {
-            this.animationState = animationState;
-            return this;
+        private void validate(@NotNull String stateId) {
+            if (textures.isEmpty()) {
+                throw new IllegalStateException("Block state '" + stateId + "' must define at least one texture.");
+            }
         }
     }
 }

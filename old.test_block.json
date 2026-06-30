@@ -1,0 +1,47 @@
+{
+  "$schema": "https://raw.githubusercontent.com/Autoyt/TurtleBlocks/blob/master/block.schema.json",
+  "name": "machines/text_block",
+  "adapter": "dev.auto.example.blocks.TextBlockAdapter",
+  "config": {
+    "toggle_on_interact": true,
+    "activation_ticks": 40,
+    "messages": {
+      "active": "Machine online",
+      "idle": "Machine idle"
+    }
+  },
+  "item": {
+    "material": "minecraft:paper",
+    "name": "<gold><bold>Text Block</bold></gold>",
+    "lore": [
+      "<gray>A showcase block definition built with the simplified Turtle schema.</gray>",
+      "<dark_gray>Animated textures use normal Minecraft mcmeta files.</dark_gray>"
+    ],
+    "glint": false
+  },
+  "placement": "horizontal_facing",
+  "states": {
+    "default": {
+      "textures": {
+        "front": "demo:block/text_block_front",
+        "side": "demo:block/text_block_side",
+        "top": "demo:block/text_block_top",
+        "bottom": "demo:block/text_block_bottom"
+      },
+      "hardness": 2.5,
+      "washable": false,
+      "breakable": true
+    },
+    "active": {
+      "textures": {
+        "front": "demo:block/text_block_front_active",
+        "side": "demo:block/text_block_side_active",
+        "top": "demo:block/text_block_top",
+        "bottom": "demo:block/text_block_bottom"
+      },
+      "hardness": 2.5,
+      "washable": false,
+      "breakable": true
+    }
+  }
+}

@@ -17,6 +17,7 @@ repositories {
 
 dependencies {
     compileOnly("io.papermc.paper:paper-api:26.2.build.+")
+    implementation("com.fasterxml.jackson.core:jackson-databind:2.19.2")
     implementation("com.github.retrooper:packetevents-spigot:2.13.0")
     implementation(project(":turtle-api"))
     compileOnly("org.projectlombok:lombok:1.18.38")
