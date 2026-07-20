@@ -5,10 +5,10 @@ import dev.auto.turtle.api.blocks.BlockAdapter;
 import dev.auto.turtle.api.util.DataComb;
 import dev.auto.turtle.types.BlockDefinition;
 import dev.auto.turtle.types.BlockName;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Objects;
 import java.util.regex.Pattern;
 
 public class BlockRegistry {
@@ -46,42 +46,43 @@ public class BlockRegistry {
         return blocks.get(name);
     }
 
-    public static BlockDefinition registerBlock(BlockAdapter adapter, String namespace, JsonNode dataDefinition) {
+    public static BlockDefinition registerBlock(@NotNull BlockAdapter adapter, @NotNull String namespace, @NotNull JsonNode dataDefinition) {
         if (!NAMESPACE_PATTERN.matcher(namespace).matches()) {
             throw new IllegalArgumentException("Invalid namespace: " + namespace);
         }
 
-        Objects.requireNonNull(adapter, "adapter");
-        Objects.requireNonNull(dataDefinition, "dataDefinition");
-
-        JsonNode jsonNameNode = dataDefinition.get("name");
-        String jsonName = null;
-        if (jsonNameNode != null && !jsonNameNode.isNull()) {
-            if (!jsonNameNode.isTextual()) {
-                throw new IllegalArgumentException("Field 'name' must be a string.");
-            }
-            jsonName = jsonNameNode.asText().trim();
-            if (jsonName.isEmpty()) {
-                jsonName = null;
-            }
-        }
-
-        String adapterName = adapter.name();
-        if (adapterName != null) {
-            adapterName = adapterName.trim();
-            if (adapterName.isEmpty()) {
-                adapterName = null;
-            }
-        }
-
-        DataComb jsonState = new DataComb()
+        DataComb dataState = new DataComb()
                 .setProperty("namespace", namespace)
-                .setProperty("name", jsonName);
+                .setProperty("name", dataDefinition.get("name").asText());
 
         DataComb adapterState = new DataComb()
                 .setProperty("namespace", namespace)
-                .setProperty("name", adapterName);
+                .setProperty("name", adapter.name());
 
-        // Finish tomorrow
+        DataComb endState = new DataComb(dataState.values());
+        endState.mergeFrom(adapterState, Map.of(
+                "namespace", DataComb.MergeMode.REPLACE,
+                "name", DataComb.MergeMode.REPLACE
+        ));
+
+        Object endNamespaceValue = endState.getProperty("namespace");
+        if (!(endNamespaceValue instanceof String endNamespace) || endNamespace.isBlank()) {
+            throw new IllegalArgumentException("Missing required string property 'namespace'.");
+        }
+        if (!NAMESPACE_PATTERN.matcher(endNamespace).matches()) {
+            throw new IllegalArgumentException("Invalid namespace: " + endNamespace);
+        }
+
+        Object endNameValue = endState.getProperty("name");
+        if (!(endNameValue instanceof String endName) || endName.isBlank()) {
+            throw new IllegalArgumentException("Missing required string property 'name'.");
+        }
+        if (!BLOCK_ID_PATTERN.matcher("x:" + endName).matches()) {
+            throw new IllegalArgumentException("Invalid block name: " + endName);
+        }
+
+        BlockDefinition definition = new BlockDefinition(new BlockName(endName, endNamespace), adapter);
+        blocks.put(definition.name(), definition);
+        return definition;
     }
 }
