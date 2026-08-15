@@ -1,20 +1,85 @@
 package dev.auto.turtle.api.blocks;
 
+import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.nio.file.Path;
-import java.util.Map;
-import java.util.Objects;
-
 /**
- * Optional hook surface for advanced Turtle blocks.
+ * Code-first definition and behavior surface for a Turtle custom block.
  *
- * <p>Most blocks can be defined entirely in JSON. Adapters are only needed when
- * a block wants custom runtime behavior or wants to consume extra config
- * values from the block definition.</p>
+ * <p>Turtle owns the outer world/chunk format. Adapters own their static block
+ * definition, runtime behavior, and optional private payload.</p>
  */
-public abstract class BlockAdapter {
-    public abstract String name();
-    public abstract @NotNull String jsonDefinitionPath();
+public interface BlockAdapter {
+    /**
+     * Local block name inside the owning plugin namespace.
+     *
+     * <p>The full id is built by Turtle as {@code namespace:name()}.</p>
+     */
+    @NotNull String name();
+
+    /**
+     * Defines static server-side block details such as hardness, states,
+     * textures, sounds, and placement.
+     */
+    void define(@NotNull BlockDefinition.Builder builder);
+
+    /**
+     * Creates the first mutable data object for a newly placed block.
+     */
+    @NotNull BlockData createDefaultData(@NotNull BlockCreateContext context);
+
+    default void onPlace(@NotNull BlockContext context) {
+    }
+
+    /**
+     * Return false to cancel breaking.
+     */
+    default boolean onBreak(@NotNull BlockContext context) {
+        return true;
+    }
+
+    /**
+     * Return true when the adapter handled the interaction.
+     */
+    default boolean onInteract(@NotNull BlockContext context, @NotNull Player player) {
+        return false;
+    }
+
+    default boolean ticking() {
+        return false;
+    }
+
+    default void onTick(@NotNull BlockContext context) {
+    }
+
+    /**
+     * Serializes only adapter-private placed-block payload.
+     *
+     * <p>Turtle still serializes position, block id, state id, and public
+     * {@link BlockData} maps.</p>
+     */
+    default byte @NotNull [] save(@NotNull BlockData data) {
+        return new byte[0];
+    }
+
+    /**
+     * Restores adapter-private payload into Turtle-owned block data.
+     */
+    default void load(@NotNull BlockData data, byte @NotNull [] payload) {
+    }
+
+    /**
+     * Called if payload data cannot be read safely.
+     *
+     * @return true to keep the block with fallback/default data, false to mark
+     * the placed block unloadable.
+     */
+    default boolean recoverPayload(
+            @NotNull BlockData data,
+            byte @NotNull [] payload,
+            @Nullable Throwable error
+    ) {
+        return true;
+    }
 }

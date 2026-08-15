@@ -11,7 +11,9 @@ import org.bukkit.scheduler.BukkitTask;
 
 import java.util.*;
 
-public class ItemEntityManager {
+public class TurtleBlockOrchestrator {
+    private static final float CUT_OFF_SPEED = 0.25f;
+
     private static boolean isEnabled = false;
     private static final int STARTING_ENTITY_ID = 2_000_000;
     private static final Set<Integer> reservedIds = new HashSet<>();
@@ -90,6 +92,9 @@ public class ItemEntityManager {
     }
 
     public static void updateVisibility(Player player) {
+        double speed = player.getVelocity().length();
+        if (speed > CUT_OFF_SPEED) return;
+
         for (VirtualItemDisplay display : worldEntities.values()) {
             display.spawn(player);
         }

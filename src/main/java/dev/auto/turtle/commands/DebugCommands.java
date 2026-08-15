@@ -1,7 +1,7 @@
 package dev.auto.turtle.commands;
 
 import dev.auto.turtle.Main;
-import dev.auto.turtle.entity.ItemEntityManager;
+import dev.auto.turtle.entity.TurtleBlockOrchestrator;
 import dev.auto.turtle.types.BlockLocationKey;
 import io.papermc.paper.command.brigadier.BasicCommand;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
@@ -120,7 +120,7 @@ public final class DebugCommands implements BasicCommand {
                 targetBlock.getZ()
         );
 
-        ItemEntityManager.addEntity(key, material);
+        TurtleBlockOrchestrator.addEntity(key, material);
         sender.sendMessage("Spawned a debug item display at " +
                 targetBlock.getX() + ", " +
                 targetBlock.getY() + ", " +

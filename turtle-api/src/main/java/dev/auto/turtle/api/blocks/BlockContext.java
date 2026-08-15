@@ -28,10 +28,6 @@ public abstract class BlockContext {
         return adapter;
     }
 
-    public final @NotNull BlockDefinition definition() {
-        return adapter.definition();
-    }
-
     public final @NotNull BlockData data() {
         return data;
     }

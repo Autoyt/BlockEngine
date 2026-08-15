@@ -1,8 +1,6 @@
 package dev.auto.turtle.registry;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import dev.auto.turtle.api.blocks.BlockAdapter;
-import dev.auto.turtle.api.util.DataComb;
 import dev.auto.turtle.types.BlockDefinition;
 import dev.auto.turtle.types.BlockName;
 import org.jetbrains.annotations.NotNull;
@@ -46,43 +44,21 @@ public class BlockRegistry {
         return blocks.get(name);
     }
 
-    public static BlockDefinition registerBlock(@NotNull BlockAdapter adapter, @NotNull String namespace, @NotNull JsonNode dataDefinition) {
+    public static BlockDefinition registerBlock(@NotNull BlockAdapter adapter, @NotNull String namespace) {
         if (!NAMESPACE_PATTERN.matcher(namespace).matches()) {
             throw new IllegalArgumentException("Invalid namespace: " + namespace);
         }
 
-        DataComb dataState = new DataComb()
-                .setProperty("namespace", namespace)
-                .setProperty("name", dataDefinition.get("name").asText());
+        dev.auto.turtle.api.blocks.BlockDefinition.Builder builder =
+                dev.auto.turtle.api.blocks.BlockDefinition.builder(adapter.name());
+        adapter.define(builder);
+        dev.auto.turtle.api.blocks.BlockDefinition apiDefinition = builder.build();
+        apiDefinition.namespace(namespace);
+        apiDefinition.validate();
 
-        DataComb adapterState = new DataComb()
-                .setProperty("namespace", namespace)
-                .setProperty("name", adapter.name());
-
-        DataComb endState = new DataComb(dataState.values());
-        endState.mergeFrom(adapterState, Map.of(
-                "namespace", DataComb.MergeMode.REPLACE,
-                "name", DataComb.MergeMode.REPLACE
-        ));
-
-        Object endNamespaceValue = endState.getProperty("namespace");
-        if (!(endNamespaceValue instanceof String endNamespace) || endNamespace.isBlank()) {
-            throw new IllegalArgumentException("Missing required string property 'namespace'.");
-        }
-        if (!NAMESPACE_PATTERN.matcher(endNamespace).matches()) {
-            throw new IllegalArgumentException("Invalid namespace: " + endNamespace);
-        }
-
-        Object endNameValue = endState.getProperty("name");
-        if (!(endNameValue instanceof String endName) || endName.isBlank()) {
-            throw new IllegalArgumentException("Missing required string property 'name'.");
-        }
-        if (!BLOCK_ID_PATTERN.matcher("x:" + endName).matches()) {
-            throw new IllegalArgumentException("Invalid block name: " + endName);
-        }
-
-        BlockDefinition definition = new BlockDefinition(new BlockName(endName, endNamespace), adapter);
+        BlockDefinition definition = new BlockDefinition(new BlockName(apiDefinition.name(), namespace), adapter);
         blocks.put(definition.name(), definition);
         return definition;
     }
+
 }

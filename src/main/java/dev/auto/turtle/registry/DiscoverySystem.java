@@ -1,13 +1,11 @@
 package dev.auto.turtle.registry;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import dev.auto.turtle.Main;
 import dev.auto.turtle.api.CustomBlockSystem;
 import dev.auto.turtle.api.blocks.BlockAdapter;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.Plugin;
 
-import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -52,20 +50,9 @@ public final class DiscoverySystem {
                         "Discovered block adapter " + adapter.getClass().getName() + " from plugin " + plugin.getName()
                 );
 
-                // Registers the block
-                try (InputStream jsonAdapterDefinition = plugin.getResource(adapter.jsonDefinitionPath())) {
-                    if (jsonAdapterDefinition == null) {
-                        throw new IllegalStateException(
-                                "Missing block definition resource '" + adapter.jsonDefinitionPath() + "' in plugin " + plugin.getName()
-                        );
-                    }
-
-                    JsonNode root = Main.getJsonMapper().readTree(jsonAdapterDefinition);
-
-                    BlockRegistry.registerBlock(adapter, namespace, root);
-                }
-
-                catch (Exception e) {
+                try {
+                    BlockRegistry.registerBlock(adapter, namespace);
+                } catch (Exception e) {
                     Main.getInstance().getLogger().severe("Failed to register block adapter " + adapter.getClass().getName() + " from plugin " + plugin.getName());
                     e.printStackTrace();
                 }

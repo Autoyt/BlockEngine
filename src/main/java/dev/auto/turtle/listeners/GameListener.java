@@ -1,8 +1,7 @@
 package dev.auto.turtle.listeners;
 
 import dev.auto.turtle.Main;
-import dev.auto.turtle.entity.ItemEntityManager;
-import io.papermc.paper.event.player.PlayerCustomClickEvent;
+import dev.auto.turtle.entity.TurtleBlockOrchestrator;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -21,6 +20,6 @@ public class GameListener implements Listener {
         final Player player = event.getPlayer();
         final UUID id = player.getUniqueId();
 
-        ItemEntityManager.updateVisibility(player);
+        TurtleBlockOrchestrator.updateVisibility(player);
     }
 }
