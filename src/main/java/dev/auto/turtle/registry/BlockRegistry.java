@@ -56,7 +56,7 @@ public class BlockRegistry {
         apiDefinition.namespace(namespace);
         apiDefinition.validate();
 
-        BlockDefinition definition = new BlockDefinition(new BlockName(apiDefinition.name(), namespace), adapter);
+        BlockDefinition definition = new BlockDefinition(new BlockName(apiDefinition.name(), namespace), adapter, apiDefinition);
         blocks.put(definition.name(), definition);
         return definition;
     }

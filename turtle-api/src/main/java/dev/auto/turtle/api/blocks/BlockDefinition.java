@@ -1,5 +1,6 @@
 package dev.auto.turtle.api.blocks;
 
+import org.bukkit.Material;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -19,17 +20,20 @@ public final class BlockDefinition {
 
     private @Nullable String namespace;
     private final @NotNull String name;
+    private final @NotNull Material defaultBlock;
     private final @NotNull Placement placement;
     private final @NotNull String defaultState;
     private final @NotNull Map<String, State> states;
 
     private BlockDefinition(
             @NotNull String name,
+            @NotNull Material defaultBlock,
             @NotNull Placement placement,
             @NotNull String defaultState,
             @NotNull Map<String, State> states
     ) {
         this.name = Objects.requireNonNull(name, "name");
+        this.defaultBlock = Objects.requireNonNull(defaultBlock, "defaultBlock");
         this.placement = Objects.requireNonNull(placement, "placement");
         this.defaultState = Objects.requireNonNull(defaultState, "defaultState");
         this.states = Collections.unmodifiableMap(new LinkedHashMap<>(states));
@@ -57,6 +61,10 @@ public final class BlockDefinition {
             throw new IllegalStateException("BlockDefinition namespace has not been attached yet.");
         }
         return namespace + ":" + name;
+    }
+
+    public @NotNull Material defaultBlock() {
+        return defaultBlock;
     }
 
     public @NotNull Placement placement() {
@@ -164,12 +172,22 @@ public final class BlockDefinition {
 
     public static final class Builder {
         private final @NotNull String name;
+        private @NotNull Material defaultBlock = Material.STONE;
         private @NotNull Placement placement = Placement.NONE;
         private @NotNull String defaultState = "default";
         private final @NotNull Map<String, State> states = new LinkedHashMap<>();
 
         private Builder(@NotNull String name) {
             this.name = Objects.requireNonNull(name, "name");
+        }
+
+        public @NotNull Builder setDefaultBlock(@NotNull Material defaultBlock) {
+            Objects.requireNonNull(defaultBlock, "defaultBlock");
+            if (!defaultBlock.isBlock()) {
+                throw new IllegalArgumentException("Default block fallback must be a block material: " + defaultBlock);
+            }
+            this.defaultBlock = defaultBlock;
+            return this;
         }
 
         public @NotNull Builder placement(@NotNull Placement placement) {
@@ -196,7 +214,7 @@ public final class BlockDefinition {
             if (states.isEmpty()) {
                 state(defaultState, state -> state.textures(textures -> textures.all("missing")));
             }
-            return new BlockDefinition(name, placement, defaultState, states);
+            return new BlockDefinition(name, defaultBlock, placement, defaultState, states);
         }
     }
 
