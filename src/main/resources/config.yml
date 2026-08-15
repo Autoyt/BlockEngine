@@ -1,0 +1,13 @@
+visibility:
+  enabled: true
+  chunks:
+    radius: 5
+    clamp-to-server-view-distance: true
+    loaded-chunks-only: true
+  entities:
+    recycle: true
+  exposure:
+    enabled: true
+    treat-liquid-as-exposed: true
+    treat-passable-as-exposed: true
+    treat-non-solid-as-exposed: true
