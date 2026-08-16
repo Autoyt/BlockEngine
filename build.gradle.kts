@@ -37,7 +37,6 @@ val pluginsDir = serverDir.dir("plugins")
 tasks {
     build {
         dependsOn(shadowJarTask)
-        finalizedBy("deployToLocalServer")
     }
 
     runServer {

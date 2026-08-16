@@ -50,6 +50,20 @@ public final class TurtleChunkRuntime {
         return chunks.get(key);
     }
 
+    public static @Nullable RuntimeBlockView getBlock(@NotNull BlockLocationKey location) {
+        LoadedTurtleChunk chunk = chunks.get(new ChunkKey(location.worldId(), location.x() >> 4, location.z() >> 4));
+        if (chunk == null) {
+            return null;
+        }
+
+        for (RuntimeBlockView block : chunk.blocks()) {
+            if (block.location().equals(location)) {
+                return block;
+            }
+        }
+        return null;
+    }
+
     public static @NotNull Collection<LoadedTurtleChunk> chunks() {
         return Collections.unmodifiableCollection(chunks.values());
     }

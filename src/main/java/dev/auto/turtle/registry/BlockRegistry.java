@@ -6,6 +6,8 @@ import dev.auto.turtle.types.BlockName;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.HashMap;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.Map;
 import java.util.regex.Pattern;
 
@@ -14,6 +16,10 @@ public class BlockRegistry {
     private static final Pattern BLOCK_ID_PATTERN = Pattern.compile("^[a-z0-9._-]+:[a-z0-9._-]+(?:/[a-z0-9._-]+)*$");
 
     private static final Map<BlockName, BlockDefinition> blocks = new HashMap<>();
+
+    public static void clear() {
+        blocks.clear();
+    }
 
     public static BlockDefinition getBlock(String namespace, String name) {
         if (namespace == null || name == null) {
@@ -42,6 +48,10 @@ public class BlockRegistry {
             return null;
         }
         return blocks.get(name);
+    }
+
+    public static Collection<BlockDefinition> getBlocks() {
+        return Collections.unmodifiableCollection(blocks.values());
     }
 
     public static BlockDefinition registerBlock(@NotNull BlockAdapter adapter, @NotNull String namespace) {

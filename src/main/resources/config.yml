@@ -11,3 +11,17 @@ visibility:
     treat-liquid-as-exposed: true
     treat-passable-as-exposed: true
     treat-non-solid-as-exposed: true
+
+resource-pack:
+  enabled: true
+  generate-on-startup: true
+  hosting:
+    enabled: true
+    host: "0.0.0.0"
+    port: 8123
+    public-url: ""
+    file-name: "turtle-resource-pack.zip"
+  send:
+    on-join: true
+    required: false
+    prompt: "This server uses Turtle custom block resources."

@@ -5,7 +5,7 @@ version: '${version}'
 main: dev.auto.turtle.Main
 bootstrapper: dev.auto.turtle.MainBootstrap
 loader: dev.auto.turtle.MainLoader
-api-version: '26.2'
+api-version: '26.1'
 load: STARTUP
 
 authors: [ AutoYT ]

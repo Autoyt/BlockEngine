@@ -1,7 +1,12 @@
 package dev.auto.turtle.commands;
 
 import dev.auto.turtle.Main;
+import dev.auto.turtle.defaultadapters.DebugBlocks;
 import dev.auto.turtle.entity.TurtleBlockOrchestrator;
+import dev.auto.turtle.items.TurtleItemManager;
+import dev.auto.turtle.registry.BlockRegistry;
+import dev.auto.turtle.resourcepack.ResourcePackManager;
+import dev.auto.turtle.types.BlockDefinition;
 import dev.auto.turtle.types.BlockLocationKey;
 import io.papermc.paper.command.brigadier.BasicCommand;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
@@ -18,7 +23,9 @@ import java.util.Locale;
 
 public final class DebugCommands implements BasicCommand {
     private static final List<String> ROOT_SUBCOMMANDS = List.of(
-            "spawn"
+            "spawn",
+            "redblock",
+            "pack"
     );
     private static final List<String> EXAMPLE_ALIASES = List.of(
             "spawn"
@@ -49,6 +56,8 @@ public final class DebugCommands implements BasicCommand {
 
         switch (sub) {
             case "spawn" -> spawnDebugEntity(sender, args);
+            case "redblock" -> redBlock(sender);
+            case "pack" -> pack(sender, args);
             default -> sender.sendMessage("Unknown subcommand. Try: " + String.join(", ", ROOT_SUBCOMMANDS));
         }
     }
@@ -82,6 +91,11 @@ public final class DebugCommands implements BasicCommand {
                     .filter(Material::isItem)
                     .map(material -> material.name().toLowerCase(Locale.ROOT))
                     .filter(name -> name.startsWith(materialPrefix))
+                    .toList();
+        }
+        if (first.equals("pack") && args.length == 2) {
+            return List.of("reload").stream()
+                    .filter(option -> option.startsWith(args[1].toLowerCase(Locale.ROOT)))
                     .toList();
         }
 
@@ -125,5 +139,37 @@ public final class DebugCommands implements BasicCommand {
                 targetBlock.getX() + ", " +
                 targetBlock.getY() + ", " +
                 targetBlock.getZ() + " using " + material.name().toLowerCase(Locale.ROOT) + ".");
+    }
+
+    private static void redBlock(org.bukkit.command.CommandSender sender) {
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage("Only players can use this subcommand.");
+            return;
+        }
+
+        BlockDefinition block = BlockRegistry.getBlock(DebugBlocks.RED_BLOCK_ID);
+        if (block == null) {
+            sender.sendMessage("Debug red block is not registered.");
+            return;
+        }
+
+        player.getInventory().addItem(TurtleItemManager.create(block));
+        sender.sendMessage("Gave you turtle_test:red_block.");
+    }
+
+    private static void pack(org.bukkit.command.CommandSender sender, String[] args) {
+        if (args.length >= 2 && args[1].equalsIgnoreCase("reload")) {
+            ResourcePackManager.reload();
+            sender.sendMessage("Regenerated and reloaded Turtle resource pack.");
+            return;
+        }
+
+        if (sender instanceof Player player) {
+            ResourcePackManager.send(player);
+            sender.sendMessage("Sent Turtle resource pack.");
+            return;
+        }
+
+        sender.sendMessage("Use /turtledebug pack reload from console, or run /turtledebug pack as a player.");
     }
 }

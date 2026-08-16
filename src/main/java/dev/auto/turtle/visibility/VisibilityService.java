@@ -3,6 +3,7 @@ package dev.auto.turtle.visibility;
 import dev.auto.turtle.Main;
 import dev.auto.turtle.entity.TurtleBlockOrchestrator;
 import dev.auto.turtle.entity.VirtualItemDisplay;
+import dev.auto.turtle.items.TurtleDisplayItemManager;
 import dev.auto.turtle.runtime.LoadedTurtleChunk;
 import dev.auto.turtle.runtime.RuntimeBlockView;
 import dev.auto.turtle.runtime.TurtleChunkRuntime;
@@ -11,15 +12,12 @@ import dev.auto.turtle.types.ChunkKey;
 import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
 import org.bukkit.Location;
-import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.event.player.PlayerMoveEvent;
-import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
@@ -76,6 +74,17 @@ public final class VisibilityService {
         for (Player player : Bukkit.getOnlinePlayers()) {
             if (isChunkInPlayerRadius(player, chunkKey)) {
                 forceRecalculate(player);
+            }
+        }
+    }
+
+    public static void refreshPlayersNear(@NotNull Iterable<ChunkKey> chunkKeys) {
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            for (ChunkKey chunkKey : chunkKeys) {
+                if (isChunkInPlayerRadius(player, chunkKey)) {
+                    forceRecalculate(player);
+                    break;
+                }
             }
         }
     }
@@ -185,9 +194,11 @@ public final class VisibilityService {
             iterator.remove();
         }
 
-        Set<BlockLocationKey> active = new HashSet<>(state.active().keySet());
         for (RuntimeBlockView block : desired.values()) {
-            if (active.contains(block.location())) {
+            VirtualItemDisplay activeDisplay = state.active().get(block.location());
+            if (activeDisplay != null) {
+                configure(activeDisplay, player.getWorld(), block);
+                activeDisplay.updateMetadata(player);
                 continue;
             }
 
@@ -216,9 +227,8 @@ public final class VisibilityService {
 
     private static void configure(@NotNull VirtualItemDisplay display, @NotNull World world, @NotNull RuntimeBlockView block) {
         BlockLocationKey location = block.location();
-        Material material = block.displayMaterial();
         display.location(new Location(world, location.x() + 0.5, location.y() + 0.5, location.z() + 0.5, 0.0f, 0.0f))
-                .itemStack(new ItemStack(material))
+                .itemStack(TurtleDisplayItemManager.create(block))
                 .displayContext(VirtualItemDisplay.DISPLAY_CONTEXT_FIXED);
     }
 

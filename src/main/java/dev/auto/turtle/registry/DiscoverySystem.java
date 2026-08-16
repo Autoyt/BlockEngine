@@ -19,6 +19,8 @@ public final class DiscoverySystem {
         int registeredPlugins = 0;
         int registeredBlocks = 0;
         List<BlockAdapter> discoveredAdapters = new ArrayList<>();
+        NamespaceRegistry.clear();
+        BlockRegistry.clear();
 
         for (Plugin plugin : Bukkit.getPluginManager().getPlugins()) {
             if (!plugin.isEnabled()) {
@@ -34,6 +36,7 @@ public final class DiscoverySystem {
             registeredPlugins++;
 
             String namespace = system.getNamespace();
+            NamespaceRegistry.load(namespace);
 
             List<BlockAdapter> adapters = system.registerAdapters();
             if (adapters == null || adapters.isEmpty()) {

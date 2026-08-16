@@ -24,7 +24,8 @@ import java.util.Map;
 import java.util.Objects;
 
 public final class TurtleChunkData {
-    public static final int VERSION = 2;
+    public static final int VERSION = 4;
+    private static final int MIN_VERSION = 2;
     public static final PersistentDataType<byte[], TurtleChunkData> TYPE = new TurtleChunkDataType();
 
     private final @NotNull Map<Integer, StoredBlock> blocks = new LinkedHashMap<>();
@@ -119,6 +120,9 @@ public final class TurtleChunkData {
             float hardness,
             float miningSpeed,
             boolean washable,
+            boolean unbreakable,
+            boolean dropsItem,
+            boolean dropInCreative,
             @NotNull SimpleBlockData data,
             byte @NotNull [] payload
     ) {
@@ -163,6 +167,9 @@ public final class TurtleChunkData {
                     state.hardness(),
                     state.miningSpeed(),
                     state.washable(),
+                    state.unbreakable(),
+                    state.dropsItem(),
+                    state.dropInCreative(),
                     data,
                     payload
             );
@@ -286,14 +293,14 @@ public final class TurtleChunkData {
             try {
                 DataInputStream in = new DataInputStream(new ByteArrayInputStream(primitive));
                 int version = in.readInt();
-                if (version != VERSION) {
+                if (version < MIN_VERSION || version > VERSION) {
                     throw new IllegalStateException("Unsupported Turtle chunk data version: " + version);
                 }
 
                 TurtleChunkData data = new TurtleChunkData();
                 int blockCount = in.readInt();
                 for (int i = 0; i < blockCount; i++) {
-                    StoredBlock block = readBlock(in);
+                    StoredBlock block = readBlock(in, version);
                     data.setBlock(block);
                 }
                 return data;
@@ -310,6 +317,9 @@ public final class TurtleChunkData {
             out.writeFloat(block.hardness());
             out.writeFloat(block.miningSpeed());
             out.writeBoolean(block.washable());
+            out.writeBoolean(block.unbreakable());
+            out.writeBoolean(block.dropsItem());
+            out.writeBoolean(block.dropInCreative());
             writeBlockData(out, block.data());
 
             byte[] payload = block.payload();
@@ -317,7 +327,7 @@ public final class TurtleChunkData {
             out.write(payload);
         }
 
-        private static @NotNull StoredBlock readBlock(@NotNull DataInputStream in) throws IOException {
+        private static @NotNull StoredBlock readBlock(@NotNull DataInputStream in, int version) throws IOException {
             int localX = in.readUnsignedByte();
             int y = in.readInt();
             int localZ = in.readUnsignedByte();
@@ -325,10 +335,13 @@ public final class TurtleChunkData {
             float hardness = in.readFloat();
             float miningSpeed = in.readFloat();
             boolean washable = in.readBoolean();
+            boolean unbreakable = version >= 3 && in.readBoolean();
+            boolean dropsItem = version < 3 || in.readBoolean();
+            boolean dropInCreative = version >= 4 && in.readBoolean();
             SimpleBlockData data = readBlockData(in);
             byte[] payload = in.readNBytes(in.readInt());
 
-            return new StoredBlock(localX, y, localZ, fallbackBlock, hardness, miningSpeed, washable, data, payload);
+            return new StoredBlock(localX, y, localZ, fallbackBlock, hardness, miningSpeed, washable, unbreakable, dropsItem, dropInCreative, data, payload);
         }
 
         private static @NotNull Material readMaterial(@NotNull String name) {
