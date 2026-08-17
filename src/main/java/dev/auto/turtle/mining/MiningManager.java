@@ -49,13 +49,9 @@ public final class MiningManager {
             return;
         }
 
-        float vanillaSpeed = MiningSpeedResolver.resolve(player, block);
-        float customSpeed = Math.max(0.05f, customBlock.storedBlock().miningSpeed());
-        float hardness = Math.max(0.05f, customBlock.storedBlock().hardness());
-        int totalTicks = Math.max(1, Math.round((hardness * 30.0f) / (vanillaSpeed * customSpeed)));
         int animationId = animationId(player, block);
 
-        MiningSession session = new MiningSession(player.getUniqueId(), block, animationId, totalTicks);
+        MiningSession session = new MiningSession(player.getUniqueId(), block, animationId);
         sendStage(session, (byte) session.stage());
         BukkitTask task = Main.getInstance().getServer().getScheduler().runTaskTimer(
                 Main.getInstance(),
@@ -150,7 +146,8 @@ public final class MiningManager {
         }
 
         int elapsed = session.tickAndGet();
-        byte stage = stage(elapsed, session.totalTicks());
+        float progress = session.addProgress(MiningSpeedResolver.progressPerTick(player, customBlock));
+        byte stage = stage(progress);
         if (session.stage(stage)) {
             sendStage(session, stage);
         }
@@ -159,10 +156,10 @@ public final class MiningManager {
             playMiningSound(player, customBlock);
         }
 
-        if (elapsed >= session.totalTicks()) {
+        if (progress >= 1.0f) {
             sessions.remove(player.getUniqueId());
             clear(session);
-            finish(player, session.block(), customBlock, true);
+            finish(player, session.block(), customBlock, MiningSpeedResolver.shouldDrop(player, customBlock));
         }
     }
 
@@ -294,12 +291,11 @@ public final class MiningManager {
         );
     }
 
-    private static byte stage(int elapsedTicks, int totalTicks) {
-        if (totalTicks <= 1) {
+    private static byte stage(float progress) {
+        if (progress >= 1.0f) {
             return 9;
         }
-        double step = totalTicks / 10.0;
-        return (byte) Math.clamp((int) Math.floor(elapsedTicks / step), 0, 9);
+        return (byte) Math.clamp((int) Math.floor(progress * 10.0f), 0, 9);
     }
 
     private static boolean sameBlock(Block current, @NotNull Block expected) {
@@ -321,17 +317,16 @@ public final class MiningManager {
         private final @NotNull UUID playerId;
         private final @NotNull Block block;
         private final int animationId;
-        private final int totalTicks;
         private byte stage;
         private int elapsedTicks;
+        private float progress;
         private BukkitTask task;
         private VirtualItemDisplay overlay;
 
-        private MiningSession(@NotNull UUID playerId, @NotNull Block block, int animationId, int totalTicks) {
+        private MiningSession(@NotNull UUID playerId, @NotNull Block block, int animationId) {
             this.playerId = playerId;
             this.block = block;
             this.animationId = animationId;
-            this.totalTicks = totalTicks;
             this.stage = 0;
         }
 
@@ -341,10 +336,6 @@ public final class MiningManager {
 
         private int animationId() {
             return animationId;
-        }
-
-        private int totalTicks() {
-            return totalTicks;
         }
 
         private byte stage() {
@@ -377,6 +368,11 @@ public final class MiningManager {
 
         private int tickAndGet() {
             return ++elapsedTicks;
+        }
+
+        private float addProgress(float amount) {
+            progress += amount;
+            return progress;
         }
     }
 }

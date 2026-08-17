@@ -75,6 +75,10 @@ public final class BlockDefinition {
         return defaultBlock;
     }
 
+    public @NotNull Material vanillaBlock() {
+        return defaultBlock;
+    }
+
     public boolean catelog() {
         return catelog;
     }
@@ -227,6 +231,10 @@ public final class BlockDefinition {
             }
             this.defaultBlock = defaultBlock;
             return this;
+        }
+
+        public @NotNull Builder vanillaBlock(@NotNull Material vanillaBlock) {
+            return setDefaultBlock(vanillaBlock);
         }
 
         public @NotNull Builder catelog(boolean catelog) {

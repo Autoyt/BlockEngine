@@ -5,6 +5,7 @@ import dev.auto.turtle.items.TurtleItemManager;
 import dev.auto.turtle.mining.MiningManager;
 import dev.auto.turtle.placement.TurtleBackingBlock;
 import dev.auto.turtle.placement.TurtlePlacementService;
+import dev.auto.turtle.placement.TurtleVanillaRules;
 import dev.auto.turtle.registry.BlockRegistry;
 import dev.auto.turtle.registry.NamespaceRegistry;
 import dev.auto.turtle.resourcepack.ResourcePackManager;
@@ -25,6 +26,7 @@ import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.block.Block;
+import org.bukkit.block.BlockFace;
 import org.bukkit.block.data.Waterlogged;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.EntityType;
@@ -382,7 +384,9 @@ public class GameListener implements Listener {
             event.setCancelled(true);
             return true;
         }
-        if (!canPlace(target, player, event.getHand())) {
+        String stateId = TurtleItemManager.stateId(item);
+        BlockFace placedAgainst = event.getBlockFace().getOppositeFace();
+        if (!canPlace(target, definition, stateId, player, placedAgainst, event.getHand())) {
             event.setCancelled(true);
             return true;
         }
@@ -395,7 +399,7 @@ public class GameListener implements Listener {
         }
 
         event.setCancelled(true);
-        if (!TurtlePlacementService.place(target, definition, player, event.getBlockFace().getOppositeFace(), TurtleItemManager.stateId(item))) {
+        if (!TurtlePlacementService.place(target, definition, player, placedAgainst, stateId)) {
             return true;
         }
         lastPlacementTicks.put(playerId, tick);
@@ -411,12 +415,25 @@ public class GameListener implements Listener {
         return TurtleItemManager.blockId(item) != null && TurtleItemManager.placeable(item);
     }
 
-    private boolean canPlace(Block target, Player player, EquipmentSlot hand) {
+    private boolean canPlace(
+            Block target,
+            BlockDefinition definition,
+            String stateId,
+            Player player,
+            BlockFace placedAgainst,
+            EquipmentSlot hand
+    ) {
+        org.bukkit.block.data.BlockData placementData = TurtleVanillaRules.placementData(
+                definition,
+                stateId,
+                player,
+                placedAgainst
+        );
         BlockCanBuildEvent buildEvent = new BlockCanBuildEvent(
                 target,
                 player,
-                TurtleBackingBlock.material().createBlockData(),
-                target.canPlace(TurtleBackingBlock.material().createBlockData()),
+                placementData,
+                TurtleVanillaRules.canPlace(target, definition, stateId, player, placedAgainst),
                 hand
         );
         Bukkit.getPluginManager().callEvent(buildEvent);

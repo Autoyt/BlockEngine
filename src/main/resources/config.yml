@@ -1,5 +1,5 @@
 custom-blocks:
-  backing-block: LIGHT_GRAY_STAINED_GLASS
+  backing-block: BARRIER
 
 visibility:
   enabled: true

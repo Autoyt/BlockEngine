@@ -5,7 +5,7 @@ import org.bukkit.Material;
 import org.jetbrains.annotations.NotNull;
 
 public final class TurtleBackingBlock {
-    private static final @NotNull Material DEFAULT_MATERIAL = Material.LIGHT_GRAY_STAINED_GLASS;
+    private static final @NotNull Material DEFAULT_MATERIAL = Material.BARRIER;
 
     private TurtleBackingBlock() {
     }
