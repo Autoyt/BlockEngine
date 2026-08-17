@@ -2,7 +2,7 @@ package dev.auto.blockengine.listeners;
 
 import dev.auto.blockengine.Main;
 import dev.auto.blockengine.items.BlockEngineItemManager;
-import dev.auto.blockengine.placement.BlockEnginePlacementService;
+import dev.auto.blockengine.placement.PlacementManager;
 import dev.auto.blockengine.registry.BlockRegistry;
 import dev.auto.blockengine.runtime.BlockEngineBlockRemover;
 import dev.auto.blockengine.runtime.BlockEngineChunkRuntime;
@@ -256,7 +256,7 @@ public final class BlockCommandOverrideListener implements Listener {
         )) != null && !BlockEngineBlockRemover.remove(block, dropExisting)) {
             return false;
         }
-        return BlockEnginePlacementService.place(block, definition, player, null, stateId);
+        return PlacementManager.getInstance().place(block, definition, player, null, stateId);
     }
 
     private boolean batch(
@@ -275,7 +275,7 @@ public final class BlockCommandOverrideListener implements Listener {
             return false;
         }
 
-        return BlockEnginePlacementService.place(block, definition, player, null, stateId);
+        return PlacementManager.getInstance().place(block, definition, player, null, stateId);
     }
 
     private record ParsedCommand(@NotNull String name, String @NotNull [] args) {
@@ -432,3 +432,5 @@ public final class BlockCommandOverrideListener implements Listener {
         }
     }
 }
+
+

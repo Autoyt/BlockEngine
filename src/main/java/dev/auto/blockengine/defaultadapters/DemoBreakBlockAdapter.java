@@ -29,7 +29,7 @@ public final class DemoBreakBlockAdapter implements BlockAdapter {
                         .hardness(0.8f)
                         .miningSpeed(1.0f)
                         .dropsItem(true)
-                        .textures(textures -> textures.all("BlockEngine_test:block/demo_break"))
+                        .textures(textures -> textures.all("blockengine_test:block/demo_break"))
                         .sounds(sounds -> sounds
                                 .mining("minecraft:block.stone.hit")
                                 .breakSound("minecraft:block.stone.break")

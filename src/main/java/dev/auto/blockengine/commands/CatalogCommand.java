@@ -1,12 +1,12 @@
 package dev.auto.blockengine.commands;
 
-import dev.auto.blockengine.catalog.CatelogListeners;
+import dev.auto.blockengine.catalog.CatalogListeners;
 import io.papermc.paper.command.brigadier.BasicCommand;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.Nullable;
 
-public final class CatelogCommand implements BasicCommand {
+public final class CatalogCommand implements BasicCommand {
     @Override
     public void execute(CommandSourceStack source, String[] args) {
         var sender = source.getSender();
@@ -15,11 +15,11 @@ public final class CatelogCommand implements BasicCommand {
             return;
         }
         if (!(sender instanceof Player player)) {
-            sender.sendMessage("Only players can open the BlockEngine catelog.");
+            sender.sendMessage("Only players can open the BlockEngine catalog.");
             return;
         }
 
-        CatelogListeners.open(player);
+        CatalogListeners.open(player);
     }
 
     @Override

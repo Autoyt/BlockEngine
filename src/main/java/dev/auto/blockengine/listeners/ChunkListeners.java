@@ -4,7 +4,7 @@ import dev.auto.blockengine.Main;
 import dev.auto.blockengine.runtime.BlockEngineChunkRuntime;
 import dev.auto.blockengine.runtime.BlockEngineMutationBatcher;
 import dev.auto.blockengine.types.ChunkKey;
-import dev.auto.blockengine.visibility.VisibilityService;
+import dev.auto.blockengine.visibility.VisibilityManager;
 import org.bukkit.Chunk;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -19,8 +19,8 @@ public class ChunkListeners implements Listener {
     @EventHandler
     public void onChunkLoad(ChunkLoadEvent event) {
         Chunk chunk = event.getChunk();
-        BlockEngineChunkRuntime.loadChunk(chunk, VisibilityService.config());
-        VisibilityService.refreshPlayersNear(ChunkKey.from(chunk));
+        BlockEngineChunkRuntime.loadChunk(chunk, VisibilityManager.getInstance().config());
+        VisibilityManager.getInstance().refreshPlayersNear(ChunkKey.from(chunk));
     }
 
     @EventHandler
@@ -28,6 +28,9 @@ public class ChunkListeners implements Listener {
         BlockEngineMutationBatcher.flushNow();
         ChunkKey key = ChunkKey.from(event.getChunk());
         BlockEngineChunkRuntime.unloadChunk(event.getChunk());
-        VisibilityService.removeChunkDisplays(key);
+        VisibilityManager.getInstance().removeChunkDisplays(key);
     }
 }
+
+
+

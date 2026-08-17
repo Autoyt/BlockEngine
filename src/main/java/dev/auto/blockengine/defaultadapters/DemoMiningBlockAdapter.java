@@ -28,7 +28,7 @@ public final class DemoMiningBlockAdapter implements BlockAdapter {
                         .miningSpeed(3.0f)
                         .dropsItem(true)
                         .dropInCreative(true)
-                        .textures(textures -> textures.all("BlockEngine_test:block/demo_mining"))
+                        .textures(textures -> textures.all("blockengine_test:block/demo_mining"))
                         .sounds(sounds -> sounds
                                 .mining("minecraft:block.grass.hit")
                                 .breakSound("minecraft:block.grass.break")

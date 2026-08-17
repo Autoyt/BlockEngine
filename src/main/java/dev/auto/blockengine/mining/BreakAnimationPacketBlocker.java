@@ -27,11 +27,11 @@ public final class BreakAnimationPacketBlocker {
                 }
 
                 WrapperPlayServerBlockBreakAnimation packet = new WrapperPlayServerBlockBreakAnimation(event);
-                if (MiningManager.blocksExternalClear(
+                if (MiningManager.getInstance().blocksExternalClear(
                         packet.getBlockPosition(),
                         packet.getEntityId(),
                         packet.getDestroyStage()
-                ) || DebugBreakAnimationService.blocksReset(
+                ) || DebugBreakAnimationManager.getInstance().blocksReset(
                         packet.getBlockPosition(),
                         packet.getDestroyStage()
                 )) {
@@ -50,3 +50,6 @@ public final class BreakAnimationPacketBlocker {
         listener = null;
     }
 }
+
+
+

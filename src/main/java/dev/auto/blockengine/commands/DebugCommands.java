@@ -4,7 +4,7 @@ import dev.auto.blockengine.Main;
 import dev.auto.blockengine.defaultadapters.DebugBlocks;
 import dev.auto.blockengine.entity.BlockEngineBlockOrchestrator;
 import dev.auto.blockengine.items.BlockEngineItemManager;
-import dev.auto.blockengine.mining.DebugBreakAnimationService;
+import dev.auto.blockengine.mining.DebugBreakAnimationManager;
 import dev.auto.blockengine.registry.BlockRegistry;
 import dev.auto.blockengine.resourcepack.ResourcePackManager;
 import dev.auto.blockengine.types.BlockDefinition;
@@ -49,7 +49,7 @@ public final class DebugCommands implements BasicCommand {
         }
 
         if (args.length == 0) {
-            sender.sendMessage("Usage: /blockenginedebug <subcommand>");
+            sender.sendMessage("Usage: /debug <subcommand>");
             sender.sendMessage("Subcommands: " + String.join(", ", ROOT_SUBCOMMANDS));
             return;
         }
@@ -114,18 +114,18 @@ public final class DebugCommands implements BasicCommand {
 
     private static void pack(org.bukkit.command.CommandSender sender, String[] args) {
         if (args.length >= 2 && args[1].equalsIgnoreCase("reload")) {
-            ResourcePackManager.reload();
+            ResourcePackManager.getInstance().reload();
             sender.sendMessage("Regenerated and reloaded BlockEngine resource pack.");
             return;
         }
 
         if (sender instanceof Player player) {
-            ResourcePackManager.send(player);
+            ResourcePackManager.getInstance().send(player);
             sender.sendMessage("Sent BlockEngine resource pack.");
             return;
         }
 
-        sender.sendMessage("Use /blockenginedebug pack reload from console, or run /blockenginedebug pack as a player.");
+        sender.sendMessage("Use /debug pack reload from console, or run /debug pack as a player.");
     }
 
     private static void breakStage(org.bukkit.command.CommandSender sender, String[] args) {
@@ -134,7 +134,7 @@ public final class DebugCommands implements BasicCommand {
             return;
         }
         if (args.length < 2) {
-            sender.sendMessage("Usage: /blockenginedebug breakstage <0-9>");
+            sender.sendMessage("Usage: /debug breakstage <0-9>");
             return;
         }
 
@@ -156,9 +156,12 @@ public final class DebugCommands implements BasicCommand {
             return;
         }
 
-        DebugBreakAnimationService.show(player, target, (byte) stage);
+        DebugBreakAnimationManager.getInstance().show(player, target, (byte) stage);
         sender.sendMessage("Sending break stage " + stage + " to "
                 + target.getX() + " " + target.getY() + " " + target.getZ()
                 + " for 1 second.");
     }
 }
+
+
+

@@ -25,7 +25,7 @@ public record ResourcePackConfig(
                 config.getString("resource-pack.hosting.host", "0.0.0.0"),
                 Math.clamp(config.getInt("resource-pack.hosting.port", 8123), 1, 65535),
                 config.getString("resource-pack.hosting.public-url", ""),
-                config.getString("resource-pack.hosting.file-name", "BlockEngine-resource-pack.zip"),
+                config.getString("resource-pack.hosting.file-name", "blockengine-resource-pack.zip"),
                 config.getBoolean("resource-pack.send.on-join", true),
                 config.getBoolean("resource-pack.send.required", false),
                 config.getString("resource-pack.send.prompt", "This server uses BlockEngine custom block resources.")

@@ -33,7 +33,7 @@ public final class DemoInventoryBlockAdapter implements BlockAdapter {
                         .hardness(1.0f)
                         .miningSpeed(1.0f)
                         .dropsItem(true)
-                        .textures(textures -> textures.all("BlockEngine_test:block/demo_inventory"))
+                        .textures(textures -> textures.all("blockengine_test:block/demo_inventory"))
                         .sounds(sounds -> sounds
                                 .mining("minecraft:block.stone.hit")
                                 .breakSound("minecraft:block.stone.break")

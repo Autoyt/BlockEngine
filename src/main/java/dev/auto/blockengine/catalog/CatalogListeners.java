@@ -32,15 +32,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-public final class CatelogListeners implements Listener {
+public final class CatalogListeners implements Listener {
     private static final int INPUT_SLOT = 0;
     private static final int OUTPUT_SLOT = 1;
-    private static final @NotNull Component TITLE = Component.text("BlockEngine Catelog");
+    private static final @NotNull Component TITLE = Component.text("BlockEngine catalog");
 
     private static final Map<UUID, Session> sessions = new HashMap<>();
     private static final Map<NamespacedKey, BlockDefinition> recipes = new LinkedHashMap<>();
 
-    public CatelogListeners() {
+    public CatalogListeners() {
         Main.getInstance().getServer().getPluginManager().registerEvents(this, Main.getInstance());
     }
 
@@ -148,18 +148,18 @@ public final class CatelogListeners implements Listener {
     private static void registerRecipes() {
         clearRecipes();
         List<BlockDefinition> blocks = BlockRegistry.getBlocks().stream()
-                .filter(block -> block.apiDefinition().catelog())
+                .filter(block -> block.apiDefinition().catalog())
                 .sorted(Comparator.comparing(BlockDefinition::id))
                 .toList();
 
         for (BlockDefinition block : blocks) {
-            NamespacedKey key = new NamespacedKey(Main.getInstance(), "catelog/" + safe(block.id()));
+            NamespacedKey key = new NamespacedKey(Main.getInstance(), "catalog/" + safe(block.id()));
             StonecuttingRecipe recipe = new StonecuttingRecipe(
                     key,
                     BlockEngineItemManager.create(block),
                     new RecipeChoice.MaterialChoice(BlockEngineBackingBlock.material())
             );
-            recipe.setGroup("BlockEngine_catelog");
+            recipe.setGroup("BlockEngine_catalog");
             Bukkit.addRecipe(recipe);
             recipes.put(key, block);
         }
@@ -194,7 +194,7 @@ public final class CatelogListeners implements Listener {
     private static @NotNull ItemStack inputItem() {
         ItemStack item = new ItemStack(BlockEngineBackingBlock.material());
         ItemMeta meta = item.getItemMeta();
-        meta.displayName(Component.text("BlockEngine Catelog"));
+        meta.displayName(Component.text("BlockEngine catalog"));
         item.setItemMeta(meta);
         return item;
     }

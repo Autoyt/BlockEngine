@@ -23,7 +23,7 @@ resource-pack:
     host: "0.0.0.0"
     port: 8123
     public-url: ""
-    file-name: "BlockEngine-resource-pack.zip"
+    file-name: "blockengine-resource-pack.zip"
   send:
     on-join: true
     required: false

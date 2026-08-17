@@ -1,14 +1,13 @@
-name: BlockEngine
-prefix: BlockEngine
+name: blockengine
+prefix: BLOCKENGINE by AutoYT
 version: '${version}'
 
 main: dev.auto.blockengine.Main
-bootstrapper: dev.auto.blockengine.MainBootstrap
-loader: dev.auto.blockengine.MainLoader
+bootstrapper: dev.auto.blockengine.PluginBootDriver
 api-version: '26.1'
 load: STARTUP
 
-authors: [ AutoYT ]
+authors: [ AutoYT, Codex ]
 
 permissions:
   blockengine.debug:

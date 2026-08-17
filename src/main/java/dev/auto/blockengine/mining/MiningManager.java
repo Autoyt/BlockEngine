@@ -11,7 +11,7 @@ import dev.auto.blockengine.placement.BlockEngineBackingBlock;
 import dev.auto.blockengine.registry.BlockRegistry;
 import dev.auto.blockengine.runtime.RuntimeBlockView;
 import dev.auto.blockengine.runtime.BlockEngineBlockContext;
-import dev.auto.blockengine.runtime.BlockEngineBlockDataService;
+import dev.auto.blockengine.runtime.BlockDataManager;
 import dev.auto.blockengine.runtime.BlockEngineBlockRemover;
 import dev.auto.blockengine.runtime.BlockEngineChunkRuntime;
 import dev.auto.blockengine.types.BlockDefinition;
@@ -33,12 +33,17 @@ import java.util.UUID;
 
 public final class MiningManager {
     private static final int TARGET_DISTANCE = 7;
-    private static final Map<UUID, MiningSession> sessions = new HashMap<>();
+    private static final MiningManager instance = new MiningManager();
+    private final Map<UUID, MiningSession> sessions = new HashMap<>();
 
     private MiningManager() {
     }
 
-    public static void start(@NotNull Player player, @NotNull Block block, @NotNull RuntimeBlockView customBlock) {
+    public static @NotNull MiningManager getInstance() {
+        return instance;
+    }
+
+    public void start(@NotNull Player player, @NotNull Block block, @NotNull RuntimeBlockView customBlock) {
         MiningSession current = sessions.get(player.getUniqueId());
         if (current != null && sameBlock(current.block(), block)) {
             return;
@@ -63,7 +68,7 @@ public final class MiningManager {
         sessions.put(player.getUniqueId(), session);
     }
 
-    public static void stop(@NotNull Player player) {
+    public void stop(@NotNull Player player) {
         MiningSession session = sessions.remove(player.getUniqueId());
         if (session == null) {
             return;
@@ -72,16 +77,16 @@ public final class MiningManager {
         clear(session);
     }
 
-    public static void abort(@NotNull Player player) {
+    public void abort(@NotNull Player player) {
         stop(player);
     }
 
-    public static boolean active(@NotNull Player player, @NotNull Block block) {
+    public boolean active(@NotNull Player player, @NotNull Block block) {
         MiningSession session = sessions.get(player.getUniqueId());
         return session != null && sameBlock(session.block(), block);
     }
 
-    public static void updateAim(@NotNull Player player) {
+    public void updateAim(@NotNull Player player) {
         MiningSession session = sessions.get(player.getUniqueId());
         if (session == null) {
             return;
@@ -92,19 +97,19 @@ public final class MiningManager {
             stop(player);
             return;
         }
-        if (sameBlock(session.block(), target)) {
-            return;
-        }
 
         RuntimeBlockView customBlock = BlockEngineChunkRuntime.getBlock(location(target));
         if (customBlock == null) {
             stop(player);
             return;
         }
+        if (sameBlock(session.block(), target)) {
+            return;
+        }
         start(player, target, customBlock);
     }
 
-    public static boolean blocksExternalClear(@NotNull Vector3i position, int animationId, byte stage) {
+    public boolean blocksExternalClear(@NotNull Vector3i position, int animationId, byte stage) {
         if (stage >= 0) {
             return false;
         }
@@ -122,7 +127,7 @@ public final class MiningManager {
         return false;
     }
 
-    public static void breakNow(@NotNull Player player, @NotNull Block block, @NotNull RuntimeBlockView customBlock) {
+    public void breakNow(@NotNull Player player, @NotNull Block block, @NotNull RuntimeBlockView customBlock) {
         if (customBlock.storedBlock().blockId().equals(DebugBlocks.INVISIBLE_BLOCK_ID)) {
             return;
         }
@@ -130,7 +135,7 @@ public final class MiningManager {
         finish(player, block, customBlock, customBlock.storedBlock().dropInCreative());
     }
 
-    public static void cleanupAll() {
+    public void cleanupAll() {
         for (UUID playerId : sessions.keySet().toArray(UUID[]::new)) {
             Player player = Main.getInstance().getServer().getPlayer(playerId);
             if (player != null) {
@@ -139,7 +144,7 @@ public final class MiningManager {
         }
     }
 
-    private static void tick(@NotNull Player player, @NotNull MiningSession session, @NotNull RuntimeBlockView customBlock) {
+    private void tick(@NotNull Player player, @NotNull MiningSession session, @NotNull RuntimeBlockView customBlock) {
         if (!player.isOnline() || !near(player, session.block())) {
             stop(player);
             return;
@@ -163,23 +168,23 @@ public final class MiningManager {
         }
     }
 
-    private static void clear(@NotNull MiningSession session) {
+    private void clear(@NotNull MiningSession session) {
         if (session.task() != null) {
             session.task().cancel();
         }
         sendStage(session, (byte) -1);
     }
 
-    private static void finish(@NotNull Player player, @NotNull Block block, @NotNull RuntimeBlockView customBlock, boolean drop) {
-        BlockEngineBlockContext context = BlockEngineBlockDataService.context(block, customBlock, player);
+    private void finish(@NotNull Player player, @NotNull Block block, @NotNull RuntimeBlockView customBlock, boolean drop) {
+        BlockEngineBlockContext context = BlockDataManager.getInstance().context(block, customBlock, player);
         if (context != null && !context.adapter().onBreak(context)) {
-            BlockEngineBlockDataService.save(block, context);
+            BlockDataManager.getInstance().save(block, context);
             return;
         }
         BlockEngineBlockRemover.remove(block, customBlock, drop);
     }
 
-    private static void sendStage(@NotNull MiningSession session, byte stage) {
+    private void sendStage(@NotNull MiningSession session, byte stage) {
         Vector3i position = new Vector3i(
                 session.block().getX(),
                 session.block().getY(),
@@ -195,7 +200,7 @@ public final class MiningManager {
         sendOverlay(session, stage, viewers);
     }
 
-    private static void sendOverlay(
+    private void sendOverlay(
             @NotNull MiningSession session,
             byte stage,
             @NotNull List<Player> viewers
@@ -229,7 +234,7 @@ public final class MiningManager {
         overlay.updateMetadataFor(viewers);
     }
 
-    private static @NotNull ItemStack breakOverlay(byte stage) {
+    private @NotNull ItemStack breakOverlay(byte stage) {
         ItemStack stack = new ItemStack(BlockEngineBackingBlock.material());
         ItemMeta meta = stack.getItemMeta();
         if (meta != null) {
@@ -239,14 +244,14 @@ public final class MiningManager {
         return stack;
     }
 
-    private static @NotNull List<Player> viewers(@NotNull Block block) {
+    private @NotNull List<Player> viewers(@NotNull Block block) {
         double maxDistanceSquared = Math.pow((Main.getInstance().getServer().getViewDistance() + 1) * 16.0, 2.0);
         return block.getWorld().getPlayers().stream()
                 .filter(viewer -> viewer.getLocation().distanceSquared(block.getLocation()) <= maxDistanceSquared)
                 .toList();
     }
 
-    private static void playMiningSound(@NotNull Player player, @NotNull RuntimeBlockView customBlock) {
+    private void playMiningSound(@NotNull Player player, @NotNull RuntimeBlockView customBlock) {
         String sound = "minecraft:block.stone.hit";
         BlockDefinition registered = BlockRegistry.getBlock(customBlock.storedBlock().blockId());
         if (registered != null) {
@@ -274,7 +279,7 @@ public final class MiningManager {
         );
     }
 
-    private static int animationId(@NotNull Player player, @NotNull Block block) {
+    private int animationId(@NotNull Player player, @NotNull Block block) {
         int result = player.getEntityId();
         result = 31 * result + block.getX();
         result = 31 * result + block.getY();
@@ -282,7 +287,7 @@ public final class MiningManager {
         return result;
     }
 
-    private static @NotNull BlockLocationKey location(@NotNull Block block) {
+    private @NotNull BlockLocationKey location(@NotNull Block block) {
         return new BlockLocationKey(
                 block.getWorld().getUID(),
                 block.getX(),
@@ -291,14 +296,14 @@ public final class MiningManager {
         );
     }
 
-    private static byte stage(float progress) {
+    private byte stage(float progress) {
         if (progress >= 1.0f) {
             return 9;
         }
         return (byte) Math.clamp((int) Math.floor(progress * 10.0f), 0, 9);
     }
 
-    private static boolean sameBlock(Block current, @NotNull Block expected) {
+    private boolean sameBlock(Block current, @NotNull Block expected) {
         return current != null
                 && current.getWorld().equals(expected.getWorld())
                 && current.getX() == expected.getX()
@@ -306,7 +311,7 @@ public final class MiningManager {
                 && current.getZ() == expected.getZ();
     }
 
-    private static boolean near(@NotNull Player player, @NotNull Block block) {
+    private boolean near(@NotNull Player player, @NotNull Block block) {
         if (!player.getWorld().equals(block.getWorld())) {
             return false;
         }
@@ -376,3 +381,5 @@ public final class MiningManager {
         }
     }
 }
+
+

@@ -33,13 +33,18 @@ public final class ResourcePackManager {
     private static final byte[] TRANSPARENT_PNG = Base64.getDecoder().decode(
             "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADElEQVR42mNgYPgPAAEDAQBQPYv1AAAAAElFTkSuQmCC"
     );
-    private static ResourcePackConfig config;
-    private static GeneratedPack pack;
+    private static final ResourcePackManager instance = new ResourcePackManager();
+    private ResourcePackConfig config;
+    private GeneratedPack pack;
 
     private ResourcePackManager() {
     }
 
-    public static void reload() {
+    public static @NotNull ResourcePackManager getInstance() {
+        return instance;
+    }
+
+    public void reload() {
         config = ResourcePackConfig.load(Main.getInstance());
         if (!config.enabled()) {
             ResourcePackHost.stop();
@@ -53,7 +58,7 @@ public final class ResourcePackManager {
         }
     }
 
-    public static GeneratedPack generate() {
+    public GeneratedPack generate() {
         config = ResourcePackConfig.load(Main.getInstance());
         Path root = Main.getInstance().getDataFolder().toPath().resolve("generated-resource-pack");
         Path zip = Main.getInstance().getDataFolder().toPath().resolve(config.fileName());
@@ -95,7 +100,7 @@ public final class ResourcePackManager {
         }
     }
 
-    public static void send(@NotNull Player player) {
+    public void send(@NotNull Player player) {
         ResourcePackConfig loadedConfig = config == null ? ResourcePackConfig.load(Main.getInstance()) : config;
         if (!loadedConfig.enabled() || !loadedConfig.sendOnJoin() || pack == null || pack.sha1().length == 0) {
             return;
@@ -118,7 +123,7 @@ public final class ResourcePackManager {
         player.setResourcePack(pack.url());
     }
 
-    public static void stop() {
+    public void stop() {
         ResourcePackHost.stop();
     }
 
@@ -379,7 +384,7 @@ public final class ResourcePackManager {
 
     private static void texture(@NotNull Path root, @NotNull String name, int argb) throws IOException {
         Path output = root.resolve("assets")
-                .resolve("BlockEngine_test")
+                .resolve("blockengine_test")
                 .resolve("textures")
                 .resolve("block")
                 .resolve(name + ".png");

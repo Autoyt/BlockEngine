@@ -9,11 +9,11 @@ import org.jetbrains.annotations.Nullable;
 
 public final class BlockEngineBlockView implements BlockView {
     private final @NotNull Block block;
-    private final @Nullable RuntimeBlockView BlockEngineBlock;
+    private final @Nullable RuntimeBlockView blockEngineBlock;
 
     public BlockEngineBlockView(@NotNull Block block) {
         this.block = block;
-        this.BlockEngineBlock = BlockEngineChunkRuntime.getBlock(new BlockLocationKey(
+        this.blockEngineBlock = BlockEngineChunkRuntime.getBlock(new BlockLocationKey(
                 block.getWorld().getUID(),
                 block.getX(),
                 block.getY(),
@@ -68,16 +68,16 @@ public final class BlockEngineBlockView implements BlockView {
 
     @Override
     public boolean isBlockEngineBlock() {
-        return BlockEngineBlock != null;
+        return blockEngineBlock != null;
     }
 
     @Override
-    public @Nullable String BlockEngineBlockId() {
-        return BlockEngineBlock == null ? null : BlockEngineBlock.storedBlock().blockId();
+    public @Nullable String blockEngineBlockId() {
+        return blockEngineBlock == null ? null : blockEngineBlock.storedBlock().blockId();
     }
 
     @Override
-    public @Nullable String BlockEngineStateId() {
-        return BlockEngineBlock == null ? null : BlockEngineBlock.storedBlock().stateId();
+    public @Nullable String blockEngineStateId() {
+        return blockEngineBlock == null ? null : blockEngineBlock.storedBlock().stateId();
     }
 }

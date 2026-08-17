@@ -4,7 +4,7 @@ import dev.auto.blockengine.registry.BlockRegistry;
 import dev.auto.blockengine.registry.NamespaceRegistry;
 
 public final class DebugBlocks {
-    public static final String NAMESPACE = "BlockEngine_test";
+    public static final String NAMESPACE = "blockengine_test";
     public static final String RED_BLOCK_ID = NAMESPACE + ":red_block";
     public static final String INVISIBLE_BLOCK_ID = NAMESPACE + ":invisible_block";
     public static final String DEMO_INVENTORY_ID = NAMESPACE + ":demo_inventory";

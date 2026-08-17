@@ -13,14 +13,19 @@ import org.jetbrains.annotations.NotNull;
 import java.util.HashMap;
 import java.util.Map;
 
-public final class DebugBreakAnimationService {
+public final class DebugBreakAnimationManager {
     private static final int TICKS = 20;
-    private static final Map<BlockLocationKey, DebugSession> sessions = new HashMap<>();
+    private static final DebugBreakAnimationManager instance = new DebugBreakAnimationManager();
+    private final Map<BlockLocationKey, DebugSession> sessions = new HashMap<>();
 
-    private DebugBreakAnimationService() {
+    private DebugBreakAnimationManager() {
     }
 
-    public static void show(@NotNull Player player, @NotNull Block block, byte stage) {
+    public static @NotNull DebugBreakAnimationManager getInstance() {
+        return instance;
+    }
+
+    public void show(@NotNull Player player, @NotNull Block block, byte stage) {
         BlockLocationKey key = key(block);
         DebugSession previous = sessions.remove(key);
         if (previous != null) {
@@ -55,7 +60,7 @@ public final class DebugBreakAnimationService {
         sessions.put(key, session);
     }
 
-    public static boolean blocksReset(@NotNull Vector3i position, byte stage) {
+    public boolean blocksReset(@NotNull Vector3i position, byte stage) {
         if (stage >= 0) {
             return false;
         }
@@ -69,14 +74,14 @@ public final class DebugBreakAnimationService {
         return false;
     }
 
-    public static void clearAll() {
+    public void clearAll() {
         for (Map.Entry<BlockLocationKey, DebugSession> entry : sessions.entrySet()) {
             entry.getValue().task().cancel();
         }
         sessions.clear();
     }
 
-    private static void send(@NotNull Block block, int animationId, byte stage) {
+    private void send(@NotNull Block block, int animationId, byte stage) {
         Vector3i position = new Vector3i(block.getX(), block.getY(), block.getZ());
         double maxDistanceSquared = Math.pow((Main.getInstance().getServer().getViewDistance() + 1) * 16.0, 2.0);
         for (Player viewer : block.getWorld().getPlayers()) {
@@ -90,11 +95,11 @@ public final class DebugBreakAnimationService {
         }
     }
 
-    private static void clear(@NotNull Block block, int animationId) {
+    private void clear(@NotNull Block block, int animationId) {
         send(block, animationId, (byte) -1);
     }
 
-    private static int animationId(@NotNull Player player, @NotNull Block block) {
+    private int animationId(@NotNull Player player, @NotNull Block block) {
         int result = 17;
         result = 31 * result + player.getEntityId();
         result = 31 * result + block.getX();
@@ -103,7 +108,7 @@ public final class DebugBreakAnimationService {
         return result;
     }
 
-    private static @NotNull BlockLocationKey key(@NotNull Block block) {
+    private @NotNull BlockLocationKey key(@NotNull Block block) {
         return new BlockLocationKey(
                 block.getWorld().getUID(),
                 block.getX(),
@@ -134,3 +139,4 @@ public final class DebugBreakAnimationService {
         }
     }
 }
+

@@ -4,7 +4,7 @@ import dev.auto.blockengine.Main;
 import dev.auto.blockengine.pdc.BlockEngineChunkData;
 import dev.auto.blockengine.types.BlockLocationKey;
 import dev.auto.blockengine.types.ChunkKey;
-import dev.auto.blockengine.visibility.VisibilityService;
+import dev.auto.blockengine.visibility.VisibilityManager;
 import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
 import org.bukkit.block.Block;
@@ -56,7 +56,7 @@ public final class BlockEngineMutationBatcher {
         for (Map.Entry<ChunkKey, ChunkEdit> entry : chunks.entrySet()) {
             ChunkEdit edit = entry.getValue();
             BlockEngineChunkData.save(edit.chunk(), BlockEngineChunkRuntime.chunkDataKey(), edit.data());
-            BlockEngineChunkRuntime.loadChunk(edit.chunk(), VisibilityService.config());
+            BlockEngineChunkRuntime.loadChunk(edit.chunk(), VisibilityManager.getInstance().config());
             touched.add(entry.getKey());
         }
 
@@ -65,7 +65,7 @@ public final class BlockEngineMutationBatcher {
         }
 
         if (!touched.isEmpty()) {
-            VisibilityService.refreshPlayersNear(touched);
+            VisibilityManager.getInstance().refreshPlayersNear(touched);
         }
 
         chunks.clear();
@@ -118,3 +118,6 @@ public final class BlockEngineMutationBatcher {
     private record ChunkEdit(@NotNull Chunk chunk, @NotNull BlockEngineChunkData data) {
     }
 }
+
+
+

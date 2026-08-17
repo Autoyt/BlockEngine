@@ -30,21 +30,21 @@ public final class DemoStateBlockAdapter implements BlockAdapter {
                         .hardness(1.0f)
                         .miningSpeed(1.0f)
                         .dropsItem(true)
-                        .textures(textures -> textures.all("BlockEngine_test:block/demo_state_red"))
+                        .textures(textures -> textures.all("blockengine_test:block/demo_state_red"))
                         .sounds(sounds -> sounds.mining("minecraft:block.stone.hit"))
                 )
                 .state("green", state -> state
                         .hardness(1.0f)
                         .miningSpeed(1.0f)
                         .dropsItem(true)
-                        .textures(textures -> textures.all("BlockEngine_test:block/demo_state_green"))
+                        .textures(textures -> textures.all("blockengine_test:block/demo_state_green"))
                         .sounds(sounds -> sounds.mining("minecraft:block.stone.hit"))
                 )
                 .state("purple", state -> state
                         .hardness(1.0f)
                         .miningSpeed(1.0f)
                         .dropsItem(true)
-                        .textures(textures -> textures.all("BlockEngine_test:block/demo_state_purple"))
+                        .textures(textures -> textures.all("blockengine_test:block/demo_state_purple"))
                         .sounds(sounds -> sounds.mining("minecraft:block.stone.hit"))
                 );
     }

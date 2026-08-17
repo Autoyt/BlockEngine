@@ -20,33 +20,36 @@ import org.jetbrains.annotations.NotNull;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 
-public final class VisibilityService {
-    private static final Map<UUID, PlayerVisibility> players = new HashMap<>();
-    private static VisibilityConfig config;
+public final class VisibilityManager {
+    private static final VisibilityManager instance = new VisibilityManager();
+    private final Map<UUID, PlayerVisibility> players = new HashMap<>();
+    private VisibilityConfig config;
 
-    private VisibilityService() {
+    private VisibilityManager() {
     }
 
-    public static void register(@NotNull Main plugin) {
-        plugin.saveDefaultConfig();
+    public static @NotNull VisibilityManager getInstance() {
+        return instance;
+    }
+
+    public void register(@NotNull Main plugin) {
         config = VisibilityConfig.load(plugin);
     }
 
-    public static @NotNull VisibilityConfig config() {
+    public @NotNull VisibilityConfig config() {
         if (config == null) {
             config = VisibilityConfig.load(Main.getInstance());
         }
         return config;
     }
 
-    public static void reloadConfig() {
+    public void reloadConfig() {
         config = VisibilityConfig.load(Main.getInstance());
     }
 
-    public static void handleMove(@NotNull PlayerMoveEvent event) {
+    public void handleMove(@NotNull PlayerMoveEvent event) {
         if (!config().enabled() || event.getTo() == null) {
             return;
         }
@@ -56,7 +59,7 @@ public final class VisibilityService {
         recalculateOnceThisTick(event.getPlayer());
     }
 
-    public static void recalculateOnceThisTick(@NotNull Player player) {
+    public void recalculateOnceThisTick(@NotNull Player player) {
         int tick = Bukkit.getCurrentTick();
         PlayerVisibility state = state(player);
         if (state.lastRecalcTick() == tick) {
@@ -66,11 +69,11 @@ public final class VisibilityService {
         recalculate(player, state, false);
     }
 
-    public static void forceRecalculate(@NotNull Player player) {
+    public void forceRecalculate(@NotNull Player player) {
         recalculate(player, state(player), true);
     }
 
-    public static void refreshPlayersNear(@NotNull ChunkKey chunkKey) {
+    public void refreshPlayersNear(@NotNull ChunkKey chunkKey) {
         for (Player player : Bukkit.getOnlinePlayers()) {
             if (isChunkInPlayerRadius(player, chunkKey)) {
                 forceRecalculate(player);
@@ -78,7 +81,7 @@ public final class VisibilityService {
         }
     }
 
-    public static void refreshPlayersNear(@NotNull Iterable<ChunkKey> chunkKeys) {
+    public void refreshPlayersNear(@NotNull Iterable<ChunkKey> chunkKeys) {
         for (Player player : Bukkit.getOnlinePlayers()) {
             for (ChunkKey chunkKey : chunkKeys) {
                 if (isChunkInPlayerRadius(player, chunkKey)) {
@@ -89,7 +92,7 @@ public final class VisibilityService {
         }
     }
 
-    public static void removeChunkDisplays(@NotNull ChunkKey chunkKey) {
+    public void removeChunkDisplays(@NotNull ChunkKey chunkKey) {
         for (Map.Entry<UUID, PlayerVisibility> entry : players.entrySet()) {
             Player player = Bukkit.getPlayer(entry.getKey());
             if (player == null) {
@@ -111,7 +114,7 @@ public final class VisibilityService {
         }
     }
 
-    public static void cleanup(@NotNull Player player) {
+    public void cleanup(@NotNull Player player) {
         PlayerVisibility state = players.remove(player.getUniqueId());
         if (state == null) {
             return;
@@ -126,7 +129,7 @@ public final class VisibilityService {
         }
     }
 
-    private static void recalculate(@NotNull Player player, @NotNull PlayerVisibility state, boolean force) {
+    private void recalculate(@NotNull Player player, @NotNull PlayerVisibility state, boolean force) {
         VisibilityConfig visibilityConfig = config();
         int radius = visibilityConfig.effectiveChunkRadius();
         Chunk chunk = player.getLocation().getChunk();
@@ -142,7 +145,7 @@ public final class VisibilityService {
         state.radius(radius);
     }
 
-    private static @NotNull Map<BlockLocationKey, RuntimeBlockView> collectDesired(
+    private @NotNull Map<BlockLocationKey, RuntimeBlockView> collectDesired(
             @NotNull World world,
             @NotNull ChunkKey center,
             int radius,
@@ -177,7 +180,7 @@ public final class VisibilityService {
         return desired;
     }
 
-    private static void reconcile(
+    private void reconcile(
             @NotNull Player player,
             @NotNull PlayerVisibility state,
             @NotNull Map<BlockLocationKey, RuntimeBlockView> desired
@@ -209,7 +212,7 @@ public final class VisibilityService {
         }
     }
 
-    private static @NotNull VirtualItemDisplay takeDisplay(@NotNull PlayerVisibility state) {
+    private @NotNull VirtualItemDisplay takeDisplay(@NotNull PlayerVisibility state) {
         VirtualItemDisplay display = state.pool().pollFirst();
         if (display != null) {
             return display;
@@ -217,7 +220,7 @@ public final class VisibilityService {
         return new VirtualItemDisplay(BlockEngineBlockOrchestrator.nextId());
     }
 
-    private static void recycleOrRelease(@NotNull PlayerVisibility state, @NotNull VirtualItemDisplay display) {
+    private void recycleOrRelease(@NotNull PlayerVisibility state, @NotNull VirtualItemDisplay display) {
         if (config().recycleDisplays()) {
             state.pool().addLast(display);
             return;
@@ -225,7 +228,7 @@ public final class VisibilityService {
         BlockEngineBlockOrchestrator.freeId(display.getId());
     }
 
-    private static void configure(@NotNull VirtualItemDisplay display, @NotNull World world, @NotNull RuntimeBlockView block) {
+    private void configure(@NotNull VirtualItemDisplay display, @NotNull World world, @NotNull RuntimeBlockView block) {
         BlockLocationKey location = block.location();
         display.location(new Location(world, location.x() + 0.5, location.y() + 0.5, location.z() + 0.5, 0.0f, 0.0f))
                 .itemStack(BlockEngineDisplayItemManager.create(block))
@@ -233,7 +236,7 @@ public final class VisibilityService {
                 .displayContext(VirtualItemDisplay.DISPLAY_CONTEXT_FIXED);
     }
 
-    private static boolean sameChunk(@NotNull Location from, @NotNull Location to) {
+    private boolean sameChunk(@NotNull Location from, @NotNull Location to) {
         if (!from.getWorld().equals(to.getWorld())) {
             return false;
         }
@@ -241,7 +244,7 @@ public final class VisibilityService {
                 && (from.getBlockZ() >> 4) == (to.getBlockZ() >> 4);
     }
 
-    private static boolean isChunkInPlayerRadius(@NotNull Player player, @NotNull ChunkKey chunkKey) {
+    private boolean isChunkInPlayerRadius(@NotNull Player player, @NotNull ChunkKey chunkKey) {
         if (!player.getWorld().getUID().equals(chunkKey.worldId())) {
             return false;
         }
@@ -253,7 +256,8 @@ public final class VisibilityService {
         return dx * dx + dz * dz <= radius * radius;
     }
 
-    private static @NotNull PlayerVisibility state(@NotNull Player player) {
+    private @NotNull PlayerVisibility state(@NotNull Player player) {
         return players.computeIfAbsent(player.getUniqueId(), ignored -> new PlayerVisibility());
     }
 }
+

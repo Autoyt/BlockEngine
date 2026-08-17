@@ -16,11 +16,17 @@ import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-public final class BlockEnginePlacementService {
-    private BlockEnginePlacementService() {
+public final class PlacementManager {
+    private static final PlacementManager instance = new PlacementManager();
+
+    private PlacementManager() {
     }
 
-    public static boolean place(@NotNull BlockPlaceEvent event) {
+    public static @NotNull PlacementManager getInstance() {
+        return instance;
+    }
+
+    public boolean place(@NotNull BlockPlaceEvent event) {
         String blockId = BlockEngineItemManager.blockId(event.getItemInHand());
         if (blockId == null) {
             return false;
@@ -36,40 +42,16 @@ public final class BlockEnginePlacementService {
             return true;
         }
 
-        Block block = event.getBlockPlaced();
-        String stateId = BlockEngineItemManager.stateId(event.getItemInHand());
-        String defaultState = stateId == null || stateId.isBlank()
-                ? definition.apiDefinition().defaultState()
-                : stateId;
-        definition.apiDefinition().state(defaultState);
-
-        BlockEngineCreateContext createContext = new BlockEngineCreateContext(
-                block.getLocation(),
+        return place(
+                event.getBlockPlaced(),
+                definition,
                 event.getPlayer(),
-                event.getBlockAgainst().getFace(block),
-                definition.id(),
-                defaultState
+                event.getBlockAgainst().getFace(event.getBlockPlaced()),
+                BlockEngineItemManager.stateId(event.getItemInHand())
         );
-
-        BlockData data = definition.adapter().createDefaultData(createContext);
-        data.blockId(definition.id());
-        if (data.stateId() == null || data.stateId().isBlank()) {
-            data.stateId(defaultState);
-        }
-        definition.apiDefinition().state(data.stateId());
-
-        byte[] payload = definition.adapter().save(data);
-        BlockEngineChunkData chunkData = BlockEngineMutationBatcher.data(block.getChunk());
-        chunkData.setBlock(block.getX() & 15, block.getY(), block.getZ() & 15, data, definition.apiDefinition(), payload);
-
-        block.setType(BlockEngineBackingBlock.material(), false);
-        BlockEngineMutationBatcher.changed(block);
-
-        definition.adapter().onPlace(new BlockEngineBlockContext(definition.adapter(), data, block, event.getPlayer()));
-        return true;
     }
 
-    public static boolean place(
+    public boolean place(
             @NotNull Block block,
             @NotNull BlockDefinition definition,
             @Nullable Player player,
@@ -107,3 +89,4 @@ public final class BlockEnginePlacementService {
         return true;
     }
 }
+

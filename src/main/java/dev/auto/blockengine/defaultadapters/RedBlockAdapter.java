@@ -20,7 +20,7 @@ public final class RedBlockAdapter implements BlockAdapter {
                 .defaultState("default")
                 .item(item -> item
                         .name("BlockEngine Test Red Block")
-                        .lore("Debug block: BlockEngine_test:red_block")
+                        .lore("Debug block: blockengine_test:red_block")
                 )
                 .state("default", state -> state
                         .hardness(1.8f)

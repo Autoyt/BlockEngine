@@ -4,7 +4,7 @@ import dev.auto.blockengine.Main;
 import dev.auto.blockengine.items.BlockEngineItemManager;
 import dev.auto.blockengine.mining.MiningManager;
 import dev.auto.blockengine.placement.BlockEngineBackingBlock;
-import dev.auto.blockengine.placement.BlockEnginePlacementService;
+import dev.auto.blockengine.placement.PlacementManager;
 import dev.auto.blockengine.placement.BlockEngineVanillaRules;
 import dev.auto.blockengine.registry.BlockRegistry;
 import dev.auto.blockengine.registry.NamespaceRegistry;
@@ -12,13 +12,13 @@ import dev.auto.blockengine.resourcepack.ResourcePackManager;
 import dev.auto.blockengine.runtime.LoadedBlockEngineChunk;
 import dev.auto.blockengine.runtime.RuntimeBlockView;
 import dev.auto.blockengine.runtime.BlockEngineBlockContext;
-import dev.auto.blockengine.runtime.BlockEngineBlockDataService;
+import dev.auto.blockengine.runtime.BlockDataManager;
 import dev.auto.blockengine.runtime.BlockEngineBlockRemover;
 import dev.auto.blockengine.runtime.BlockEngineChunkRuntime;
 import dev.auto.blockengine.runtime.BlockEngineMutationBatcher;
 import dev.auto.blockengine.types.BlockDefinition;
 import dev.auto.blockengine.types.BlockLocationKey;
-import dev.auto.blockengine.visibility.VisibilityService;
+import dev.auto.blockengine.visibility.VisibilityManager;
 import io.papermc.paper.event.player.PlayerPickBlockEvent;
 import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
@@ -70,8 +70,8 @@ public class GameListener implements Listener {
 
     @EventHandler
     public void onMove(PlayerMoveEvent event) {
-        MiningManager.updateAim(event.getPlayer());
-        VisibilityService.handleMove(event);
+        MiningManager.getInstance().updateAim(event.getPlayer());
+        VisibilityManager.getInstance().handleMove(event);
     }
 
     @EventHandler
@@ -79,21 +79,21 @@ public class GameListener implements Listener {
         if (event.getTo() == null) {
             return;
         }
-        VisibilityService.forceRecalculate(event.getPlayer());
+        VisibilityManager.getInstance().forceRecalculate(event.getPlayer());
     }
 
     @EventHandler
     public void onJoin(PlayerJoinEvent event) {
-        ResourcePackManager.send(event.getPlayer());
-        VisibilityService.forceRecalculate(event.getPlayer());
+        ResourcePackManager.getInstance().send(event.getPlayer());
+        VisibilityManager.getInstance().forceRecalculate(event.getPlayer());
     }
 
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
         BlockEngineMutationBatcher.flushNow();
         lastPlacementTicks.remove(event.getPlayer().getUniqueId());
-        MiningManager.stop(event.getPlayer());
-        VisibilityService.cleanup(event.getPlayer());
+        MiningManager.getInstance().stop(event.getPlayer());
+        VisibilityManager.getInstance().cleanup(event.getPlayer());
     }
 
     @EventHandler
@@ -111,15 +111,15 @@ public class GameListener implements Listener {
 
         event.setCancelled(true);
         if (player.getGameMode() == GameMode.CREATIVE) {
-            MiningManager.breakNow(player, event.getBlock(), block);
+            MiningManager.getInstance().breakNow(player, event.getBlock(), block);
             return;
         }
-        MiningManager.start(player, event.getBlock(), block);
+        MiningManager.getInstance().start(player, event.getBlock(), block);
     }
 
     @EventHandler
     public void onStopBreaking(BlockDamageAbortEvent event) {
-        MiningManager.abort(event.getPlayer());
+        MiningManager.getInstance().abort(event.getPlayer());
     }
 
     @EventHandler
@@ -133,7 +133,7 @@ public class GameListener implements Listener {
         if (block != null) {
             event.setCancelled(true);
             if (event.getPlayer().getGameMode() == GameMode.CREATIVE) {
-                MiningManager.breakNow(event.getPlayer(), event.getBlock(), block);
+                MiningManager.getInstance().breakNow(event.getPlayer(), event.getBlock(), block);
             }
         }
     }
@@ -150,7 +150,7 @@ public class GameListener implements Listener {
 
     @EventHandler
     public void onPlace(BlockPlaceEvent event) {
-        BlockEnginePlacementService.place(event);
+        PlacementManager.getInstance().place(event);
     }
 
     @EventHandler
@@ -189,11 +189,11 @@ public class GameListener implements Listener {
         if (event.getAction() == Action.LEFT_CLICK_BLOCK) {
             event.setCancelled(true);
             if (event.getPlayer().getGameMode() == GameMode.CREATIVE) {
-                MiningManager.breakNow(event.getPlayer(), event.getClickedBlock(), block);
+                MiningManager.getInstance().breakNow(event.getPlayer(), event.getClickedBlock(), block);
                 return;
             }
-            if (!MiningManager.active(event.getPlayer(), event.getClickedBlock())) {
-                MiningManager.start(event.getPlayer(), event.getClickedBlock(), block);
+            if (!MiningManager.getInstance().active(event.getPlayer(), event.getClickedBlock())) {
+                MiningManager.getInstance().start(event.getPlayer(), event.getClickedBlock(), block);
             }
             return;
         }
@@ -218,10 +218,10 @@ public class GameListener implements Listener {
             return;
         }
 
-        BlockEngineBlockContext context = BlockEngineBlockDataService.context(event.getClickedBlock(), block, event.getPlayer());
+        BlockEngineBlockContext context = BlockDataManager.getInstance().context(event.getClickedBlock(), block, event.getPlayer());
         if (context != null && context.adapter().onInteract(context, event.getPlayer())) {
             event.setCancelled(true);
-            BlockEngineBlockDataService.save(event.getClickedBlock(), context);
+            BlockDataManager.getInstance().save(event.getClickedBlock(), context);
             return;
         }
 
@@ -399,7 +399,7 @@ public class GameListener implements Listener {
         }
 
         event.setCancelled(true);
-        if (!BlockEnginePlacementService.place(target, definition, player, placedAgainst, stateId)) {
+        if (!PlacementManager.getInstance().place(target, definition, player, placedAgainst, stateId)) {
             return true;
         }
         lastPlacementTicks.put(playerId, tick);
@@ -499,3 +499,12 @@ public class GameListener implements Listener {
         player.updateInventory();
     }
 }
+
+
+
+
+
+
+
+
+

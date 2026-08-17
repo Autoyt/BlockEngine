@@ -31,7 +31,7 @@ public interface BlockView {
 
     boolean isBlockEngineBlock();
 
-    @Nullable String BlockEngineBlockId();
+    @Nullable String blockEngineBlockId();
 
-    @Nullable String BlockEngineStateId();
+    @Nullable String blockEngineStateId();
 }

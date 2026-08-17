@@ -23,7 +23,7 @@ public final class BlockDefinition {
     private @Nullable String namespace;
     private final @NotNull String name;
     private final @NotNull Material defaultBlock;
-    private final boolean catelog;
+    private final boolean catalog;
     private final @NotNull Item item;
     private final @NotNull Placement placement;
     private final @NotNull String defaultState;
@@ -32,7 +32,7 @@ public final class BlockDefinition {
     private BlockDefinition(
             @NotNull String name,
             @NotNull Material defaultBlock,
-            boolean catelog,
+            boolean catalog,
             @NotNull Item item,
             @NotNull Placement placement,
             @NotNull String defaultState,
@@ -40,7 +40,7 @@ public final class BlockDefinition {
     ) {
         this.name = Objects.requireNonNull(name, "name");
         this.defaultBlock = Objects.requireNonNull(defaultBlock, "defaultBlock");
-        this.catelog = catelog;
+        this.catalog = catalog;
         this.item = Objects.requireNonNull(item, "item");
         this.placement = Objects.requireNonNull(placement, "placement");
         this.defaultState = Objects.requireNonNull(defaultState, "defaultState");
@@ -79,8 +79,8 @@ public final class BlockDefinition {
         return defaultBlock;
     }
 
-    public boolean catelog() {
-        return catelog;
+    public boolean catalog() {
+        return catalog;
     }
 
     public @NotNull Item item() {
@@ -214,8 +214,8 @@ public final class BlockDefinition {
     public static final class Builder {
         private final @NotNull String name;
         private @NotNull Material defaultBlock = Material.STONE;
-        private boolean catelog = true;
-        private @NotNull Item item = new Item(Material.LIGHT_GRAY_STAINED_GLASS, null, List.of(), false, true);
+        private boolean catalog = true;
+        private @NotNull Item item = new Item(Material.KNOWLEDGE_BOOK, null, List.of(), false, true);
         private @NotNull Placement placement = Placement.NONE;
         private @NotNull String defaultState = "default";
         private final @NotNull Map<String, State> states = new LinkedHashMap<>();
@@ -237,8 +237,8 @@ public final class BlockDefinition {
             return setDefaultBlock(vanillaBlock);
         }
 
-        public @NotNull Builder catelog(boolean catelog) {
-            this.catelog = catelog;
+        public @NotNull Builder catalog(boolean catalog) {
+            this.catalog = catalog;
             return this;
         }
 
@@ -274,7 +274,7 @@ public final class BlockDefinition {
             if (states.isEmpty()) {
                 state(defaultState, state -> state.textures(textures -> textures.all("missing")));
             }
-            return new BlockDefinition(name, defaultBlock, catelog, item, placement, defaultState, states);
+            return new BlockDefinition(name, defaultBlock, catalog, item, placement, defaultState, states);
         }
     }
 
@@ -311,7 +311,7 @@ public final class BlockDefinition {
         }
 
         private @NotNull Item build() {
-            return new Item(Material.LIGHT_GRAY_STAINED_GLASS, name, lore, glint, placeable);
+            return new Item(Material.KNOWLEDGE_BOOK, name, lore, glint, placeable);
         }
     }
 

@@ -9,11 +9,17 @@ import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-public final class BlockEngineBlockDataService {
-    private BlockEngineBlockDataService() {
+public final class BlockDataManager {
+    private static final BlockDataManager instance = new BlockDataManager();
+
+    private BlockDataManager() {
     }
 
-    public static @Nullable BlockEngineBlockContext context(
+    public static @NotNull BlockDataManager getInstance() {
+        return instance;
+    }
+
+    public @Nullable BlockEngineBlockContext context(
             @NotNull Block block,
             @NotNull RuntimeBlockView view,
             @Nullable Player player
@@ -30,7 +36,7 @@ public final class BlockEngineBlockDataService {
         return new BlockEngineBlockContext(definition.adapter(), data, block, player);
     }
 
-    public static void save(@NotNull Block block, @NotNull BlockEngineBlockContext context) {
+    public void save(@NotNull Block block, @NotNull BlockEngineBlockContext context) {
         BlockDefinition definition = BlockRegistry.getBlock(context.blockId());
         if (definition == null) {
             return;
@@ -49,3 +55,4 @@ public final class BlockEngineBlockDataService {
         BlockEngineMutationBatcher.changed(block);
     }
 }
+
