@@ -56,12 +56,7 @@ public final class TurtleChunkRuntime {
             return null;
         }
 
-        for (RuntimeBlockView block : chunk.blocks()) {
-            if (block.location().equals(location)) {
-                return block;
-            }
-        }
-        return null;
+        return chunk.block(location.x() & 15, location.y(), location.z() & 15);
     }
 
     public static @NotNull Collection<LoadedTurtleChunk> chunks() {

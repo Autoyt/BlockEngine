@@ -24,7 +24,7 @@ import java.util.Map;
 import java.util.Objects;
 
 public final class TurtleChunkData {
-    public static final int VERSION = 4;
+    public static final int VERSION = 5;
     private static final int MIN_VERSION = 2;
     public static final PersistentDataType<byte[], TurtleChunkData> TYPE = new TurtleChunkDataType();
 
@@ -119,7 +119,6 @@ public final class TurtleChunkData {
             @NotNull Material fallbackBlock,
             float hardness,
             float miningSpeed,
-            boolean washable,
             boolean unbreakable,
             boolean dropsItem,
             boolean dropInCreative,
@@ -166,7 +165,6 @@ public final class TurtleChunkData {
                     definition.defaultBlock(),
                     state.hardness(),
                     state.miningSpeed(),
-                    state.washable(),
                     state.unbreakable(),
                     state.dropsItem(),
                     state.dropInCreative(),
@@ -316,7 +314,6 @@ public final class TurtleChunkData {
             out.writeUTF(block.fallbackBlock().name());
             out.writeFloat(block.hardness());
             out.writeFloat(block.miningSpeed());
-            out.writeBoolean(block.washable());
             out.writeBoolean(block.unbreakable());
             out.writeBoolean(block.dropsItem());
             out.writeBoolean(block.dropInCreative());
@@ -334,14 +331,16 @@ public final class TurtleChunkData {
             Material fallbackBlock = readMaterial(in.readUTF());
             float hardness = in.readFloat();
             float miningSpeed = in.readFloat();
-            boolean washable = in.readBoolean();
+            if (version < 5) {
+                in.readBoolean();
+            }
             boolean unbreakable = version >= 3 && in.readBoolean();
             boolean dropsItem = version < 3 || in.readBoolean();
             boolean dropInCreative = version >= 4 && in.readBoolean();
             SimpleBlockData data = readBlockData(in);
             byte[] payload = in.readNBytes(in.readInt());
 
-            return new StoredBlock(localX, y, localZ, fallbackBlock, hardness, miningSpeed, washable, unbreakable, dropsItem, dropInCreative, data, payload);
+            return new StoredBlock(localX, y, localZ, fallbackBlock, hardness, miningSpeed, unbreakable, dropsItem, dropInCreative, data, payload);
         }
 
         private static @NotNull Material readMaterial(@NotNull String name) {

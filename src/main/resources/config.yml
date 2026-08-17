@@ -1,3 +1,6 @@
+custom-blocks:
+  backing-block: LIGHT_GRAY_STAINED_GLASS
+
 visibility:
   enabled: true
   chunks:

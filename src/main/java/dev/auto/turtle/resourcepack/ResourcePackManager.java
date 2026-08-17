@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import dev.auto.turtle.Main;
 import dev.auto.turtle.api.CustomBlockSystem;
 import dev.auto.turtle.api.blocks.BlockDefinition;
+import dev.auto.turtle.placement.TurtleBackingBlock;
 import dev.auto.turtle.registry.BlockRegistry;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
@@ -22,6 +23,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.Base64;
 import java.util.Comparator;
 import java.util.HexFormat;
+import java.util.Locale;
 import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
@@ -64,9 +66,14 @@ public final class ResourcePackManager {
             ObjectNode packNode = rootNode.putObject("pack");
             packNode.put("pack_format", PACK_FORMAT);
             packNode.put("description", packText());
+            ObjectNode supportedFormats = packNode.putObject("supported_formats");
+            supportedFormats.put("min_inclusive", 16);
+            supportedFormats.put("max_inclusive", 99);
             Main.getJsonMapper().writeValue(root.resolve("pack.mcmeta").toFile(), rootNode);
             packLogo(root);
+            backingBlock(root);
             demoTextures(root);
+            breakOverlays(root);
 
             for (dev.auto.turtle.types.BlockDefinition registered : BlockRegistry.getBlocks()) {
                 block(root, registered.apiDefinition());
@@ -258,6 +265,43 @@ public final class ResourcePackManager {
         Main.getJsonMapper().writeValue(output.toFile(), rootNode);
     }
 
+    private static void breakOverlays(@NotNull Path root) throws IOException {
+        String namespace = pluginNamespace();
+        for (int stage = 0; stage <= 9; stage++) {
+            Path modelPath = root.resolve("assets")
+                    .resolve(namespace)
+                    .resolve("models")
+                    .resolve("block")
+                    .resolve("break_stage")
+                    .resolve(stage + ".json");
+            Files.createDirectories(modelPath.getParent());
+
+            ObjectNode model = Main.getJsonMapper().createObjectNode();
+            model.put("parent", "minecraft:block/cube_all");
+            ObjectNode textures = model.putObject("textures");
+            textures.put("all", "minecraft:block/destroy_stage_" + stage);
+            textures.put("particle", "minecraft:block/destroy_stage_" + stage);
+            Main.getJsonMapper().writeValue(modelPath.toFile(), model);
+
+            Path itemPath = root.resolve("assets")
+                    .resolve(namespace)
+                    .resolve("items")
+                    .resolve("break_stage")
+                    .resolve(stage + ".json");
+            Files.createDirectories(itemPath.getParent());
+
+            ObjectNode item = Main.getJsonMapper().createObjectNode();
+            ObjectNode itemModel = item.putObject("model");
+            itemModel.put("type", "minecraft:model");
+            itemModel.put("model", namespace + ":block/break_stage/" + stage);
+            Main.getJsonMapper().writeValue(itemPath.toFile(), item);
+        }
+    }
+
+    private static @NotNull String pluginNamespace() {
+        return Main.getInstance().getName().toLowerCase(Locale.ROOT);
+    }
+
     private static @NotNull String texture(@NotNull BlockDefinition definition, String path) {
         if (path == null || path.isBlank()) {
             return "minecraft:block/stone";
@@ -279,11 +323,58 @@ public final class ResourcePackManager {
         texture(root, "transparent", 0x00000000);
         texture(root, "demo_inventory", 0xFF2F6BFF);
         texture(root, "demo_break", 0xFFFF8C1A);
-        texture(root, "demo_washable", 0xFF00C8D7);
         texture(root, "demo_state_red", 0xFFFF3355);
         texture(root, "demo_state_green", 0xFF33CC66);
         texture(root, "demo_state_purple", 0xFFB84DFF);
         texture(root, "demo_mining", 0xFF7DFF42);
+    }
+
+    private static void backingBlock(@NotNull Path root) throws IOException {
+        String assetName = TurtleBackingBlock.assetName();
+        Path texture = root.resolve("assets")
+                .resolve("minecraft")
+                .resolve("textures")
+                .resolve("block")
+                .resolve(assetName + ".png");
+        Files.createDirectories(texture.getParent());
+        transparentTexture(texture);
+
+        Path modelPath = root.resolve("assets")
+                .resolve("minecraft")
+                .resolve("models")
+                .resolve("block")
+                .resolve(assetName + ".json");
+        Files.createDirectories(modelPath.getParent());
+
+        ObjectNode model = Main.getJsonMapper().createObjectNode();
+        model.put("parent", "minecraft:block/cube_all");
+        ObjectNode textures = model.putObject("textures");
+        textures.put("all", "minecraft:block/" + assetName);
+        textures.put("particle", "minecraft:block/" + assetName);
+        Main.getJsonMapper().writeValue(modelPath.toFile(), model);
+
+        Path blockStatePath = root.resolve("assets")
+                .resolve("minecraft")
+                .resolve("blockstates")
+                .resolve(assetName + ".json");
+        Files.createDirectories(blockStatePath.getParent());
+
+        ObjectNode blockState = Main.getJsonMapper().createObjectNode();
+        ObjectNode variants = blockState.putObject("variants");
+        if (TurtleBackingBlock.material() == org.bukkit.Material.TEST_BLOCK) {
+            backingVariant(variants, "mode=start", assetName);
+            backingVariant(variants, "mode=log", assetName);
+            backingVariant(variants, "mode=fail", assetName);
+            backingVariant(variants, "mode=accept", assetName);
+        } else {
+            backingVariant(variants, "", assetName);
+        }
+        Main.getJsonMapper().writeValue(blockStatePath.toFile(), blockState);
+    }
+
+    private static void backingVariant(@NotNull ObjectNode variants, @NotNull String key, @NotNull String assetName) {
+        ArrayNode entries = variants.putArray(key);
+        entries.addObject().put("model", "minecraft:block/" + assetName);
     }
 
     private static void texture(@NotNull Path root, @NotNull String name, int argb) throws IOException {
@@ -294,7 +385,7 @@ public final class ResourcePackManager {
                 .resolve(name + ".png");
         Files.createDirectories(output.getParent());
         if (argb == 0x00000000) {
-            Files.write(output, TRANSPARENT_PNG);
+            transparentTexture(output);
             return;
         }
 
@@ -304,6 +395,11 @@ public final class ResourcePackManager {
                 image.setRGB(x, y, argb);
             }
         }
+        ImageIO.write(image, "png", output.toFile());
+    }
+
+    private static void transparentTexture(@NotNull Path output) throws IOException {
+        BufferedImage image = new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB);
         ImageIO.write(image, "png", output.toFile());
     }
 

@@ -31,6 +31,9 @@ public final class BreakAnimationPacketBlocker {
                         packet.getBlockPosition(),
                         packet.getEntityId(),
                         packet.getDestroyStage()
+                ) || DebugBreakAnimationService.blocksReset(
+                        packet.getBlockPosition(),
+                        packet.getDestroyStage()
                 )) {
                     event.setCancelled(true);
                 }

@@ -26,7 +26,8 @@ public final class InvisibleBlockAdapter implements BlockAdapter {
                 .state("default", state -> state
                         .hardness(0.3f)
                         .miningSpeed(1.0f)
-                        .dropsItem(true)
+                        .unbreakable(true)
+                        .dropsItem(false)
                         .textures(textures -> textures.all("turtle_test:block/transparent"))
                         .sounds(sounds -> sounds
                                 .mining("minecraft:block.glass.hit")

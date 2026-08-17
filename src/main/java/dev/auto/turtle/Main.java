@@ -11,9 +11,11 @@ import dev.auto.turtle.listeners.BlockCommandOverrideListener;
 import dev.auto.turtle.listeners.ChunkListeners;
 import dev.auto.turtle.listeners.GameListener;
 import dev.auto.turtle.mining.BreakAnimationPacketBlocker;
+import dev.auto.turtle.mining.DebugBreakAnimationService;
 import dev.auto.turtle.mining.MiningManager;
 import dev.auto.turtle.registry.DiscoverySystem;
 import dev.auto.turtle.resourcepack.ResourcePackManager;
+import dev.auto.turtle.runtime.TurtleMutationBatcher;
 import dev.auto.turtle.visibility.VisibilityService;
 import io.github.retrooper.packetevents.factory.spigot.SpigotPacketEventsBuilder;
 import lombok.Getter;
@@ -69,13 +71,16 @@ public final class Main extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        TurtleMutationBatcher.flushNow();
         for (Player player : Bukkit.getOnlinePlayers()) {
             VisibilityService.cleanup(player);
         }
         MiningManager.cleanupAll();
+        DebugBreakAnimationService.clearAll();
         BreakAnimationPacketBlocker.unregister();
         CatelogListeners.cleanup();
         ResourcePackManager.stop();
+        TurtleMutationBatcher.clear();
         PacketEvents.getAPI().terminate();
     }
 }

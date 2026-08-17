@@ -4,6 +4,7 @@ import dev.auto.turtle.Main;
 import dev.auto.turtle.defaultadapters.DebugBlocks;
 import dev.auto.turtle.entity.TurtleBlockOrchestrator;
 import dev.auto.turtle.items.TurtleItemManager;
+import dev.auto.turtle.mining.DebugBreakAnimationService;
 import dev.auto.turtle.registry.BlockRegistry;
 import dev.auto.turtle.resourcepack.ResourcePackManager;
 import dev.auto.turtle.types.BlockDefinition;
@@ -25,7 +26,8 @@ public final class DebugCommands implements BasicCommand {
     private static final List<String> ROOT_SUBCOMMANDS = List.of(
             "spawn",
             "redblock",
-            "pack"
+            "pack",
+            "breakstage"
     );
     private static final List<String> EXAMPLE_ALIASES = List.of(
             "spawn"
@@ -55,9 +57,8 @@ public final class DebugCommands implements BasicCommand {
         String sub = args[0].toLowerCase(Locale.ROOT);
 
         switch (sub) {
-            case "spawn" -> spawnDebugEntity(sender, args);
-            case "redblock" -> redBlock(sender);
             case "pack" -> pack(sender, args);
+            case "breakstage", "breakamount", "crack" -> breakStage(sender, args);
             default -> sender.sendMessage("Unknown subcommand. Try: " + String.join(", ", ROOT_SUBCOMMANDS));
         }
     }
@@ -98,63 +99,17 @@ public final class DebugCommands implements BasicCommand {
                     .filter(option -> option.startsWith(args[1].toLowerCase(Locale.ROOT)))
                     .toList();
         }
+        if ((first.equals("breakstage") || first.equals("breakamount") || first.equals("crack")) && args.length == 2) {
+            return List.of("0", "1", "2", "3", "4", "5", "6", "7", "8", "9").stream()
+                    .filter(stage -> stage.startsWith(args[1]))
+                    .toList();
+        }
 
         return List.of();
     }
 
     private static boolean hasAlias(String input, List<String> aliases) {
         return aliases.contains(input.toLowerCase(Locale.ROOT));
-    }
-
-    private static void spawnDebugEntity(org.bukkit.command.CommandSender sender, String[] args) {
-        if (!(sender instanceof Player player)) {
-            sender.sendMessage("Only players can use this subcommand.");
-            return;
-        }
-
-        Material material = Material.STONE;
-        if (args.length >= 2) {
-            material = Material.matchMaterial(args[1], true);
-            if (material == null || !material.isItem()) {
-                sender.sendMessage("Unknown item material: " + args[1]);
-                return;
-            }
-        }
-
-        Block targetBlock = player.getTargetBlockExact(6, FluidCollisionMode.NEVER);
-        if (targetBlock == null) {
-            sender.sendMessage("Look at a block within 6 blocks first.");
-            return;
-        }
-
-        BlockLocationKey key = new BlockLocationKey(
-                player.getWorld().getUID(),
-                targetBlock.getX(),
-                targetBlock.getY(),
-                targetBlock.getZ()
-        );
-
-        TurtleBlockOrchestrator.addEntity(key, material);
-        sender.sendMessage("Spawned a debug item display at " +
-                targetBlock.getX() + ", " +
-                targetBlock.getY() + ", " +
-                targetBlock.getZ() + " using " + material.name().toLowerCase(Locale.ROOT) + ".");
-    }
-
-    private static void redBlock(org.bukkit.command.CommandSender sender) {
-        if (!(sender instanceof Player player)) {
-            sender.sendMessage("Only players can use this subcommand.");
-            return;
-        }
-
-        BlockDefinition block = BlockRegistry.getBlock(DebugBlocks.RED_BLOCK_ID);
-        if (block == null) {
-            sender.sendMessage("Debug red block is not registered.");
-            return;
-        }
-
-        player.getInventory().addItem(TurtleItemManager.create(block));
-        sender.sendMessage("Gave you turtle_test:red_block.");
     }
 
     private static void pack(org.bukkit.command.CommandSender sender, String[] args) {
@@ -171,5 +126,39 @@ public final class DebugCommands implements BasicCommand {
         }
 
         sender.sendMessage("Use /turtledebug pack reload from console, or run /turtledebug pack as a player.");
+    }
+
+    private static void breakStage(org.bukkit.command.CommandSender sender, String[] args) {
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage("Only players can debug block break animation targets.");
+            return;
+        }
+        if (args.length < 2) {
+            sender.sendMessage("Usage: /turtledebug breakstage <0-9>");
+            return;
+        }
+
+        int stage;
+        try {
+            stage = Integer.parseInt(args[1]);
+        } catch (NumberFormatException ignored) {
+            sender.sendMessage("Break stage must be a number from 0 to 9.");
+            return;
+        }
+        if (stage < 0 || stage > 9) {
+            sender.sendMessage("Break stage must be from 0 to 9.");
+            return;
+        }
+
+        Block target = player.getTargetBlockExact(8, FluidCollisionMode.NEVER);
+        if (target == null) {
+            sender.sendMessage("Look at a block within 8 blocks first.");
+            return;
+        }
+
+        DebugBreakAnimationService.show(player, target, (byte) stage);
+        sender.sendMessage("Sending break stage " + stage + " to "
+                + target.getX() + " " + target.getY() + " " + target.getZ()
+                + " for 1 second.");
     }
 }

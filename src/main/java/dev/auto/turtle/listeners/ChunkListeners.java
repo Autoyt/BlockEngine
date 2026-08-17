@@ -2,6 +2,7 @@ package dev.auto.turtle.listeners;
 
 import dev.auto.turtle.Main;
 import dev.auto.turtle.runtime.TurtleChunkRuntime;
+import dev.auto.turtle.runtime.TurtleMutationBatcher;
 import dev.auto.turtle.types.ChunkKey;
 import dev.auto.turtle.visibility.VisibilityService;
 import org.bukkit.Chunk;
@@ -24,6 +25,7 @@ public class ChunkListeners implements Listener {
 
     @EventHandler
     public void onChunkUnload(ChunkUnloadEvent event) {
+        TurtleMutationBatcher.flushNow();
         ChunkKey key = ChunkKey.from(event.getChunk());
         TurtleChunkRuntime.unloadChunk(event.getChunk());
         VisibilityService.removeChunkDisplays(key);

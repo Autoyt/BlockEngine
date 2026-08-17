@@ -1,23 +1,15 @@
 package dev.auto.turtle.listeners;
 
 import dev.auto.turtle.Main;
-import dev.auto.turtle.api.blocks.BlockData;
 import dev.auto.turtle.items.TurtleItemManager;
-import dev.auto.turtle.pdc.TurtleChunkData;
 import dev.auto.turtle.placement.TurtlePlacementService;
 import dev.auto.turtle.registry.BlockRegistry;
-import dev.auto.turtle.runtime.TurtleBlockContext;
 import dev.auto.turtle.runtime.TurtleBlockRemover;
-import dev.auto.turtle.runtime.TurtleCreateContext;
 import dev.auto.turtle.runtime.TurtleChunkRuntime;
 import dev.auto.turtle.types.BlockDefinition;
 import dev.auto.turtle.types.BlockLocationKey;
-import dev.auto.turtle.types.ChunkKey;
-import dev.auto.turtle.visibility.VisibilityService;
 import org.bukkit.Bukkit;
-import org.bukkit.Chunk;
 import org.bukkit.Location;
-import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.command.BlockCommandSender;
@@ -35,11 +27,8 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
 
 public final class BlockCommandOverrideListener implements Listener {
     private static final int MAX_BLOCKS = 32768;
@@ -189,7 +178,6 @@ public final class BlockCommandOverrideListener implements Listener {
             return true;
         }
 
-        Map<ChunkKey, BatchChunk> chunks = new HashMap<>();
         int changed = 0;
         for (int x = minX; x <= maxX; x++) {
             for (int y = minY; y <= maxY; y++) {
@@ -198,7 +186,7 @@ public final class BlockCommandOverrideListener implements Listener {
                     if (mode.equals("keep") && !block.getType().isAir()) {
                         continue;
                     }
-                    if (!batch(block, definition, source.player(), target.stateId(), mode.equals("destroy"), chunks)) {
+                    if (!batch(block, definition, source.player(), target.stateId(), mode.equals("destroy"))) {
                         continue;
                     }
                     changed++;
@@ -206,7 +194,6 @@ public final class BlockCommandOverrideListener implements Listener {
             }
         }
 
-        commit(chunks);
         sender.sendMessage("Filled " + changed + " Turtle block(s).");
         return true;
     }
@@ -277,8 +264,7 @@ public final class BlockCommandOverrideListener implements Listener {
             @NotNull BlockDefinition definition,
             @Nullable Player player,
             @Nullable String stateId,
-            boolean dropExisting,
-            @NotNull Map<ChunkKey, BatchChunk> chunks
+            boolean dropExisting
     ) {
         if (dropExisting && TurtleChunkRuntime.getBlock(new BlockLocationKey(
                 block.getWorld().getUID(),
@@ -289,62 +275,7 @@ public final class BlockCommandOverrideListener implements Listener {
             return false;
         }
 
-        String defaultState = stateId == null || stateId.isBlank()
-                ? definition.apiDefinition().defaultState()
-                : stateId;
-        try {
-            definition.apiDefinition().state(defaultState);
-        } catch (IllegalArgumentException ignored) {
-            return false;
-        }
-
-        TurtleCreateContext createContext = new TurtleCreateContext(
-                block.getLocation(),
-                player,
-                null,
-                definition.id(),
-                defaultState
-        );
-        BlockData data = definition.adapter().createDefaultData(createContext);
-        data.blockId(definition.id());
-        if (data.stateId() == null || data.stateId().isBlank()) {
-            data.stateId(defaultState);
-        }
-        try {
-            definition.apiDefinition().state(data.stateId());
-        } catch (IllegalArgumentException ignored) {
-            return false;
-        }
-
-        BatchChunk batch = chunks.computeIfAbsent(ChunkKey.from(block.getChunk()), ignored -> new BatchChunk(block.getChunk()));
-        byte[] payload = definition.adapter().save(data);
-        batch.data().setBlock(block.getX() & 15, block.getY(), block.getZ() & 15, data, definition.apiDefinition(), payload);
-        batch.placements().add(new BatchPlacement(block, definition, data, player));
-        block.setType(Material.BARRIER, false);
-        return true;
-    }
-
-    private void commit(@NotNull Map<ChunkKey, BatchChunk> chunks) {
-        Set<ChunkKey> touched = new HashSet<>();
-        for (Map.Entry<ChunkKey, BatchChunk> entry : chunks.entrySet()) {
-            BatchChunk batch = entry.getValue();
-            TurtleChunkData.save(batch.chunk(), TurtleChunkRuntime.chunkDataKey(), batch.data());
-            TurtleChunkRuntime.loadChunk(batch.chunk(), VisibilityService.config());
-            touched.add(entry.getKey());
-        }
-
-        for (BatchChunk batch : chunks.values()) {
-            for (BatchPlacement placement : batch.placements()) {
-                placement.definition().adapter().onPlace(new TurtleBlockContext(
-                        placement.definition().adapter(),
-                        placement.data(),
-                        placement.block(),
-                        placement.player()
-                ));
-            }
-        }
-
-        VisibilityService.refreshPlayersNear(touched);
+        return TurtlePlacementService.place(block, definition, player, null, stateId);
     }
 
     private record ParsedCommand(@NotNull String name, String @NotNull [] args) {
@@ -499,23 +430,5 @@ public final class BlockCommandOverrideListener implements Listener {
             }
             return null;
         }
-    }
-
-    private record BatchChunk(
-            @NotNull Chunk chunk,
-            @NotNull TurtleChunkData data,
-            @NotNull Collection<BatchPlacement> placements
-    ) {
-        private BatchChunk(@NotNull Chunk chunk) {
-            this(chunk, TurtleChunkData.load(chunk, TurtleChunkRuntime.chunkDataKey()), new ArrayList<>());
-        }
-    }
-
-    private record BatchPlacement(
-            @NotNull Block block,
-            @NotNull BlockDefinition definition,
-            @NotNull BlockData data,
-            @Nullable Player player
-    ) {
     }
 }

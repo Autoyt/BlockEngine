@@ -23,7 +23,7 @@ public final class BlockDefinition {
     private @Nullable String namespace;
     private final @NotNull String name;
     private final @NotNull Material defaultBlock;
-    private final boolean creativeMenu;
+    private final boolean catelog;
     private final @NotNull Item item;
     private final @NotNull Placement placement;
     private final @NotNull String defaultState;
@@ -32,7 +32,7 @@ public final class BlockDefinition {
     private BlockDefinition(
             @NotNull String name,
             @NotNull Material defaultBlock,
-            boolean creativeMenu,
+            boolean catelog,
             @NotNull Item item,
             @NotNull Placement placement,
             @NotNull String defaultState,
@@ -40,7 +40,7 @@ public final class BlockDefinition {
     ) {
         this.name = Objects.requireNonNull(name, "name");
         this.defaultBlock = Objects.requireNonNull(defaultBlock, "defaultBlock");
-        this.creativeMenu = creativeMenu;
+        this.catelog = catelog;
         this.item = Objects.requireNonNull(item, "item");
         this.placement = Objects.requireNonNull(placement, "placement");
         this.defaultState = Objects.requireNonNull(defaultState, "defaultState");
@@ -75,8 +75,8 @@ public final class BlockDefinition {
         return defaultBlock;
     }
 
-    public boolean creativeMenu() {
-        return creativeMenu;
+    public boolean catelog() {
+        return catelog;
     }
 
     public @NotNull Item item() {
@@ -148,7 +148,6 @@ public final class BlockDefinition {
     public record State(
             float hardness,
             float miningSpeed,
-            boolean washable,
             boolean unbreakable,
             boolean dropsItem,
             boolean dropInCreative,
@@ -211,8 +210,8 @@ public final class BlockDefinition {
     public static final class Builder {
         private final @NotNull String name;
         private @NotNull Material defaultBlock = Material.STONE;
-        private boolean creativeMenu = true;
-        private @NotNull Item item = new Item(Material.KNOWLEDGE_BOOK, null, List.of(), false, true);
+        private boolean catelog = true;
+        private @NotNull Item item = new Item(Material.LIGHT_GRAY_STAINED_GLASS, null, List.of(), false, true);
         private @NotNull Placement placement = Placement.NONE;
         private @NotNull String defaultState = "default";
         private final @NotNull Map<String, State> states = new LinkedHashMap<>();
@@ -230,8 +229,8 @@ public final class BlockDefinition {
             return this;
         }
 
-        public @NotNull Builder creativeMenu(boolean creativeMenu) {
-            this.creativeMenu = creativeMenu;
+        public @NotNull Builder catelog(boolean catelog) {
+            this.catelog = catelog;
             return this;
         }
 
@@ -267,7 +266,7 @@ public final class BlockDefinition {
             if (states.isEmpty()) {
                 state(defaultState, state -> state.textures(textures -> textures.all("missing")));
             }
-            return new BlockDefinition(name, defaultBlock, creativeMenu, item, placement, defaultState, states);
+            return new BlockDefinition(name, defaultBlock, catelog, item, placement, defaultState, states);
         }
     }
 
@@ -304,14 +303,13 @@ public final class BlockDefinition {
         }
 
         private @NotNull Item build() {
-            return new Item(Material.KNOWLEDGE_BOOK, name, lore, glint, placeable);
+            return new Item(Material.LIGHT_GRAY_STAINED_GLASS, name, lore, glint, placeable);
         }
     }
 
     public static final class StateBuilder {
         private float hardness = 0.5f;
         private float miningSpeed = 1.0f;
-        private boolean washable = false;
         private boolean unbreakable = false;
         private boolean dropsItem = true;
         private boolean dropInCreative = false;
@@ -325,11 +323,6 @@ public final class BlockDefinition {
 
         public @NotNull StateBuilder miningSpeed(float miningSpeed) {
             this.miningSpeed = miningSpeed;
-            return this;
-        }
-
-        public @NotNull StateBuilder washable(boolean washable) {
-            this.washable = washable;
             return this;
         }
 
@@ -365,7 +358,7 @@ public final class BlockDefinition {
         }
 
         private @NotNull State build() {
-            return new State(hardness, miningSpeed, washable, unbreakable, dropsItem, dropInCreative, textures, sounds);
+            return new State(hardness, miningSpeed, unbreakable, dropsItem, dropInCreative, textures, sounds);
         }
     }
 

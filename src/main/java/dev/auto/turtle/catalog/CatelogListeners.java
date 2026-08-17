@@ -2,6 +2,7 @@ package dev.auto.turtle.catalog;
 
 import dev.auto.turtle.Main;
 import dev.auto.turtle.items.TurtleItemManager;
+import dev.auto.turtle.placement.TurtleBackingBlock;
 import dev.auto.turtle.registry.BlockRegistry;
 import dev.auto.turtle.types.BlockDefinition;
 import io.papermc.paper.event.player.PlayerStonecutterRecipeSelectEvent;
@@ -56,7 +57,7 @@ public final class CatelogListeners implements Listener {
 
         InventoryView view = MenuType.STONECUTTER.create(player, TITLE);
         player.openInventory(view);
-        view.getTopInventory().setItem(INPUT_SLOT, takeButton());
+        view.getTopInventory().setItem(INPUT_SLOT, inputItem());
         view.getTopInventory().setItem(OUTPUT_SLOT, output(first));
     }
 
@@ -86,7 +87,7 @@ public final class CatelogListeners implements Listener {
         }
 
         session.selected(block);
-        event.getStonecutterInventory().setInputItem(takeButton());
+        event.getStonecutterInventory().setInputItem(inputItem());
         event.getStonecutterInventory().setResult(output(block));
     }
 
@@ -103,10 +104,16 @@ public final class CatelogListeners implements Listener {
         }
 
         int rawSlot = event.getRawSlot();
-        if (rawSlot == INPUT_SLOT || rawSlot == OUTPUT_SLOT) {
+        if (rawSlot == INPUT_SLOT) {
+            event.setCancelled(true);
+            event.getView().getTopInventory().setItem(INPUT_SLOT, inputItem());
+            return;
+        }
+
+        if (rawSlot == OUTPUT_SLOT) {
             event.setCancelled(true);
             give(player, session.selected());
-            event.getView().getTopInventory().setItem(INPUT_SLOT, takeButton());
+            event.getView().getTopInventory().setItem(INPUT_SLOT, inputItem());
             event.getView().getTopInventory().setItem(OUTPUT_SLOT, output(session.selected()));
             return;
         }
@@ -141,6 +148,7 @@ public final class CatelogListeners implements Listener {
     private static void registerRecipes() {
         clearRecipes();
         List<BlockDefinition> blocks = BlockRegistry.getBlocks().stream()
+                .filter(block -> block.apiDefinition().catelog())
                 .sorted(Comparator.comparing(BlockDefinition::id))
                 .toList();
 
@@ -149,7 +157,7 @@ public final class CatelogListeners implements Listener {
             StonecuttingRecipe recipe = new StonecuttingRecipe(
                     key,
                     TurtleItemManager.create(block),
-                    new RecipeChoice.MaterialChoice(Material.LIME_STAINED_GLASS_PANE)
+                    new RecipeChoice.MaterialChoice(TurtleBackingBlock.material())
             );
             recipe.setGroup("turtle_catelog");
             Bukkit.addRecipe(recipe);
@@ -183,10 +191,10 @@ public final class CatelogListeners implements Listener {
         player.sendMessage("Gave 64x " + block.id() + ".");
     }
 
-    private static @NotNull ItemStack takeButton() {
-        ItemStack item = new ItemStack(Material.LIME_STAINED_GLASS_PANE);
+    private static @NotNull ItemStack inputItem() {
+        ItemStack item = new ItemStack(TurtleBackingBlock.material());
         ItemMeta meta = item.getItemMeta();
-        meta.displayName(Component.text("Take 64"));
+        meta.displayName(Component.text("Turtle Catelog"));
         item.setItemMeta(meta);
         return item;
     }

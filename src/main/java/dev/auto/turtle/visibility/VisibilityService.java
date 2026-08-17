@@ -229,6 +229,7 @@ public final class VisibilityService {
         BlockLocationKey location = block.location();
         display.location(new Location(world, location.x() + 0.5, location.y() + 0.5, location.z() + 0.5, 0.0f, 0.0f))
                 .itemStack(TurtleDisplayItemManager.create(block))
+                .scale(2.0f, 2.0f, 2.0f)
                 .displayContext(VirtualItemDisplay.DISPLAY_CONTEXT_FIXED);
     }
 

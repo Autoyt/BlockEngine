@@ -4,25 +4,35 @@ import com.github.retrooper.packetevents.PacketEvents;
 import com.github.retrooper.packetevents.util.Vector3i;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerBlockBreakAnimation;
 import dev.auto.turtle.Main;
+import dev.auto.turtle.defaultadapters.DebugBlocks;
+import dev.auto.turtle.entity.TurtleBlockOrchestrator;
+import dev.auto.turtle.entity.VirtualItemDisplay;
+import dev.auto.turtle.placement.TurtleBackingBlock;
 import dev.auto.turtle.registry.BlockRegistry;
 import dev.auto.turtle.runtime.RuntimeBlockView;
 import dev.auto.turtle.runtime.TurtleBlockContext;
 import dev.auto.turtle.runtime.TurtleBlockDataService;
 import dev.auto.turtle.runtime.TurtleBlockRemover;
+import dev.auto.turtle.runtime.TurtleChunkRuntime;
 import dev.auto.turtle.types.BlockDefinition;
+import dev.auto.turtle.types.BlockLocationKey;
 import org.bukkit.NamespacedKey;
 import org.bukkit.SoundCategory;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
 import org.bukkit.Location;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.scheduler.BukkitTask;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.List;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
 public final class MiningManager {
+    private static final int TARGET_DISTANCE = 7;
     private static final Map<UUID, MiningSession> sessions = new HashMap<>();
 
     private MiningManager() {
@@ -35,7 +45,7 @@ public final class MiningManager {
         }
         stop(player);
 
-        if (customBlock.storedBlock().unbreakable()) {
+        if (customBlock.storedBlock().unbreakable() || customBlock.storedBlock().blockId().equals(DebugBlocks.INVISIBLE_BLOCK_ID)) {
             return;
         }
 
@@ -75,6 +85,29 @@ public final class MiningManager {
         return session != null && sameBlock(session.block(), block);
     }
 
+    public static void updateAim(@NotNull Player player) {
+        MiningSession session = sessions.get(player.getUniqueId());
+        if (session == null) {
+            return;
+        }
+
+        Block target = player.getTargetBlockExact(TARGET_DISTANCE);
+        if (target == null) {
+            stop(player);
+            return;
+        }
+        if (sameBlock(session.block(), target)) {
+            return;
+        }
+
+        RuntimeBlockView customBlock = TurtleChunkRuntime.getBlock(location(target));
+        if (customBlock == null) {
+            stop(player);
+            return;
+        }
+        start(player, target, customBlock);
+    }
+
     public static boolean blocksExternalClear(@NotNull Vector3i position, int animationId, byte stage) {
         if (stage >= 0) {
             return false;
@@ -94,6 +127,9 @@ public final class MiningManager {
     }
 
     public static void breakNow(@NotNull Player player, @NotNull Block block, @NotNull RuntimeBlockView customBlock) {
+        if (customBlock.storedBlock().blockId().equals(DebugBlocks.INVISIBLE_BLOCK_ID)) {
+            return;
+        }
         stop(player);
         finish(player, block, customBlock, customBlock.storedBlock().dropInCreative());
     }
@@ -152,16 +188,65 @@ public final class MiningManager {
                 session.block().getY(),
                 session.block().getZ()
         );
-        double maxDistanceSquared = Math.pow((Main.getInstance().getServer().getViewDistance() + 1) * 16.0, 2.0);
-        for (Player viewer : session.block().getWorld().getPlayers()) {
-            if (viewer.getLocation().distanceSquared(session.block().getLocation()) > maxDistanceSquared) {
-                continue;
-            }
+        List<Player> viewers = viewers(session.block());
+        for (Player viewer : viewers) {
             PacketEvents.getAPI().getPlayerManager().sendPacket(
                     viewer,
-            new WrapperPlayServerBlockBreakAnimation(session.animationId(), position, stage)
+                    new WrapperPlayServerBlockBreakAnimation(session.animationId(), position, stage)
             );
         }
+        sendOverlay(session, stage, viewers);
+    }
+
+    private static void sendOverlay(
+            @NotNull MiningSession session,
+            byte stage,
+            @NotNull List<Player> viewers
+    ) {
+        VirtualItemDisplay overlay = session.overlay();
+        if (stage < 0) {
+            if (overlay != null) {
+                overlay.destroyForAll();
+                TurtleBlockOrchestrator.freeId(overlay.getId());
+                session.overlay(null);
+            }
+            return;
+        }
+
+        if (overlay == null) {
+            overlay = new VirtualItemDisplay(TurtleBlockOrchestrator.nextId())
+                    .location(session.block().getLocation().add(0.5, 0.5, 0.5))
+                    .itemStack(breakOverlay(stage))
+                    .displayContext(VirtualItemDisplay.DISPLAY_CONTEXT_FIXED)
+                    .scale(2.025f, 2.025f, 2.025f)
+                    .viewRange(1.25f)
+                    .brightness(15, 15)
+                    .shadowRadius(0.0f)
+                    .shadowStrength(0.0f);
+            session.overlay(overlay);
+            overlay.spawnFor(viewers);
+            return;
+        }
+
+        overlay.itemStack(breakOverlay(stage));
+        overlay.updateMetadataFor(viewers);
+    }
+
+    private static @NotNull ItemStack breakOverlay(byte stage) {
+        ItemStack stack = new ItemStack(TurtleBackingBlock.material());
+        ItemMeta meta = stack.getItemMeta();
+        if (meta != null) {
+            meta.setItemModel(new NamespacedKey(Main.getInstance(), "break_stage/" + Math.clamp(stage, 0, 9)));
+            stack.setItemMeta(meta);
+        }
+        return stack;
+    }
+
+    private static @NotNull List<Player> viewers(@NotNull Block block) {
+        double maxDistanceSquared = Math.pow((Main.getInstance().getServer().getViewDistance() + 1) * 16.0, 2.0);
+        return block.getWorld().getPlayers().stream()
+                .filter(viewer -> viewer.getLocation().distanceSquared(block.getLocation()) <= maxDistanceSquared)
+                .toList();
     }
 
     private static void playMiningSound(@NotNull Player player, @NotNull RuntimeBlockView customBlock) {
@@ -200,6 +285,15 @@ public final class MiningManager {
         return result;
     }
 
+    private static @NotNull BlockLocationKey location(@NotNull Block block) {
+        return new BlockLocationKey(
+                block.getWorld().getUID(),
+                block.getX(),
+                block.getY(),
+                block.getZ()
+        );
+    }
+
     private static byte stage(int elapsedTicks, int totalTicks) {
         if (totalTicks <= 1) {
             return 9;
@@ -231,6 +325,7 @@ public final class MiningManager {
         private byte stage;
         private int elapsedTicks;
         private BukkitTask task;
+        private VirtualItemDisplay overlay;
 
         private MiningSession(@NotNull UUID playerId, @NotNull Block block, int animationId, int totalTicks) {
             this.playerId = playerId;
@@ -270,6 +365,14 @@ public final class MiningManager {
 
         private void task(BukkitTask task) {
             this.task = task;
+        }
+
+        private VirtualItemDisplay overlay() {
+            return overlay;
+        }
+
+        private void overlay(VirtualItemDisplay overlay) {
+            this.overlay = overlay;
         }
 
         private int tickAndGet() {

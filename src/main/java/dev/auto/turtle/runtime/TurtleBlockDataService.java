@@ -4,8 +4,6 @@ import dev.auto.turtle.api.blocks.BlockData;
 import dev.auto.turtle.pdc.TurtleChunkData;
 import dev.auto.turtle.registry.BlockRegistry;
 import dev.auto.turtle.types.BlockDefinition;
-import dev.auto.turtle.types.ChunkKey;
-import dev.auto.turtle.visibility.VisibilityService;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
@@ -39,7 +37,7 @@ public final class TurtleBlockDataService {
         }
         definition.apiDefinition().state(context.stateId());
 
-        TurtleChunkData chunkData = TurtleChunkData.load(block.getChunk(), TurtleChunkRuntime.chunkDataKey());
+        TurtleChunkData chunkData = TurtleMutationBatcher.data(block.getChunk());
         chunkData.setBlock(
                 block.getX() & 15,
                 block.getY(),
@@ -48,8 +46,6 @@ public final class TurtleBlockDataService {
                 definition.apiDefinition(),
                 definition.adapter().save(context.data())
         );
-        TurtleChunkData.save(block.getChunk(), TurtleChunkRuntime.chunkDataKey(), chunkData);
-        TurtleChunkRuntime.loadChunk(block.getChunk(), VisibilityService.config());
-        VisibilityService.refreshPlayersNear(ChunkKey.from(block.getChunk()));
+        TurtleMutationBatcher.changed(block);
     }
 }

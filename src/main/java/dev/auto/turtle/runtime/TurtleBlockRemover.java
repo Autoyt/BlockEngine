@@ -5,8 +5,6 @@ import dev.auto.turtle.pdc.TurtleChunkData;
 import dev.auto.turtle.registry.BlockRegistry;
 import dev.auto.turtle.types.BlockDefinition;
 import dev.auto.turtle.types.BlockLocationKey;
-import dev.auto.turtle.types.ChunkKey;
-import dev.auto.turtle.visibility.VisibilityService;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
@@ -34,6 +32,25 @@ public final class TurtleBlockRemover {
     }
 
     public static boolean remove(@NotNull Block block, @NotNull RuntimeBlockView customBlock, boolean drop) {
+        return remove(block, customBlock, drop, Material.AIR);
+    }
+
+    public static boolean remove(
+            @NotNull Block block,
+            @NotNull RuntimeBlockView customBlock,
+            boolean drop,
+            @NotNull Material replacement
+    ) {
+        return remove(block, customBlock, drop, replacement, replacement != Material.AIR);
+    }
+
+    public static boolean remove(
+            @NotNull Block block,
+            @NotNull RuntimeBlockView customBlock,
+            boolean drop,
+            @NotNull Material replacement,
+            boolean applyPhysics
+    ) {
         if (customBlock.storedBlock().unbreakable()) {
             return false;
         }
@@ -43,14 +60,11 @@ public final class TurtleBlockRemover {
         }
         sound(block, customBlock);
 
-        TurtleChunkData data = TurtleChunkData.load(block.getChunk(), TurtleChunkRuntime.chunkDataKey());
+        TurtleChunkData data = TurtleMutationBatcher.data(block.getChunk());
         data.removeBlock(block.getX() & 15, block.getY(), block.getZ() & 15);
-        TurtleChunkData.save(block.getChunk(), TurtleChunkRuntime.chunkDataKey(), data);
 
-        block.setType(Material.AIR, false);
-        ChunkKey chunkKey = ChunkKey.from(block.getChunk());
-        TurtleChunkRuntime.loadChunk(block.getChunk(), VisibilityService.config());
-        VisibilityService.refreshPlayersNear(chunkKey);
+        block.setType(replacement, applyPhysics);
+        TurtleMutationBatcher.changed(block);
         return true;
     }
 

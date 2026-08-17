@@ -3,6 +3,7 @@ package dev.auto.turtle.listeners;
 import dev.auto.turtle.Main;
 import dev.auto.turtle.items.TurtleItemManager;
 import dev.auto.turtle.mining.MiningManager;
+import dev.auto.turtle.placement.TurtleBackingBlock;
 import dev.auto.turtle.placement.TurtlePlacementService;
 import dev.auto.turtle.registry.BlockRegistry;
 import dev.auto.turtle.registry.NamespaceRegistry;
@@ -13,6 +14,7 @@ import dev.auto.turtle.runtime.TurtleBlockContext;
 import dev.auto.turtle.runtime.TurtleBlockDataService;
 import dev.auto.turtle.runtime.TurtleBlockRemover;
 import dev.auto.turtle.runtime.TurtleChunkRuntime;
+import dev.auto.turtle.runtime.TurtleMutationBatcher;
 import dev.auto.turtle.types.BlockDefinition;
 import dev.auto.turtle.types.BlockLocationKey;
 import dev.auto.turtle.visibility.VisibilityService;
@@ -20,17 +22,24 @@ import io.papermc.paper.event.player.PlayerPickBlockEvent;
 import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.block.Block;
+import org.bukkit.block.data.Waterlogged;
+import org.bukkit.entity.Entity;
+import org.bukkit.entity.EntityType;
+import org.bukkit.entity.LivingEntity;
+import org.bukkit.entity.Vehicle;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.Event;
 import org.bukkit.event.Listener;
+import org.bukkit.event.block.BlockCanBuildEvent;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockDamageAbortEvent;
 import org.bukkit.event.block.BlockDamageEvent;
 import org.bukkit.event.block.BlockExplodeEvent;
-import org.bukkit.event.block.BlockFromToEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
 import org.bukkit.event.block.Action;
@@ -41,18 +50,25 @@ import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerTeleportEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
+import org.bukkit.util.BoundingBox;
 
-import java.util.ArrayList;
-import java.util.Iterator;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 
 public class GameListener implements Listener {
+    private final Map<UUID, Integer> lastPlacementTicks = new HashMap<>();
+
     public GameListener() {
         Main.getInstance().getServer().getPluginManager().registerEvents(this, Main.getInstance());
     }
 
     @EventHandler
     public void onMove(PlayerMoveEvent event) {
+        MiningManager.updateAim(event.getPlayer());
         VisibilityService.handleMove(event);
     }
 
@@ -72,6 +88,8 @@ public class GameListener implements Listener {
 
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
+        TurtleMutationBatcher.flushNow();
+        lastPlacementTicks.remove(event.getPlayer().getUniqueId());
         MiningManager.stop(event.getPlayer());
         VisibilityService.cleanup(event.getPlayer());
     }
@@ -119,21 +137,6 @@ public class GameListener implements Listener {
     }
 
     @EventHandler
-    public void onFlow(BlockFromToEvent event) {
-        RuntimeBlockView block = block(event.getToBlock());
-        if (block == null) {
-            return;
-        }
-
-        if (block.storedBlock().unbreakable() || !block.storedBlock().washable()) {
-            event.setCancelled(true);
-            return;
-        }
-
-        TurtleBlockRemover.remove(event.getToBlock(), block, block.storedBlock().dropsItem());
-    }
-
-    @EventHandler
     public void onExplode(EntityExplodeEvent event) {
         explode(event.getLocation(), event.blockList());
     }
@@ -156,6 +159,10 @@ public class GameListener implements Listener {
         }
 
         event.setCancelled(true);
+        if (event.getPlayer().getGameMode() != GameMode.CREATIVE) {
+            return;
+        }
+
         BlockDefinition definition = BlockRegistry.getBlock(customBlock.storedBlock().blockId());
         if (definition == null) {
             return;
@@ -171,12 +178,9 @@ public class GameListener implements Listener {
             return;
         }
 
-        if (placeHeld(event)) {
-            return;
-        }
-
         RuntimeBlockView block = block(event.getClickedBlock());
         if (block == null) {
+            placeHeld(event);
             return;
         }
 
@@ -192,37 +196,54 @@ public class GameListener implements Listener {
             return;
         }
 
-        TurtleBlockContext context = TurtleBlockDataService.context(event.getClickedBlock(), block, event.getPlayer());
-        if (context == null) {
+        if (event.getAction() != Action.RIGHT_CLICK_BLOCK) {
             return;
         }
-        if (context.adapter().onInteract(context, event.getPlayer())) {
+
+        handleCustomRightClick(event, block);
+    }
+
+    private void handleCustomRightClick(PlayerInteractEvent event, RuntimeBlockView block) {
+        if (event.getHand() != EquipmentSlot.HAND) {
+            useHeldItem(event);
+            return;
+        }
+
+        if (event.getPlayer().isSneaking()) {
+            if (!placeHeld(event)) {
+                useHeldItem(event);
+            }
+            return;
+        }
+
+        TurtleBlockContext context = TurtleBlockDataService.context(event.getClickedBlock(), block, event.getPlayer());
+        if (context != null && context.adapter().onInteract(context, event.getPlayer())) {
             event.setCancelled(true);
             TurtleBlockDataService.save(event.getClickedBlock(), context);
+            return;
         }
+
+        if (placeHeld(event)) {
+            return;
+        }
+        useHeldItem(event);
     }
 
     private void explode(Location origin, List<Block> vanillaBlocks) {
-        double radius = radius(origin, vanillaBlocks);
-        List<RuntimeBlockView> customBlocks = customBlocks(origin, radius);
+        vanillaBlocks.removeIf(block -> block(block) != null);
 
-        Iterator<Block> iterator = vanillaBlocks.iterator();
-        while (iterator.hasNext()) {
-            if (block(iterator.next()) != null) {
-                iterator.remove();
-            }
+        World world = origin.getWorld();
+        if (world == null) {
+            return;
         }
 
-        for (RuntimeBlockView customBlock : customBlocks) {
+        Set<BlockLocationKey> affected = affectedByExplosion(origin, radius(origin, vanillaBlocks));
+        for (BlockLocationKey location : affected) {
+            RuntimeBlockView customBlock = TurtleChunkRuntime.getBlock(location);
+            if (customBlock == null) {
+                continue;
+            }
             if (customBlock.storedBlock().unbreakable()) {
-                continue;
-            }
-            if (!breaks(origin, radius, customBlock)) {
-                continue;
-            }
-
-            World world = Bukkit.getWorld(customBlock.location().worldId());
-            if (world == null) {
                 continue;
             }
             Block block = world.getBlockAt(
@@ -242,43 +263,90 @@ public class GameListener implements Listener {
         return radius + 1.0;
     }
 
-    private List<RuntimeBlockView> customBlocks(Location origin, double radius) {
-        List<RuntimeBlockView> result = new ArrayList<>();
+    private Set<BlockLocationKey> affectedByExplosion(Location origin, double radius) {
+        Set<BlockLocationKey> affected = new HashSet<>();
         World world = origin.getWorld();
         if (world == null) {
-            return result;
+            return affected;
         }
 
-        double maxDistanceSquared = radius * radius;
-        for (LoadedTurtleChunk chunk : TurtleChunkRuntime.chunks()) {
-            if (!chunk.key().worldId().equals(world.getUID())) {
-                continue;
-            }
-            for (RuntimeBlockView block : chunk.blocks()) {
-                double distanceSquared = origin.distanceSquared(new Location(
-                        world,
-                        block.location().x() + 0.5,
-                        block.location().y() + 0.5,
-                        block.location().z() + 0.5
-                ));
-                if (distanceSquared <= maxDistanceSquared) {
-                    result.add(block);
+        double power = Math.max(0.5, radius / 2.0);
+        int samples = 16;
+        for (int x = 0; x < samples; x++) {
+            for (int y = 0; y < samples; y++) {
+                for (int z = 0; z < samples; z++) {
+                    if (x != 0 && x != samples - 1
+                            && y != 0 && y != samples - 1
+                            && z != 0 && z != samples - 1) {
+                        continue;
+                    }
+                    ray(origin, world, affected, power, dir(x, samples), dir(y, samples), dir(z, samples));
                 }
             }
         }
-        return result;
+        return affected;
     }
 
-    private boolean breaks(Location origin, double radius, RuntimeBlockView block) {
-        double distance = origin.distance(new Location(
-                origin.getWorld(),
-                block.location().x() + 0.5,
-                block.location().y() + 0.5,
-                block.location().z() + 0.5
-        ));
-        double falloff = Math.max(0.0, 1.0 - (distance / radius));
-        double strength = falloff * 6.0;
-        return strength >= Math.max(0.05f, block.storedBlock().hardness());
+    private void ray(
+            Location origin,
+            World world,
+            Set<BlockLocationKey> affected,
+            double explosionPower,
+            double dx,
+            double dy,
+            double dz
+    ) {
+        double length = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        dx /= length;
+        dy /= length;
+        dz /= length;
+
+        double power = explosionPower * (0.7 + Math.random() * 0.6);
+        double x = origin.getX();
+        double y = origin.getY();
+        double z = origin.getZ();
+
+        while (power > 0.0) {
+            int blockX = floor(x);
+            int blockY = floor(y);
+            int blockZ = floor(z);
+            Block block = world.getBlockAt(blockX, blockY, blockZ);
+            if (protectedByWater(block)) {
+                return;
+            }
+
+            BlockLocationKey location = new BlockLocationKey(world.getUID(), blockX, blockY, blockZ);
+            RuntimeBlockView customBlock = TurtleChunkRuntime.getBlock(location);
+            float resistance = customBlock == null
+                    ? block.getType().getBlastResistance()
+                    : Math.max(0.05f, customBlock.storedBlock().hardness());
+            if (!block.getType().isAir() || customBlock != null) {
+                power -= (resistance + 0.3f) * 0.3f;
+            }
+
+            if (power > 0.0) {
+                affected.add(location);
+            }
+
+            x += dx * 0.3;
+            y += dy * 0.3;
+            z += dz * 0.3;
+            power -= 0.225;
+        }
+    }
+
+    private boolean protectedByWater(Block block) {
+        return block.getType() == Material.WATER
+                || block.getBlockData() instanceof Waterlogged waterlogged && waterlogged.isWaterlogged();
+    }
+
+    private double dir(int value, int samples) {
+        return (value / (double) (samples - 1)) * 2.0 - 1.0;
+    }
+
+    private int floor(double value) {
+        int integer = (int) value;
+        return value < integer ? integer - 1 : integer;
     }
 
     private RuntimeBlockView block(Block block) {
@@ -314,16 +382,88 @@ public class GameListener implements Listener {
             event.setCancelled(true);
             return true;
         }
+        if (!canPlace(target, player, event.getHand())) {
+            event.setCancelled(true);
+            return true;
+        }
+
+        int tick = Bukkit.getCurrentTick();
+        UUID playerId = player.getUniqueId();
+        if (lastPlacementTicks.getOrDefault(playerId, -1) == tick) {
+            event.setCancelled(true);
+            return true;
+        }
 
         event.setCancelled(true);
         if (!TurtlePlacementService.place(target, definition, player, event.getBlockFace().getOppositeFace(), TurtleItemManager.stateId(item))) {
             return true;
         }
+        lastPlacementTicks.put(playerId, tick);
+        player.swingHand(event.getHand());
 
         if (player.getGameMode() != GameMode.CREATIVE && item != null) {
             item.subtract();
         }
         return true;
+    }
+
+    private boolean holdingPlaceableTurtleBlock(ItemStack item) {
+        return TurtleItemManager.blockId(item) != null && TurtleItemManager.placeable(item);
+    }
+
+    private boolean canPlace(Block target, Player player, EquipmentSlot hand) {
+        BlockCanBuildEvent buildEvent = new BlockCanBuildEvent(
+                target,
+                player,
+                TurtleBackingBlock.material().createBlockData(),
+                target.canPlace(TurtleBackingBlock.material().createBlockData()),
+                hand
+        );
+        Bukkit.getPluginManager().callEvent(buildEvent);
+        return buildEvent.isBuildable() && !occupied(target, player);
+    }
+
+    private boolean occupied(Block target, Player player) {
+        BoundingBox blockBox = new BoundingBox(
+                target.getX(),
+                target.getY(),
+                target.getZ(),
+                target.getX() + 1.0,
+                target.getY() + 1.0,
+                target.getZ() + 1.0
+        );
+
+        if (player.getBoundingBox().overlaps(blockBox)) {
+            return true;
+        }
+
+        for (Entity entity : target.getWorld().getNearbyEntities(blockBox)) {
+            if (!blocksPlacement(entity)) {
+                continue;
+            }
+            if (entity.getBoundingBox().overlaps(blockBox)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean blocksPlacement(Entity entity) {
+        if (entity.isDead()) {
+            return false;
+        }
+        if (entity instanceof Player player && player.getGameMode() == GameMode.SPECTATOR) {
+            return false;
+        }
+        return entity instanceof LivingEntity
+                || entity instanceof Vehicle
+                || entity.getType() == EntityType.ARMOR_STAND
+                || entity.getType() == EntityType.END_CRYSTAL;
+    }
+
+    private void useHeldItem(PlayerInteractEvent event) {
+        event.setUseInteractedBlock(Event.Result.DENY);
+        event.setUseItemInHand(Event.Result.ALLOW);
     }
 
     private Block target(PlayerInteractEvent event) {

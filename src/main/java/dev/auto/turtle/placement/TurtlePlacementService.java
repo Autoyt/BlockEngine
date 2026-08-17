@@ -6,12 +6,9 @@ import dev.auto.turtle.pdc.TurtleChunkData;
 import dev.auto.turtle.registry.BlockRegistry;
 import dev.auto.turtle.registry.NamespaceRegistry;
 import dev.auto.turtle.runtime.TurtleBlockContext;
-import dev.auto.turtle.runtime.TurtleChunkRuntime;
 import dev.auto.turtle.runtime.TurtleCreateContext;
+import dev.auto.turtle.runtime.TurtleMutationBatcher;
 import dev.auto.turtle.types.BlockDefinition;
-import dev.auto.turtle.types.ChunkKey;
-import dev.auto.turtle.visibility.VisibilityService;
-import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.event.block.BlockPlaceEvent;
@@ -62,13 +59,11 @@ public final class TurtlePlacementService {
         definition.apiDefinition().state(data.stateId());
 
         byte[] payload = definition.adapter().save(data);
-        TurtleChunkData chunkData = TurtleChunkData.load(block.getChunk(), TurtleChunkRuntime.chunkDataKey());
+        TurtleChunkData chunkData = TurtleMutationBatcher.data(block.getChunk());
         chunkData.setBlock(block.getX() & 15, block.getY(), block.getZ() & 15, data, definition.apiDefinition(), payload);
-        TurtleChunkData.save(block.getChunk(), TurtleChunkRuntime.chunkDataKey(), chunkData);
 
-        block.setType(Material.BARRIER, false);
-        TurtleChunkRuntime.loadChunk(block.getChunk(), VisibilityService.config());
-        VisibilityService.refreshPlayersNear(ChunkKey.from(block.getChunk()));
+        block.setType(TurtleBackingBlock.material(), false);
+        TurtleMutationBatcher.changed(block);
 
         definition.adapter().onPlace(new TurtleBlockContext(definition.adapter(), data, block, event.getPlayer()));
         return true;
@@ -102,13 +97,11 @@ public final class TurtlePlacementService {
         definition.apiDefinition().state(data.stateId());
 
         byte[] payload = definition.adapter().save(data);
-        TurtleChunkData chunkData = TurtleChunkData.load(block.getChunk(), TurtleChunkRuntime.chunkDataKey());
+        TurtleChunkData chunkData = TurtleMutationBatcher.data(block.getChunk());
         chunkData.setBlock(block.getX() & 15, block.getY(), block.getZ() & 15, data, definition.apiDefinition(), payload);
-        TurtleChunkData.save(block.getChunk(), TurtleChunkRuntime.chunkDataKey(), chunkData);
 
-        block.setType(Material.BARRIER, false);
-        TurtleChunkRuntime.loadChunk(block.getChunk(), VisibilityService.config());
-        VisibilityService.refreshPlayersNear(ChunkKey.from(block.getChunk()));
+        block.setType(TurtleBackingBlock.material(), false);
+        TurtleMutationBatcher.changed(block);
 
         definition.adapter().onPlace(new TurtleBlockContext(definition.adapter(), data, block, player));
         return true;
