@@ -23,8 +23,8 @@ resource-pack:
     host: "0.0.0.0"
     port: 8123
     public-url: ""
-    file-name: "turtle-resource-pack.zip"
+    file-name: "BlockEngine-resource-pack.zip"
   send:
     on-join: true
     required: false
-    prompt: "This server uses Turtle custom block resources."
+    prompt: "This server uses BlockEngine custom block resources."

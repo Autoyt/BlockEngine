@@ -1,16 +1,16 @@
-name: Turtle
-prefix: Turtle
+name: BlockEngine
+prefix: BlockEngine
 version: '${version}'
 
-main: dev.auto.turtle.Main
-bootstrapper: dev.auto.turtle.MainBootstrap
-loader: dev.auto.turtle.MainLoader
+main: dev.auto.blockengine.Main
+bootstrapper: dev.auto.blockengine.MainBootstrap
+loader: dev.auto.blockengine.MainLoader
 api-version: '26.1'
 load: STARTUP
 
 authors: [ AutoYT ]
 
 permissions:
-  turtle.debug:
-    description: Allows access to Turtle debug commands.
+  blockengine.debug:
+    description: Allows access to BlockEngine debug commands.
     default: op

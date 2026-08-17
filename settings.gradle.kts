@@ -1,2 +1,2 @@
-rootProject.name = "Turtle"
-include("turtle-api")
+rootProject.name = "BlockEngine"
+include("blockengine-api")

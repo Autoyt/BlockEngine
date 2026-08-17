@@ -19,7 +19,7 @@ dependencies {
     compileOnly("io.papermc.paper:paper-api:26.2.build.+")
     implementation("com.fasterxml.jackson.core:jackson-databind:2.19.2")
     implementation("com.github.retrooper:packetevents-spigot:2.13.0")
-    implementation(project(":turtle-api"))
+    implementation(project(":blockengine-api"))
     compileOnly("org.projectlombok:lombok:1.18.38")
     annotationProcessor("org.projectlombok:lombok:1.18.38")
     testCompileOnly("org.projectlombok:lombok:1.18.38")
@@ -56,7 +56,7 @@ tasks {
 
     register<Copy>("copyPluginJar") {
         group = "deployment"
-        description = "Builds the shaded Turtle jar and copies it into server/plugins."
+        description = "Builds the shaded BlockEngine jar and copies it into server/plugins."
         dependsOn(shadowJarTask)
         from(shadowJarTask.flatMap { it.archiveFile })
         into(pluginsDir)
