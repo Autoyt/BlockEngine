@@ -152,73 +152,14 @@ public final class ResourcePackManager {
         model.put("parent", "minecraft:block/cube");
 
         BlockDefinition.Textures source = state.textures();
-        String particle = source.all();
-        if (particle == null || particle.isBlank()) {
-            particle = source.side();
-        }
-        if (particle == null || particle.isBlank()) {
-            particle = source.front();
-        }
-        if (particle == null || particle.isBlank()) {
-            particle = source.top();
-        }
-        if (particle == null || particle.isBlank()) {
-            particle = source.bottom();
-        }
-
-        String north = source.north();
-        if (north == null || north.isBlank()) {
-            north = source.front();
-        }
-        if (north == null || north.isBlank()) {
-            north = source.side();
-        }
-        if (north == null || north.isBlank()) {
-            north = source.all();
-        }
-
-        String east = source.east();
-        if (east == null || east.isBlank()) {
-            east = source.side();
-        }
-        if (east == null || east.isBlank()) {
-            east = source.all();
-        }
-
-        String south = source.south();
-        if (south == null || south.isBlank()) {
-            south = source.side();
-        }
-        if (south == null || south.isBlank()) {
-            south = source.all();
-        }
-
-        String west = source.west();
-        if (west == null || west.isBlank()) {
-            west = source.side();
-        }
-        if (west == null || west.isBlank()) {
-            west = source.all();
-        }
-
-        String up = source.top();
-        if (up == null || up.isBlank()) {
-            up = source.all();
-        }
-
-        String down = source.bottom();
-        if (down == null || down.isBlank()) {
-            down = source.all();
-        }
-
         ObjectNode textures = model.putObject("textures");
-        textures.put("particle", texture(definition, particle));
-        textures.put("north", texture(definition, north));
-        textures.put("east", texture(definition, east));
-        textures.put("south", texture(definition, south));
-        textures.put("west", texture(definition, west));
-        textures.put("up", texture(definition, up));
-        textures.put("down", texture(definition, down));
+        textures.put("particle", texture(definition, source.all(), source.side(), source.front(), source.top(), source.bottom()));
+        textures.put("north", texture(definition, source.north(), source.front(), source.side(), source.all()));
+        textures.put("east", texture(definition, source.east(), source.side(), source.all()));
+        textures.put("south", texture(definition, source.south(), source.side(), source.all()));
+        textures.put("west", texture(definition, source.west(), source.side(), source.all()));
+        textures.put("up", texture(definition, source.top(), source.all()));
+        textures.put("down", texture(definition, source.bottom(), source.all()));
 
         Main.getJsonMapper().writeValue(output.toFile(), model);
     }
@@ -271,7 +212,7 @@ public final class ResourcePackManager {
     }
 
     private static void breakOverlays(@NotNull Path root) throws IOException {
-        String namespace = pluginNamespace();
+        String namespace = Main.getInstance().getName().toLowerCase(Locale.ROOT);
         for (int stage = 0; stage <= 9; stage++) {
             Path modelPath = root.resolve("assets")
                     .resolve(namespace)
@@ -303,11 +244,14 @@ public final class ResourcePackManager {
         }
     }
 
-    private static @NotNull String pluginNamespace() {
-        return Main.getInstance().getName().toLowerCase(Locale.ROOT);
-    }
-
-    private static @NotNull String texture(@NotNull BlockDefinition definition, String path) {
+    private static @NotNull String texture(@NotNull BlockDefinition definition, String... paths) {
+        String path = null;
+        for (String candidate : paths) {
+            if (candidate != null && !candidate.isBlank()) {
+                path = candidate;
+                break;
+            }
+        }
         if (path == null || path.isBlank()) {
             return "minecraft:block/stone";
         }
@@ -365,14 +309,11 @@ public final class ResourcePackManager {
         Files.createDirectories(blockStatePath.getParent());
 
         ObjectNode blockState = Main.getJsonMapper().createObjectNode();
-        ObjectNode variants = blockState.putObject("variants");
-        backingVariant(variants, "", assetName);
+        blockState.putObject("variants")
+                .putArray("")
+                .addObject()
+                .put("model", "minecraft:block/" + assetName);
         Main.getJsonMapper().writeValue(blockStatePath.toFile(), blockState);
-    }
-
-    private static void backingVariant(@NotNull ObjectNode variants, @NotNull String key, @NotNull String assetName) {
-        ArrayNode entries = variants.putArray(key);
-        entries.addObject().put("model", "minecraft:block/" + assetName);
     }
 
     private static void texture(@NotNull Path root, @NotNull String name, int argb) throws IOException {

@@ -186,7 +186,7 @@ public final class BlockCommandOverrideListener implements Listener {
                     if (mode.equals("keep") && !block.getType().isAir()) {
                         continue;
                     }
-                    if (!batch(block, definition, source.player(), target.stateId(), mode.equals("destroy"))) {
+                    if (!place(block, definition, source.player(), target.stateId(), mode.equals("destroy"), mode.equals("destroy"))) {
                         continue;
                     }
                     changed++;
@@ -236,42 +236,25 @@ public final class BlockCommandOverrideListener implements Listener {
             return true;
         }
 
-        boolean changed = replace(block, definition, source.player(), target.stateId(), mode.equals("destroy"));
+        boolean changed = place(block, definition, source.player(), target.stateId(), true, mode.equals("destroy"));
         sender.sendMessage(changed ? "Set BlockEngine block." : "No block was changed.");
         return true;
     }
 
-    private boolean replace(
+    private boolean place(
             @NotNull Block block,
             @NotNull BlockDefinition definition,
             @Nullable Player player,
             @Nullable String stateId,
+            boolean removeExisting,
             boolean dropExisting
     ) {
-        if (BlockEngineChunkRuntime.getBlock(new BlockLocationKey(
+        if (removeExisting && BlockEngineChunkRuntime.getBlock(new BlockLocationKey(
                 block.getWorld().getUID(),
                 block.getX(),
                 block.getY(),
                 block.getZ()
         )) != null && !BlockEngineBlockRemover.remove(block, dropExisting)) {
-            return false;
-        }
-        return PlacementManager.getInstance().place(block, definition, player, null, stateId);
-    }
-
-    private boolean batch(
-            @NotNull Block block,
-            @NotNull BlockDefinition definition,
-            @Nullable Player player,
-            @Nullable String stateId,
-            boolean dropExisting
-    ) {
-        if (dropExisting && BlockEngineChunkRuntime.getBlock(new BlockLocationKey(
-                block.getWorld().getUID(),
-                block.getX(),
-                block.getY(),
-                block.getZ()
-        )) != null && !BlockEngineBlockRemover.remove(block, true)) {
             return false;
         }
 

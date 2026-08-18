@@ -99,12 +99,7 @@ public class GameListener implements Listener {
     @EventHandler
     public void onStartBreaking(BlockDamageEvent event) {
         final Player player = event.getPlayer();
-        RuntimeBlockView block = BlockEngineChunkRuntime.getBlock(new BlockLocationKey(
-                event.getBlock().getWorld().getUID(),
-                event.getBlock().getX(),
-                event.getBlock().getY(),
-                event.getBlock().getZ()
-        ));
+        RuntimeBlockView block = block(event.getBlock());
         if (block == null) {
             return;
         }
@@ -124,12 +119,7 @@ public class GameListener implements Listener {
 
     @EventHandler
     public void onBreak(BlockBreakEvent event) {
-        RuntimeBlockView block = BlockEngineChunkRuntime.getBlock(new BlockLocationKey(
-                event.getBlock().getWorld().getUID(),
-                event.getBlock().getX(),
-                event.getBlock().getY(),
-                event.getBlock().getZ()
-        ));
+        RuntimeBlockView block = block(event.getBlock());
         if (block != null) {
             event.setCancelled(true);
             if (event.getPlayer().getGameMode() == GameMode.CREATIVE) {
@@ -379,7 +369,8 @@ public class GameListener implements Listener {
             return true;
         }
 
-        Block target = target(event);
+        Block clicked = event.getClickedBlock();
+        Block target = clicked.isReplaceable() ? clicked : clicked.getRelative(event.getBlockFace());
         if (!target.isReplaceable()) {
             event.setCancelled(true);
             return true;
@@ -451,40 +442,22 @@ public class GameListener implements Listener {
         }
 
         for (Entity entity : target.getWorld().getNearbyEntities(blockBox)) {
-            if (!blocksPlacement(entity)) {
-                continue;
-            }
-            if (entity.getBoundingBox().overlaps(blockBox)) {
+            if (!entity.isDead()
+                    && !(entity instanceof Player targetPlayer && targetPlayer.getGameMode() == GameMode.SPECTATOR)
+                    && (entity instanceof LivingEntity
+                    || entity instanceof Vehicle
+                    || entity.getType() == EntityType.ARMOR_STAND
+                    || entity.getType() == EntityType.END_CRYSTAL)
+                    && entity.getBoundingBox().overlaps(blockBox)) {
                 return true;
             }
         }
         return false;
     }
 
-    private boolean blocksPlacement(Entity entity) {
-        if (entity.isDead()) {
-            return false;
-        }
-        if (entity instanceof Player player && player.getGameMode() == GameMode.SPECTATOR) {
-            return false;
-        }
-        return entity instanceof LivingEntity
-                || entity instanceof Vehicle
-                || entity.getType() == EntityType.ARMOR_STAND
-                || entity.getType() == EntityType.END_CRYSTAL;
-    }
-
     private void useHeldItem(PlayerInteractEvent event) {
         event.setUseInteractedBlock(Event.Result.DENY);
         event.setUseItemInHand(Event.Result.ALLOW);
-    }
-
-    private Block target(PlayerInteractEvent event) {
-        Block clicked = event.getClickedBlock();
-        if (clicked.isReplaceable()) {
-            return clicked;
-        }
-        return clicked.getRelative(event.getBlockFace());
     }
 
     private void pick(Player player, ItemStack stack, int targetSlot) {
