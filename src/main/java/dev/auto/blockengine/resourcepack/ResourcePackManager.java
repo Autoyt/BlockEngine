@@ -366,14 +366,7 @@ public final class ResourcePackManager {
 
         ObjectNode blockState = Main.getJsonMapper().createObjectNode();
         ObjectNode variants = blockState.putObject("variants");
-        if (BlockEngineBackingBlock.material() == org.bukkit.Material.TEST_BLOCK) {
-            backingVariant(variants, "mode=start", assetName);
-            backingVariant(variants, "mode=log", assetName);
-            backingVariant(variants, "mode=fail", assetName);
-            backingVariant(variants, "mode=accept", assetName);
-        } else {
-            backingVariant(variants, "", assetName);
-        }
+        backingVariant(variants, "", assetName);
         Main.getJsonMapper().writeValue(blockStatePath.toFile(), blockState);
     }
 

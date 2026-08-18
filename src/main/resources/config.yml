@@ -1,6 +1,3 @@
-custom-blocks:
-  backing-block: BARRIER
-
 visibility:
   enabled: true
   chunks:
