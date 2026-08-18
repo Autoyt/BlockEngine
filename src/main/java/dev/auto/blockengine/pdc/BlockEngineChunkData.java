@@ -1,7 +1,6 @@
 package dev.auto.blockengine.pdc;
 
 import dev.auto.blockengine.api.blocks.BlockData;
-import dev.auto.blockengine.types.BlockEngineBlockInstance;
 import org.bukkit.Chunk;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
@@ -44,18 +43,6 @@ public final class BlockEngineChunkData {
 
     public void setBlock(@NotNull StoredBlock block) {
         blocks.put(packBlockKey(block.localX(), block.y(), block.localZ()), block);
-    }
-
-    public void setBlock(@NotNull BlockEngineBlockInstance instance) {
-        Objects.requireNonNull(instance, "instance");
-        setBlock(
-                instance.location().x() & 15,
-                instance.location().y(),
-                instance.location().z() & 15,
-                instance.data(),
-                instance.definition().apiDefinition(),
-                instance.savePayload()
-        );
     }
 
     public void setBlock(

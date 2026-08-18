@@ -411,10 +411,6 @@ public class GameListener implements Listener {
         return true;
     }
 
-    private boolean holdingPlaceableBlockEngineBlock(ItemStack item) {
-        return BlockEngineItemManager.blockId(item) != null && BlockEngineItemManager.placeable(item);
-    }
-
     private boolean canPlace(
             Block target,
             BlockDefinition definition,
