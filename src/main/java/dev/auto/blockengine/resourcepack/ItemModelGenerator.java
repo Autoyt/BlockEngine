@@ -64,6 +64,41 @@ public final class ItemModelGenerator {
                 .addObject()
                 .put("model", "minecraft:block/" + assetName);
         Main.getJsonMapper().writeValue(blockStatePath.toFile(), blockState);
+
+        breakOverlays(root);
+    }
+
+    public static void breakOverlays(@NotNull Path root) throws IOException {
+        String namespace = Main.getInstance().getName().toLowerCase(Locale.ROOT);
+        for (int stage = 0; stage <= 9; stage++) {
+            Path modelPath = root.resolve("assets")
+                    .resolve(namespace)
+                    .resolve("models")
+                    .resolve("block")
+                    .resolve("break_stage")
+                    .resolve(stage + ".json");
+            Files.createDirectories(modelPath.getParent());
+
+            ObjectNode model = Main.getJsonMapper().createObjectNode();
+            model.put("parent", "minecraft:block/cube_all");
+            ObjectNode textures = model.putObject("textures");
+            textures.put("all", "minecraft:block/destroy_stage_" + stage);
+            textures.put("particle", "minecraft:block/destroy_stage_" + stage);
+            Main.getJsonMapper().writeValue(modelPath.toFile(), model);
+
+            Path itemPath = root.resolve("assets")
+                    .resolve(namespace)
+                    .resolve("items")
+                    .resolve("break_stage")
+                    .resolve(stage + ".json");
+            Files.createDirectories(itemPath.getParent());
+
+            ObjectNode item = Main.getJsonMapper().createObjectNode();
+            ObjectNode itemModel = item.putObject("model");
+            itemModel.put("type", "minecraft:model");
+            itemModel.put("model", namespace + ":block/break_stage/" + stage);
+            Main.getJsonMapper().writeValue(itemPath.toFile(), item);
+        }
     }
 
     public static void generateItemModel(@NotNull Path root, @NotNull GeneratedItemModel generated) throws IOException {

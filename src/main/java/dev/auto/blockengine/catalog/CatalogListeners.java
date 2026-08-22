@@ -14,6 +14,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
+import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.Inventory;
@@ -143,9 +144,17 @@ public final class CatalogListeners implements Listener {
     }
 
     @EventHandler
+    public void onDrag(InventoryDragEvent event) {
+        if (isCatalog(event.getView())) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler
     public void onClose(InventoryCloseEvent event) {
         Session session = sessions.remove(event.getPlayer().getUniqueId());
         if (session != null && event.getPlayer() instanceof Player player) {
+            clearCatalogItems(event.getView());
             player.undiscoverRecipes(session.recipes());
         }
         if (sessions.isEmpty()) {
@@ -157,6 +166,7 @@ public final class CatalogListeners implements Listener {
     public void onLeave(PlayerQuitEvent event) {
         Session session = sessions.remove(event.getPlayer().getUniqueId());
         if (session != null) {
+            clearCatalogItems(event.getPlayer().getOpenInventory());
             event.getPlayer().undiscoverRecipes(session.recipes());
         }
         if (sessions.isEmpty()) {
@@ -234,6 +244,14 @@ public final class CatalogListeners implements Listener {
 
     private static boolean isCatalog(@NotNull InventoryView view) {
         return view.getType() == InventoryType.STONECUTTER && view.title().equals(TITLE);
+    }
+
+    private static void clearCatalogItems(@NotNull InventoryView view) {
+        if (!isCatalog(view)) {
+            return;
+        }
+        view.getTopInventory().setItem(INPUT_SLOT, null);
+        view.getTopInventory().setItem(OUTPUT_SLOT, null);
     }
 
     private static @NotNull String safe(@NotNull String id) {

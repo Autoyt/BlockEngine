@@ -48,11 +48,27 @@ public final class PlacementManager {
             return true;
         }
 
+        BlockFace placedAgainst = event.getBlockAgainst().getFace(event.getBlockPlaced());
+        PlacementVerificationEngine.Result verification = PlacementVerificationEngine.verify(
+                new PlacementVerificationEngine.Request(
+                        event.getBlockPlaced(),
+                        definition,
+                        ItemManager.stateId(event.getItemInHand()),
+                        event.getPlayer(),
+                        placedAgainst,
+                        event.getHand()
+                )
+        );
+        if (!verification.allowed()) {
+            event.setCancelled(true);
+            return true;
+        }
+
         return place(
                 event.getBlockPlaced(),
                 definition,
                 event.getPlayer(),
-                event.getBlockAgainst().getFace(event.getBlockPlaced()),
+                placedAgainst,
                 ItemManager.stateId(event.getItemInHand())
         );
     }
