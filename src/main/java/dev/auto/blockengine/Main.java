@@ -61,7 +61,9 @@ public final class Main extends JavaPlugin {
         BlockIntegrityManager.getInstance().register(this);
         registerCommand("catalog", new CatalogCommand());
         DebugCommands debugCommands = new DebugCommands(this);
-        registerCommand("blockengine", new BlockEngineCommand(this, debugCommands));
+        BlockEngineCommand blockEngineCommand = new BlockEngineCommand(this, debugCommands);
+        registerCommand("blockengine", blockEngineCommand);
+        registerCommand("be", blockEngineCommand);
 
         new CatalogListeners();
         new OverideFillCommand();
@@ -116,6 +118,5 @@ public final class Main extends JavaPlugin {
         return Bukkit.isPrimaryThread();
     }
 }
-
 
 

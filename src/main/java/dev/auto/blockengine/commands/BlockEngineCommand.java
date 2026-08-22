@@ -30,7 +30,7 @@ import java.util.Locale;
 
 public final class BlockEngineCommand implements BasicCommand {
     private static final List<String> ROOT = List.of(
-            "info", "debug", "packs", "perf", "blocks", "plugins", "give", "catalog", "chunks", "validate", "events", "reload"
+            "info", "catalog", "packs", "debug"
     );
 
     private final Main plugin;
@@ -48,11 +48,15 @@ public final class BlockEngineCommand implements BasicCommand {
             info(sender);
             return;
         }
+        if (args[0].equalsIgnoreCase("catalog") || args[0].equalsIgnoreCase("packs")) {
+            debug.execute(source, args);
+            return;
+        }
         if (args[0].equalsIgnoreCase("debug")) {
             debug.execute(source, Arrays.copyOfRange(args, 1, args.length));
             return;
         }
-        debug.execute(source, args);
+        usage(sender);
     }
 
     @Override
@@ -71,7 +75,16 @@ public final class BlockEngineCommand implements BasicCommand {
         if (args[0].equalsIgnoreCase("debug")) {
             return debug.suggest(source, Arrays.copyOfRange(args, 1, args.length));
         }
-        return debug.suggest(source, args);
+        if (args[0].equalsIgnoreCase("catalog") || args[0].equalsIgnoreCase("packs")) {
+            return debug.suggest(source, args);
+        }
+        return List.of();
+    }
+
+    private void usage(@NotNull CommandSender sender) {
+        BlockEngineChat.send(sender, BlockEngineChat.header("blockengine"));
+        BlockEngineChat.send(sender, BlockEngineChat.row("usage", "/blockengine <info|catalog|packs|debug>"));
+        BlockEngineChat.send(sender, BlockEngineChat.row("short", "/be <info|catalog|packs|debug>"));
     }
 
     private void info(@NotNull CommandSender sender) {

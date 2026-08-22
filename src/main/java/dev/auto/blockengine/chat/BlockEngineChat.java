@@ -56,7 +56,7 @@ public final class BlockEngineChat {
         return Component.text("[", DARK_GRAY)
                 .append(Component.text("BlockEngine", ORANGE).decorate(TextDecoration.BOLD))
                 .append(Component.text("]", DARK_GRAY))
-                .clickEvent(ClickEvent.runCommand("/blockengine info"))
+                .clickEvent(ClickEvent.runCommand("/be info"))
                 .hoverEvent(HoverEvent.showText(Component.text("Open BlockEngine info", ORANGE_LIGHT)));
     }
 

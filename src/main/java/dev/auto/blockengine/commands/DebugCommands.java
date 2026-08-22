@@ -54,8 +54,8 @@ import java.util.UUID;
 
 public final class DebugCommands implements BasicCommand, Listener {
     private static final List<String> ROOT_SUBCOMMANDS = List.of(
-            "info", "packs", "perf", "blocks", "plugins", "give", "catalog", "chunks", "validate", "events", "reload",
-            "pack", "profile", "block", "plugin", "chunk", "visibility", "displays"
+            "perf", "blocks", "plugins", "give", "chunks", "validate", "events", "reload", "profile", "block", "plugin",
+            "chunk", "visibility", "displays"
     );
     private static final List<String> PROFILE_TARGETS = List.of(
             "placement", "validation", "chunk-save", "flush", "events", "visibility", "displays", "commands"
@@ -145,9 +145,10 @@ public final class DebugCommands implements BasicCommand, Listener {
 
     private void usage(@NotNull CommandSender sender) {
         BlockEngineChat.send(sender, DebugStyle.header("blockengine debug"));
-        BlockEngineChat.send(sender, DebugStyle.row("usage", "/blockengine <subcommand>"));
-        BlockEngineChat.send(sender, DebugStyle.row("main", "info, packs, perf, blocks, plugins, give, catalog, chunks, events"));
-        BlockEngineChat.send(sender, DebugStyle.row("legacy", "pack, profile, block, plugin, chunk"));
+        BlockEngineChat.send(sender, DebugStyle.row("usage", "/blockengine debug <subcommand>"));
+        BlockEngineChat.send(sender, DebugStyle.row("short", "/be debug <subcommand>"));
+        BlockEngineChat.send(sender, DebugStyle.row("main", "perf, blocks, plugins, give, chunks, validate, events, reload"));
+        BlockEngineChat.send(sender, DebugStyle.row("legacy", "profile, block, plugin, chunk"));
     }
 
     private void info(@NotNull CommandSender sender) {
@@ -157,9 +158,9 @@ public final class DebugCommands implements BasicCommand, Listener {
         BlockEngineChat.send(sender, DebugStyle.row("resource packs", ResourcePackManager.getInstance().packIds().size()));
         BlockEngineChat.send(sender, DebugStyle.action("packs", "/blockengine packs list", "List resource packs")
                 .append(Component.space())
-                .append(DebugStyle.action("plugins", "/blockengine plugins", "List BlockEngine plugins"))
+                .append(DebugStyle.action("plugins", "/blockengine debug plugins", "List BlockEngine plugins"))
                 .append(Component.space())
-                .append(DebugStyle.action("blocks", "/blockengine blocks list", "List registered blocks")));
+                .append(DebugStyle.action("blocks", "/blockengine debug blocks list", "List registered blocks")));
     }
 
     private void pack(@NotNull CommandSender sender, String[] args) {
@@ -256,14 +257,14 @@ public final class DebugCommands implements BasicCommand, Listener {
         BlockEngineChat.send(sender, DebugStyle.row("event rate", rate(activitySnapshot) + " events/s"));
         BlockEngineChat.send(sender, DebugStyle.row("events", activitySnapshot.samples()));
         BlockEngineChat.send(sender, DebugStyle.row("last event", age(activitySnapshot.lastEventAgeNanos())));
-        BlockEngineChat.send(sender, DebugStyle.action("bossbar", "/blockengine perf live " + target, "Show live bossbar profile")
+        BlockEngineChat.send(sender, DebugStyle.action("bossbar", "/blockengine debug perf live " + target, "Show live bossbar profile")
                 .append(Component.space())
-                .append(DebugStyle.action("stop", "/blockengine perf stop", "Stop live bossbar profile")));
+                .append(DebugStyle.action("stop", "/blockengine debug perf stop", "Stop live bossbar profile")));
     }
 
     private void block(@NotNull CommandSender sender, String[] args) {
         if (args.length < 2) {
-            DebugStyle.usage(sender, "/blockengine blocks <looking|list|give|namespace|blockId>");
+            DebugStyle.usage(sender, "/blockengine debug blocks <looking|list|give|namespace|blockId>");
             return;
         }
         String action = args[1].toLowerCase(Locale.ROOT);
@@ -279,7 +280,7 @@ public final class DebugCommands implements BasicCommand, Listener {
             case "list" -> blockList(sender, args.length >= 3 && !args[2].equals("*") ? args[2] : null);
             case "give" -> blockGive(sender, args);
             case "looking" -> blockLooking(sender);
-            default -> DebugStyle.usage(sender, "/blockengine blocks <looking|list|give|namespace|blockId>");
+            default -> DebugStyle.usage(sender, "/blockengine debug blocks <looking|list|give|namespace|blockId>");
         }
     }
 
@@ -292,11 +293,11 @@ public final class DebugCommands implements BasicCommand, Listener {
         BlockEngineChat.send(sender, DebugStyle.header(namespace == null ? "blocks" : namespace + " blocks"));
         for (BlockDefinition block : blocks) {
             Component line = DebugStyle.blockName(block)
-                    .clickEvent(ClickEvent.runCommand("/blockengine give " + block.id()))
+                    .clickEvent(ClickEvent.runCommand("/blockengine debug give " + block.id()))
                     .hoverEvent(HoverEvent.showText(Component.text("Click to give yourself this block.")));
             BlockEngineChat.send(sender, DebugStyle.bullet(line
                     .append(Component.space())
-                    .append(DebugStyle.action("give", "/blockengine give " + block.id(), "Give yourself this block"))
+                    .append(DebugStyle.action("give", "/blockengine debug give " + block.id(), "Give yourself this block"))
                     .append(Component.space())
                     .append(DebugStyle.action("catalog", "/blockengine catalog " + block.name().namespace(),
                             "Open " + block.name().namespace() + " catalog"))));
@@ -309,7 +310,7 @@ public final class DebugCommands implements BasicCommand, Listener {
             return;
         }
         if (args.length < 3) {
-            DebugStyle.usage(sender, "/blockengine give <blockId> [stateId]");
+            DebugStyle.usage(sender, "/blockengine debug give <blockId> [stateId]");
             return;
         }
         BlockDefinition block = BlockRegistry.getBlock(args[2]);
@@ -373,12 +374,12 @@ public final class DebugCommands implements BasicCommand, Listener {
             BlockEngineChat.send(sender, DebugStyle.header("plugins"));
             for (String namespace : namespaces()) {
                 BlockEngineChat.send(sender, DebugStyle.bullet(DebugStyle.pluginName(namespace)
-                        .clickEvent(ClickEvent.runCommand("/blockengine plugins " + namespace))
+                        .clickEvent(ClickEvent.runCommand("/blockengine debug plugins " + namespace))
                         .hoverEvent(HoverEvent.showText(Component.text("Inspect " + namespace)))
                         .append(Component.space())
                         .append(DebugStyle.value(blocks(namespace).size() + " blocks"))
                         .append(Component.space())
-                        .append(DebugStyle.action("blocks", "/blockengine blocks " + namespace, "List this plugin's blocks"))
+                        .append(DebugStyle.action("blocks", "/blockengine debug blocks " + namespace, "List this plugin's blocks"))
                         .append(Component.space())
                         .append(DebugStyle.action("catalog", "/blockengine catalog " + namespace, "Open this plugin's catalog"))));
             }
@@ -400,7 +401,7 @@ public final class DebugCommands implements BasicCommand, Listener {
             blockList(sender, args.length >= 3 ? args[2] : null);
             return;
         }
-        DebugStyle.usage(sender, "/blockengine plugins [namespace|list|catalog|blocks]");
+        DebugStyle.usage(sender, "/blockengine debug plugins [namespace|list|catalog|blocks]");
     }
 
     private void pluginInfo(@NotNull CommandSender sender, @NotNull String namespace) {
@@ -410,7 +411,7 @@ public final class DebugCommands implements BasicCommand, Listener {
         BlockEngineChat.send(sender, DebugStyle.row("pack", ResourcePackManager.getInstance().packIds().contains(namespace)
                 ? DebugStyle.status("ready", true)
                 : DebugStyle.status("none", false)));
-        BlockEngineChat.send(sender, DebugStyle.action("blocks", "/blockengine blocks " + namespace, "List this plugin's blocks")
+        BlockEngineChat.send(sender, DebugStyle.action("blocks", "/blockengine debug blocks " + namespace, "List this plugin's blocks")
                 .append(Component.space())
                 .append(DebugStyle.action("catalog", "/blockengine catalog " + namespace, "Open this plugin's catalog"))
                 .append(Component.space())
@@ -504,7 +505,7 @@ public final class DebugCommands implements BasicCommand, Listener {
                 eventTail.clear();
                 DebugStyle.success(sender, "BlockEngine event tail cleared.");
             }
-            default -> DebugStyle.usage(sender, "/blockengine events <on|off|tail|clear>");
+            default -> DebugStyle.usage(sender, "/blockengine debug events <on|off|tail|clear>");
         }
     }
 
