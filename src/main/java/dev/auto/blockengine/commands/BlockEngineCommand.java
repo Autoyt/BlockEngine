@@ -125,13 +125,13 @@ public final class BlockEngineCommand implements BasicCommand {
                         .pause(false)
                         .body(List.of(
                                 DialogBody.item(infoItem())
-                                        .description(DialogBody.plainMessage(Component.text("AutoYT / BlockEngine", BlockEngineChat.ORANGE_LIGHT), 180))
-                                        .showDecorations(false)
+                                        .description(DialogBody.plainMessage(Component.text("AutoYT / BlockEngine", BlockEngineChat.ORANGE_LIGHT), 160))
+                                        .showDecorations(true)
                                         .showTooltip(true)
-                                        .width(160)
-                                        .height(160)
+                                        .width(32)
+                                        .height(32)
                                         .build(),
-                                DialogBody.plainMessage(summary, 320)
+                                DialogBody.plainMessage(summary, 260)
                         ))
                         .build())
                 .type(DialogType.notice()));
