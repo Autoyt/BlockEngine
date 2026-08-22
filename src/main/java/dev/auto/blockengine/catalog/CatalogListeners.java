@@ -16,9 +16,10 @@ import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.inventory.Inventory;
+import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.InventoryView;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.MenuType;
 import org.bukkit.inventory.RecipeChoice;
 import org.bukkit.inventory.StonecuttingRecipe;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -64,12 +65,13 @@ public final class CatalogListeners implements Listener {
                 .toList();
         player.discoverRecipes(keys);
         BlockDefinition first = blocks.getFirst();
-        sessions.put(player.getUniqueId(), new Session(first, keys));
+        CatalogHolder holder = new CatalogHolder(namespace, keys);
+        sessions.put(player.getUniqueId(), new Session(first, keys, holder));
 
-        InventoryView view = MenuType.STONECUTTER.create(player, TITLE);
-        player.openInventory(view);
-        view.getTopInventory().setItem(INPUT_SLOT, inputItem());
-        view.getTopInventory().setItem(OUTPUT_SLOT, output(first));
+        Inventory inventory = holder.getInventory();
+        inventory.setItem(INPUT_SLOT, inputItem());
+        inventory.setItem(OUTPUT_SLOT, output(first));
+        player.openInventory(inventory);
     }
 
     public static void cleanup() {
@@ -92,16 +94,17 @@ public final class CatalogListeners implements Listener {
         }
 
         Session session = sessions.get(event.getPlayer().getUniqueId());
-        if (session == null || !isCatalog(event.getPlayer().getOpenInventory())) {
+        CatalogHolder holder = catalogHolder(event.getPlayer().getOpenInventory());
+        if (session == null || holder == null || holder != session.holder()) {
             event.setCancelled(true);
             return;
         }
 
-        session.selected(block);
-        if (!session.recipes().contains(key)) {
+        if (!holder.recipes().contains(key)) {
             event.setCancelled(true);
             return;
         }
+        session.selected(block);
         event.getStonecutterInventory().setInputItem(inputItem());
         event.getStonecutterInventory().setResult(output(block));
     }
@@ -229,7 +232,14 @@ public final class CatalogListeners implements Listener {
     }
 
     private static boolean isCatalog(@NotNull InventoryView view) {
-        return view.getType() == InventoryType.STONECUTTER && view.title().equals(TITLE);
+        return catalogHolder(view) != null;
+    }
+
+    private static @Nullable CatalogHolder catalogHolder(@NotNull InventoryView view) {
+        if (view.getType() != InventoryType.STONECUTTER) {
+            return null;
+        }
+        return view.getTopInventory().getHolder(false) instanceof CatalogHolder holder ? holder : null;
     }
 
     private static @NotNull String safe(@NotNull String id) {
@@ -239,10 +249,16 @@ public final class CatalogListeners implements Listener {
     private static final class Session {
         private @NotNull BlockDefinition selected;
         private final @NotNull Collection<NamespacedKey> recipes;
+        private final @NotNull CatalogHolder holder;
 
-        private Session(@NotNull BlockDefinition selected, @NotNull Collection<NamespacedKey> recipes) {
+        private Session(
+                @NotNull BlockDefinition selected,
+                @NotNull Collection<NamespacedKey> recipes,
+                @NotNull CatalogHolder holder
+        ) {
             this.selected = selected;
             this.recipes = List.copyOf(recipes);
+            this.holder = holder;
         }
 
         private @NotNull BlockDefinition selected() {
@@ -253,8 +269,37 @@ public final class CatalogListeners implements Listener {
             return recipes;
         }
 
+        private @NotNull CatalogHolder holder() {
+            return holder;
+        }
+
         private void selected(@NotNull BlockDefinition selected) {
             this.selected = selected;
+        }
+    }
+
+    private static final class CatalogHolder implements InventoryHolder {
+        private final @Nullable String namespace;
+        private final @NotNull Collection<NamespacedKey> recipes;
+        private final @NotNull Inventory inventory;
+
+        private CatalogHolder(@Nullable String namespace, @NotNull Collection<NamespacedKey> recipes) {
+            this.namespace = namespace;
+            this.recipes = List.copyOf(recipes);
+            this.inventory = Bukkit.createInventory(this, InventoryType.STONECUTTER, TITLE);
+        }
+
+        private @Nullable String namespace() {
+            return namespace;
+        }
+
+        private @NotNull Collection<NamespacedKey> recipes() {
+            return recipes;
+        }
+
+        @Override
+        public @NotNull Inventory getInventory() {
+            return inventory;
         }
     }
 }
