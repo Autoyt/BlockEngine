@@ -6,6 +6,7 @@ import com.github.retrooper.packetevents.PacketEvents;
 import com.github.retrooper.packetevents.settings.PacketEventsSettings;
 import dev.auto.blockengine.api.BlockEngine;
 import dev.auto.blockengine.catalog.CatalogListeners;
+import dev.auto.blockengine.commands.BlockEngineCommand;
 import dev.auto.blockengine.commands.CatalogCommand;
 import dev.auto.blockengine.commands.DebugCommands;
 import dev.auto.blockengine.commands.OverideFillCommand;
@@ -60,6 +61,7 @@ public final class Main extends JavaPlugin {
         BlockIntegrityManager.getInstance().register(this);
         registerCommand("catalog", new CatalogCommand());
         DebugCommands debugCommands = new DebugCommands(this);
+        registerCommand("blockengine", new BlockEngineCommand(this, debugCommands));
         registerCommand("debug", debugCommands);
         registerCommand("blockenginedebug", debugCommands);
 
@@ -116,7 +118,6 @@ public final class Main extends JavaPlugin {
         return Bukkit.isPrimaryThread();
     }
 }
-
 
 
 

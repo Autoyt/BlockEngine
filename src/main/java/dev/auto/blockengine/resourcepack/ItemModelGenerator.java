@@ -11,6 +11,7 @@ import org.jetbrains.annotations.NotNull;
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Locale;
@@ -66,6 +67,47 @@ public final class ItemModelGenerator {
         Main.getJsonMapper().writeValue(blockStatePath.toFile(), blockState);
 
         breakOverlays(root);
+        infoCard(root);
+    }
+
+    public static void infoCard(@NotNull Path root) throws IOException {
+        String namespace = Main.getInstance().getName().toLowerCase(Locale.ROOT);
+        Path texture = root.resolve("assets")
+                .resolve(namespace)
+                .resolve("textures")
+                .resolve("item")
+                .resolve("pfp.png");
+        Files.createDirectories(texture.getParent());
+        try (InputStream input = Main.getInstance().getResource("assets/pfp.png")) {
+            if (input != null) {
+                Files.copy(input, texture, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            }
+        }
+
+        Path modelPath = root.resolve("assets")
+                .resolve(namespace)
+                .resolve("models")
+                .resolve("item")
+                .resolve("info_card.json");
+        Files.createDirectories(modelPath.getParent());
+
+        ObjectNode model = Main.getJsonMapper().createObjectNode();
+        model.put("parent", "minecraft:item/generated");
+        ObjectNode textures = model.putObject("textures");
+        textures.put("layer0", namespace + ":item/pfp");
+        Main.getJsonMapper().writeValue(modelPath.toFile(), model);
+
+        Path itemPath = root.resolve("assets")
+                .resolve(namespace)
+                .resolve("items")
+                .resolve("info_card.json");
+        Files.createDirectories(itemPath.getParent());
+
+        ObjectNode item = Main.getJsonMapper().createObjectNode();
+        ObjectNode itemModel = item.putObject("model");
+        itemModel.put("type", "minecraft:model");
+        itemModel.put("model", namespace + ":item/info_card");
+        Main.getJsonMapper().writeValue(itemPath.toFile(), item);
     }
 
     public static void breakOverlays(@NotNull Path root) throws IOException {
