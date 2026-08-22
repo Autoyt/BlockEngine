@@ -37,6 +37,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.block.BlockBurnEvent;
 import org.bukkit.event.block.BlockBreakEvent;
+import org.bukkit.event.block.BlockDamageEvent;
 import org.bukkit.event.block.BlockExplodeEvent;
 import org.bukkit.event.block.BlockFadeEvent;
 import org.bukkit.event.block.BlockFromToEvent;
@@ -110,6 +111,18 @@ public class GameListener implements Listener {
         ChunkEngine.flushNow();
         lastPlacementTicks.remove(event.getPlayer().getUniqueId());
         VisibilityManager.getInstance().cleanup(event.getPlayer());
+    }
+
+    @EventHandler
+    public void onDamage(BlockDamageEvent event) {
+        if (BlockIntegrityManager.getInstance().verifyInteraction(event.getBlock())) {
+            return;
+        }
+        RuntimeBlockView block = block(event.getBlock());
+        if (block == null || block.storedBlock().unbreakable()) {
+            return;
+        }
+        event.setInstaBreak(true);
     }
 
     @EventHandler
@@ -421,5 +434,4 @@ public class GameListener implements Listener {
         player.updateInventory();
     }
 }
-
 

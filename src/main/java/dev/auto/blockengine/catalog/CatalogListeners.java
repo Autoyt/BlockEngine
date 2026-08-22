@@ -20,6 +20,7 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.InventoryView;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.MenuType;
 import org.bukkit.inventory.RecipeChoice;
 import org.bukkit.inventory.StonecuttingRecipe;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -68,10 +69,11 @@ public final class CatalogListeners implements Listener {
         CatalogHolder holder = new CatalogHolder(namespace, keys);
         sessions.put(player.getUniqueId(), new Session(first, keys, holder));
 
-        Inventory inventory = holder.getInventory();
-        inventory.setItem(INPUT_SLOT, inputItem());
-        inventory.setItem(OUTPUT_SLOT, output(first));
-        player.openInventory(inventory);
+        InventoryView view = MenuType.STONECUTTER.create(player, TITLE);
+        player.openInventory(view);
+        holder.inventory(view.getTopInventory());
+        view.getTopInventory().setItem(INPUT_SLOT, inputItem());
+        view.getTopInventory().setItem(OUTPUT_SLOT, output(first));
     }
 
     public static void cleanup() {
@@ -94,13 +96,12 @@ public final class CatalogListeners implements Listener {
         }
 
         Session session = sessions.get(event.getPlayer().getUniqueId());
-        CatalogHolder holder = catalogHolder(event.getPlayer().getOpenInventory());
-        if (session == null || holder == null || holder != session.holder()) {
+        if (session == null || !isCatalog(event.getPlayer().getOpenInventory())) {
             event.setCancelled(true);
             return;
         }
 
-        if (!holder.recipes().contains(key)) {
+        if (!session.holder().recipes().contains(key)) {
             event.setCancelled(true);
             return;
         }
@@ -232,14 +233,7 @@ public final class CatalogListeners implements Listener {
     }
 
     private static boolean isCatalog(@NotNull InventoryView view) {
-        return catalogHolder(view) != null;
-    }
-
-    private static @Nullable CatalogHolder catalogHolder(@NotNull InventoryView view) {
-        if (view.getType() != InventoryType.STONECUTTER) {
-            return null;
-        }
-        return view.getTopInventory().getHolder(false) instanceof CatalogHolder holder ? holder : null;
+        return view.getType() == InventoryType.STONECUTTER && view.title().equals(TITLE);
     }
 
     private static @NotNull String safe(@NotNull String id) {
@@ -281,12 +275,11 @@ public final class CatalogListeners implements Listener {
     private static final class CatalogHolder implements InventoryHolder {
         private final @Nullable String namespace;
         private final @NotNull Collection<NamespacedKey> recipes;
-        private final @NotNull Inventory inventory;
+        private @Nullable Inventory inventory;
 
         private CatalogHolder(@Nullable String namespace, @NotNull Collection<NamespacedKey> recipes) {
             this.namespace = namespace;
             this.recipes = List.copyOf(recipes);
-            this.inventory = Bukkit.createInventory(this, InventoryType.STONECUTTER, TITLE);
         }
 
         private @Nullable String namespace() {
@@ -297,8 +290,15 @@ public final class CatalogListeners implements Listener {
             return recipes;
         }
 
+        private void inventory(@NotNull Inventory inventory) {
+            this.inventory = inventory;
+        }
+
         @Override
         public @NotNull Inventory getInventory() {
+            if (inventory == null) {
+                throw new IllegalStateException("Catalog inventory has not been opened yet.");
+            }
             return inventory;
         }
     }
