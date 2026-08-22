@@ -32,7 +32,9 @@ public final class BlockDataManager {
             return null;
         }
 
+        long loadStarted = System.nanoTime();
         BlockData data = view.storedBlock().loadData(definition);
+        PerformanceMetrics.record(PerformanceMetrics.ADAPTER_LOAD, System.nanoTime() - loadStarted, 1, view.storedBlock().payload().length);
         if (data == null) {
             data = ChunkEngine.SimpleBlockData.copyOf(view.storedBlock().data());
         }
@@ -62,13 +64,17 @@ public final class BlockDataManager {
         }
 
         ChunkEngine.Data chunkData = ChunkEngine.data(block.getChunk());
+        long saveStarted = System.nanoTime();
+        byte[] payload = definition.adapter().save(context.data());
+        PerformanceMetrics.record(PerformanceMetrics.ADAPTER_SAVE, System.nanoTime() - saveStarted,
+                1, payload == null ? 0 : payload.length);
         chunkData.setBlock(
                 block.getX() & 15,
                 block.getY(),
                 block.getZ() & 15,
                 context.data(),
                 definition.apiDefinition(),
-                definition.adapter().save(context.data())
+                payload
         );
         ChunkEngine.changed(block);
         BlockEngineEvents.call(new BlockEngineBlockDataSavedEvent(

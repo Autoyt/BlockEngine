@@ -16,6 +16,7 @@ import dev.auto.blockengine.registry.BlockRegistry;
 import dev.auto.blockengine.registry.NamespaceRegistry;
 import dev.auto.blockengine.resourcepack.ResourcePackManager;
 import dev.auto.blockengine.runtime.ChunkEngine;
+import dev.auto.blockengine.runtime.PerformanceMetrics;
 import dev.auto.blockengine.runtime.RuntimeBlockView;
 import dev.auto.blockengine.types.BlockDefinition;
 import dev.auto.blockengine.types.BlockLocationKey;
@@ -133,6 +134,7 @@ public final class DebugCommands implements BasicCommand, Listener {
         }
         if (args.length >= 1 && (args[0].equalsIgnoreCase("on") || args[0].equalsIgnoreCase("off"))) {
             performanceTrackingEnabled = args[0].equalsIgnoreCase("on");
+            PerformanceMetrics.enabled(performanceTrackingEnabled);
             DebugStyle.success(sender, "BlockEngine performance tracking is now "
                     + (performanceTrackingEnabled ? "enabled." : "disabled."));
             return;
@@ -263,6 +265,7 @@ public final class DebugCommands implements BasicCommand, Listener {
         }
         if (args.length >= 2 && (args[1].equalsIgnoreCase("on") || args[1].equalsIgnoreCase("off"))) {
             performanceTrackingEnabled = args[1].equalsIgnoreCase("on");
+            PerformanceMetrics.enabled(performanceTrackingEnabled);
             DebugStyle.success(sender, "BlockEngine performance tracking is now "
                     + (performanceTrackingEnabled ? "enabled." : "disabled."));
             return;
@@ -342,6 +345,20 @@ public final class DebugCommands implements BasicCommand, Listener {
         perfTiming(sender, "visibility", timings.snapshot("visibility"));
         perfTiming(sender, "displays", timings.snapshot("displays"));
 
+        BlockEngineChat.send(sender, DebugStyle.header("chunk storage"));
+        runtimeTiming(sender, "chunk load", PerformanceMetrics.snapshot(PerformanceMetrics.CHUNK_LOAD), "chunks", "blocks");
+        runtimeTiming(sender, "chunk save", PerformanceMetrics.snapshot(PerformanceMetrics.CHUNK_SAVE), "chunks", "blocks");
+        runtimeTiming(sender, "chunk encode", PerformanceMetrics.snapshot(PerformanceMetrics.CHUNK_ENCODE), "chunks", "blocks");
+        runtimeTiming(sender, "chunk decode", PerformanceMetrics.snapshot(PerformanceMetrics.CHUNK_DECODE), "chunks", "blocks");
+
+        BlockEngineChat.send(sender, DebugStyle.header("block storage"));
+        runtimeTiming(sender, "block read", PerformanceMetrics.snapshot(PerformanceMetrics.BLOCK_READ), "blocks", "blocks");
+        runtimeTiming(sender, "block write", PerformanceMetrics.snapshot(PerformanceMetrics.BLOCK_WRITE), "blocks", "blocks");
+
+        BlockEngineChat.send(sender, DebugStyle.header("adapter payload"));
+        runtimeTiming(sender, "adapter load", PerformanceMetrics.snapshot(PerformanceMetrics.ADAPTER_LOAD), "calls", "blocks");
+        runtimeTiming(sender, "adapter save", PerformanceMetrics.snapshot(PerformanceMetrics.ADAPTER_SAVE), "calls", "blocks");
+
         BlockEngineChat.send(sender, DebugStyle.header("event phases"));
         perfActivity(sender, "placement", placement);
         perfActivity(sender, "events", events);
@@ -402,6 +419,43 @@ public final class DebugCommands implements BasicCommand, Listener {
                         .append(DebugStyle.value(snapshot.samples()))
                         .append(Component.text(" | last ", BlockEngineChat.GRAY))
                         .append(DebugStyle.value(age(snapshot.lastSampleAgeNanos())))));
+    }
+
+    private void runtimeTiming(
+            @NotNull CommandSender sender,
+            @NotNull String label,
+            @NotNull PerformanceMetrics.Snapshot snapshot,
+            @NotNull String sampleUnit,
+            @NotNull String unitLabel
+    ) {
+        if (snapshot.empty()) {
+            BlockEngineChat.send(sender, DebugStyle.row(label, DebugStyle.status("idle", false)
+                    .append(Component.space())
+                    .append(DebugStyle.dim("no samples"))));
+            return;
+        }
+
+        Component detail = Component.text("avg ", BlockEngineChat.GRAY)
+                .append(Component.text(PerformanceMetrics.ms(snapshot.avgNanos()) + "ms", speedTextColor(snapshot.avgNanos())))
+                .append(Component.text(" | p95 ", BlockEngineChat.GRAY))
+                .append(Component.text(PerformanceMetrics.ms(snapshot.p95Nanos()) + "ms", speedTextColor(snapshot.p95Nanos())))
+                .append(Component.text(" | max ", BlockEngineChat.GRAY))
+                .append(Component.text(PerformanceMetrics.ms(snapshot.maxNanos()) + "ms", speedTextColor(snapshot.maxNanos())))
+                .append(Component.text(" | per " + unitLabel + " ", BlockEngineChat.GRAY))
+                .append(Component.text(snapshot.nanosPerUnit() <= 0L
+                        ? "n/a"
+                        : PerformanceMetrics.ms(snapshot.nanosPerUnit()) + "ms", speedTextColor(snapshot.nanosPerUnit())))
+                .append(Component.text(" | avg " + unitLabel + " ", BlockEngineChat.GRAY))
+                .append(DebugStyle.value(snapshot.avgUnits()))
+                .append(Component.text(" | avg bytes ", BlockEngineChat.GRAY))
+                .append(DebugStyle.value(bytes(snapshot.avgBytes())))
+                .append(Component.text(" | window ", BlockEngineChat.GRAY))
+                .append(DebugStyle.value(snapshot.windowSamples() + " " + sampleUnit))
+                .append(Component.text(" | total ", BlockEngineChat.GRAY))
+                .append(DebugStyle.value(snapshot.totalSamples() + " " + sampleUnit + ", " + snapshot.totalUnits() + " " + unitLabel))
+                .append(Component.text(" | last ", BlockEngineChat.GRAY))
+                .append(DebugStyle.value(age(snapshot.lastSampleAgeNanos())));
+        BlockEngineChat.send(sender, DebugStyle.row(label, detail));
     }
 
     private void perfActivity(@NotNull CommandSender sender, @NotNull String label, @NotNull ActivitySnapshot snapshot) {
@@ -976,6 +1030,16 @@ public final class DebugCommands implements BasicCommand, Listener {
             return ms(nanos) + "ms";
         }
         return String.format(Locale.ROOT, "%.1fs", nanos / 1_000_000_000.0);
+    }
+
+    private static @NotNull String bytes(long bytes) {
+        if (bytes < 1024L) {
+            return bytes + " B";
+        }
+        if (bytes < 1024L * 1024L) {
+            return String.format(Locale.ROOT, "%.1f KiB", bytes / 1024.0);
+        }
+        return String.format(Locale.ROOT, "%.1f MiB", bytes / (1024.0 * 1024.0));
     }
 
     private record LiveProfile(@NotNull BossBar bar, @NotNull BukkitTask task) {

@@ -57,6 +57,7 @@ public final class ChunkEngine {
     }
 
     public static void load(@NotNull Chunk chunk, @NotNull VisibilityConfig config) {
+        long started = System.nanoTime();
         Key key = Key.from(chunk);
         Data data = Data.load(chunk, CHUNK_DATA_KEY);
 
@@ -72,6 +73,7 @@ public final class ChunkEngine {
 
         chunks.put(key, loaded);
         ManagedDisplayManager.getInstance().loadChunk(key, data);
+        PerformanceMetrics.record(PerformanceMetrics.CHUNK_LOAD, System.nanoTime() - started, data.blocks().size(), 0);
     }
 
     public static void unload(@NotNull Chunk chunk) {
@@ -129,12 +131,14 @@ public final class ChunkEngine {
 
         Set<Key> touched = new HashSet<>();
         for (Map.Entry<Key, ChunkEdit> entry : pendingChunks.entrySet()) {
+            long started = System.nanoTime();
             ChunkEdit edit = entry.getValue();
             int blockCount = edit.data().blocks().size();
             int displayCount = edit.data().displays().size();
             boolean empty = edit.data().isEmpty();
             BlockEngineEvents.call(new BlockEngineChunkSaveEvent(edit.chunk(), blockCount, displayCount, empty));
             Data.save(edit.chunk(), dataKey(), edit.data());
+            PerformanceMetrics.record(PerformanceMetrics.CHUNK_SAVE, System.nanoTime() - started, blockCount, 0);
             BlockEngineEvents.call(new BlockEngineChunkSavedEvent(edit.chunk(), blockCount, displayCount, empty));
             load(edit.chunk(), VisibilityManager.getInstance().config());
             touched.add(entry.getKey());
@@ -588,6 +592,7 @@ public final class ChunkEngine {
             Objects.requireNonNull(complex, "complex");
             Objects.requireNonNull(context, "context");
 
+            long started = System.nanoTime();
             try {
                 ByteArrayOutputStream bytes = new ByteArrayOutputStream();
                 DataOutputStream out = new DataOutputStream(bytes);
@@ -603,7 +608,10 @@ public final class ChunkEngine {
                 }
 
                 out.flush();
-                return bytes.toByteArray();
+                byte[] primitive = bytes.toByteArray();
+                PerformanceMetrics.record(PerformanceMetrics.CHUNK_ENCODE, System.nanoTime() - started,
+                        complex.blocks.size(), primitive.length);
+                return primitive;
             } catch (IOException exception) {
                 throw new UncheckedIOException("Failed to encode BlockEngine chunk data.", exception);
             }
@@ -614,6 +622,7 @@ public final class ChunkEngine {
             Objects.requireNonNull(primitive, "primitive");
             Objects.requireNonNull(context, "context");
 
+            long started = System.nanoTime();
             try {
                 DataInputStream in = new DataInputStream(new ByteArrayInputStream(primitive));
                 int version = in.readInt();
@@ -633,6 +642,8 @@ public final class ChunkEngine {
                         data.setDisplay(readDisplay(in));
                     }
                 }
+                PerformanceMetrics.record(PerformanceMetrics.CHUNK_DECODE, System.nanoTime() - started,
+                        data.blocks.size(), primitive.length);
                 return data;
             } catch (IOException exception) {
                 throw new UncheckedIOException("Failed to decode BlockEngine chunk data.", exception);
@@ -640,6 +651,7 @@ public final class ChunkEngine {
         }
 
         private static void writeBlock(@NotNull DataOutputStream out, @NotNull StoredBlock block) throws IOException {
+            long started = System.nanoTime();
             out.writeByte(block.localX());
             out.writeInt(block.y());
             out.writeByte(block.localZ());
@@ -659,9 +671,11 @@ public final class ChunkEngine {
             for (StoredDisplay display : block.displays()) {
                 writeDisplay(out, display);
             }
+            PerformanceMetrics.record(PerformanceMetrics.BLOCK_WRITE, System.nanoTime() - started, 1, payload.length);
         }
 
         private static @NotNull StoredBlock readBlock(@NotNull DataInputStream in, int version) throws IOException {
+            long started = System.nanoTime();
             int localX = in.readUnsignedByte();
             int y = in.readInt();
             int localZ = in.readUnsignedByte();
@@ -684,8 +698,10 @@ public final class ChunkEngine {
                 }
             }
 
-            return new StoredBlock(localX, y, localZ, fallbackBlock, hardness, miningSpeed,
+            StoredBlock block = new StoredBlock(localX, y, localZ, fallbackBlock, hardness, miningSpeed,
                     unbreakable, dropsItem, dropInCreative, data, payload, displays);
+            PerformanceMetrics.record(PerformanceMetrics.BLOCK_READ, System.nanoTime() - started, 1, payload.length);
+            return block;
         }
 
         private static void writeDisplay(@NotNull DataOutputStream out, @NotNull StoredDisplay display) throws IOException {
