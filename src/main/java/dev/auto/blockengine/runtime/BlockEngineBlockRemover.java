@@ -1,7 +1,6 @@
 package dev.auto.blockengine.runtime;
 
 import dev.auto.blockengine.items.BlockEngineItemManager;
-import dev.auto.blockengine.pdc.BlockEngineChunkData;
 import dev.auto.blockengine.registry.BlockRegistry;
 import dev.auto.blockengine.types.BlockDefinition;
 import dev.auto.blockengine.types.BlockLocationKey;
@@ -19,7 +18,7 @@ public final class BlockEngineBlockRemover {
     }
 
     public static boolean remove(@NotNull Block block, boolean drop) {
-        RuntimeBlockView customBlock = BlockEngineChunkRuntime.getBlock(new BlockLocationKey(
+        RuntimeBlockView customBlock = ChunkEngine.getBlock(new BlockLocationKey(
                 block.getWorld().getUID(),
                 block.getX(),
                 block.getY(),
@@ -60,7 +59,7 @@ public final class BlockEngineBlockRemover {
         }
         sound(block, customBlock);
 
-        BlockEngineChunkData data = BlockEngineMutationBatcher.data(block.getChunk());
+        ChunkEngine.Data data = BlockEngineMutationBatcher.data(block.getChunk());
         data.removeBlock(block.getX() & 15, block.getY(), block.getZ() & 15);
 
         block.setType(replacement, applyPhysics);

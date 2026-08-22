@@ -1,13 +1,14 @@
 package dev.auto.blockengine.placement;
 
 import dev.auto.blockengine.api.blocks.BlockData;
+import dev.auto.blockengine.Main;
 import dev.auto.blockengine.items.BlockEngineItemManager;
-import dev.auto.blockengine.pdc.BlockEngineChunkData;
 import dev.auto.blockengine.registry.BlockRegistry;
 import dev.auto.blockengine.registry.NamespaceRegistry;
 import dev.auto.blockengine.runtime.BlockEngineBlockContext;
 import dev.auto.blockengine.runtime.BlockEngineCreateContext;
 import dev.auto.blockengine.runtime.BlockEngineMutationBatcher;
+import dev.auto.blockengine.runtime.ChunkEngine;
 import dev.auto.blockengine.types.BlockDefinition;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
@@ -79,10 +80,10 @@ public final class PlacementManager {
         definition.apiDefinition().state(data.stateId());
 
         byte[] payload = definition.adapter().save(data);
-        BlockEngineChunkData chunkData = BlockEngineMutationBatcher.data(block.getChunk());
+        ChunkEngine.Data chunkData = BlockEngineMutationBatcher.data(block.getChunk());
         chunkData.setBlock(block.getX() & 15, block.getY(), block.getZ() & 15, data, definition.apiDefinition(), payload);
 
-        block.setType(BlockEngineBackingBlock.material(), false);
+        block.setType(Main.getBackingBlock(), false);
         BlockEngineMutationBatcher.changed(block);
 
         definition.adapter().onPlace(new BlockEngineBlockContext(definition.adapter(), data, block, player));

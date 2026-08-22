@@ -2,7 +2,6 @@ package dev.auto.blockengine.catalog;
 
 import dev.auto.blockengine.Main;
 import dev.auto.blockengine.items.BlockEngineItemManager;
-import dev.auto.blockengine.placement.BlockEngineBackingBlock;
 import dev.auto.blockengine.registry.BlockRegistry;
 import dev.auto.blockengine.types.BlockDefinition;
 import io.papermc.paper.event.player.PlayerStonecutterRecipeSelectEvent;
@@ -157,7 +156,7 @@ public final class CatalogListeners implements Listener {
             StonecuttingRecipe recipe = new StonecuttingRecipe(
                     key,
                     BlockEngineItemManager.create(block),
-                    new RecipeChoice.MaterialChoice(BlockEngineBackingBlock.material())
+                    new RecipeChoice.MaterialChoice(Main.getBackingBlock())
             );
             recipe.setGroup("BlockEngine_catalog");
             Bukkit.addRecipe(recipe);
@@ -192,7 +191,7 @@ public final class CatalogListeners implements Listener {
     }
 
     private static @NotNull ItemStack inputItem() {
-        ItemStack item = new ItemStack(BlockEngineBackingBlock.material());
+        ItemStack item = new ItemStack(Main.getBackingBlock());
         ItemMeta meta = item.getItemMeta();
         meta.displayName(Component.text("BlockEngine catalog"));
         item.setItemMeta(meta);

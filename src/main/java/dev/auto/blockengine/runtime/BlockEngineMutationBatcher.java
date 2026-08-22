@@ -1,9 +1,7 @@
 package dev.auto.blockengine.runtime;
 
 import dev.auto.blockengine.Main;
-import dev.auto.blockengine.pdc.BlockEngineChunkData;
 import dev.auto.blockengine.types.BlockLocationKey;
-import dev.auto.blockengine.types.ChunkKey;
 import dev.auto.blockengine.visibility.VisibilityManager;
 import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
@@ -18,7 +16,7 @@ import java.util.Map;
 import java.util.Set;
 
 public final class BlockEngineMutationBatcher {
-    private static final Map<ChunkKey, ChunkEdit> chunks = new HashMap<>();
+    private static final Map<ChunkEngine.Key, ChunkEdit> chunks = new HashMap<>();
     private static final Map<BlockLocationKey, Block> changedBlocks = new HashMap<>();
     private static final List<Runnable> afterFlush = new ArrayList<>();
     private static boolean scheduled;
@@ -26,7 +24,7 @@ public final class BlockEngineMutationBatcher {
     private BlockEngineMutationBatcher() {
     }
 
-    public static @NotNull BlockEngineChunkData data(@NotNull Chunk chunk) {
+    public static @NotNull ChunkEngine.Data data(@NotNull Chunk chunk) {
         return edit(chunk).data();
     }
 
@@ -52,11 +50,11 @@ public final class BlockEngineMutationBatcher {
             return;
         }
 
-        Set<ChunkKey> touched = new HashSet<>();
-        for (Map.Entry<ChunkKey, ChunkEdit> entry : chunks.entrySet()) {
+        Set<ChunkEngine.Key> touched = new HashSet<>();
+        for (Map.Entry<ChunkEngine.Key, ChunkEdit> entry : chunks.entrySet()) {
             ChunkEdit edit = entry.getValue();
-            BlockEngineChunkData.save(edit.chunk(), BlockEngineChunkRuntime.chunkDataKey(), edit.data());
-            BlockEngineChunkRuntime.loadChunk(edit.chunk(), VisibilityManager.getInstance().config());
+            ChunkEngine.Data.save(edit.chunk(), ChunkEngine.dataKey(), edit.data());
+            ChunkEngine.load(edit.chunk(), VisibilityManager.getInstance().config());
             touched.add(entry.getKey());
         }
 
@@ -91,10 +89,10 @@ public final class BlockEngineMutationBatcher {
     }
 
     private static @NotNull ChunkEdit edit(@NotNull Chunk chunk) {
-        ChunkKey key = ChunkKey.from(chunk);
+        ChunkEngine.Key key = ChunkEngine.Key.from(chunk);
         return chunks.computeIfAbsent(key, ignored -> new ChunkEdit(
                 chunk,
-                BlockEngineChunkData.load(chunk, BlockEngineChunkRuntime.chunkDataKey())
+                ChunkEngine.Data.load(chunk, ChunkEngine.dataKey())
         ));
     }
 
@@ -115,7 +113,7 @@ public final class BlockEngineMutationBatcher {
         );
     }
 
-    private record ChunkEdit(@NotNull Chunk chunk, @NotNull BlockEngineChunkData data) {
+    private record ChunkEdit(@NotNull Chunk chunk, @NotNull ChunkEngine.Data data) {
     }
 }
 

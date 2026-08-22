@@ -1,19 +1,10 @@
 package dev.auto.blockengine.commands;
 
 import dev.auto.blockengine.Main;
-import dev.auto.blockengine.defaultadapters.DebugBlocks;
-import dev.auto.blockengine.entity.BlockEngineBlockOrchestrator;
-import dev.auto.blockengine.items.BlockEngineItemManager;
-import dev.auto.blockengine.mining.DebugBreakAnimationManager;
-import dev.auto.blockengine.registry.BlockRegistry;
 import dev.auto.blockengine.resourcepack.ResourcePackManager;
-import dev.auto.blockengine.types.BlockDefinition;
-import dev.auto.blockengine.types.BlockLocationKey;
 import io.papermc.paper.command.brigadier.BasicCommand;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
-import org.bukkit.FluidCollisionMode;
 import org.bukkit.Material;
-import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.Nullable;
 
@@ -26,8 +17,7 @@ public final class DebugCommands implements BasicCommand {
     private static final List<String> ROOT_SUBCOMMANDS = List.of(
             "spawn",
             "redblock",
-            "pack",
-            "breakstage"
+            "pack"
     );
     private static final List<String> EXAMPLE_ALIASES = List.of(
             "spawn"
@@ -58,7 +48,6 @@ public final class DebugCommands implements BasicCommand {
 
         switch (sub) {
             case "pack" -> pack(sender, args);
-            case "breakstage", "breakamount", "crack" -> breakStage(sender, args);
             default -> sender.sendMessage("Unknown subcommand. Try: " + String.join(", ", ROOT_SUBCOMMANDS));
         }
     }
@@ -99,12 +88,6 @@ public final class DebugCommands implements BasicCommand {
                     .filter(option -> option.startsWith(args[1].toLowerCase(Locale.ROOT)))
                     .toList();
         }
-        if ((first.equals("breakstage") || first.equals("breakamount") || first.equals("crack")) && args.length == 2) {
-            return List.of("0", "1", "2", "3", "4", "5", "6", "7", "8", "9").stream()
-                    .filter(stage -> stage.startsWith(args[1]))
-                    .toList();
-        }
-
         return List.of();
     }
 
@@ -128,39 +111,6 @@ public final class DebugCommands implements BasicCommand {
         sender.sendMessage("Use /debug pack reload from console, or run /debug pack as a player.");
     }
 
-    private static void breakStage(org.bukkit.command.CommandSender sender, String[] args) {
-        if (!(sender instanceof Player player)) {
-            sender.sendMessage("Only players can debug block break animation targets.");
-            return;
-        }
-        if (args.length < 2) {
-            sender.sendMessage("Usage: /debug breakstage <0-9>");
-            return;
-        }
-
-        int stage;
-        try {
-            stage = Integer.parseInt(args[1]);
-        } catch (NumberFormatException ignored) {
-            sender.sendMessage("Break stage must be a number from 0 to 9.");
-            return;
-        }
-        if (stage < 0 || stage > 9) {
-            sender.sendMessage("Break stage must be from 0 to 9.");
-            return;
-        }
-
-        Block target = player.getTargetBlockExact(8, FluidCollisionMode.NEVER);
-        if (target == null) {
-            sender.sendMessage("Look at a block within 8 blocks first.");
-            return;
-        }
-
-        DebugBreakAnimationManager.getInstance().show(player, target, (byte) stage);
-        sender.sendMessage("Sending break stage " + stage + " to "
-                + target.getX() + " " + target.getY() + " " + target.getZ()
-                + " for 1 second.");
-    }
 }
 
 

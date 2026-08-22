@@ -6,24 +6,21 @@ import com.github.retrooper.packetevents.PacketEvents;
 import dev.auto.blockengine.catalog.CatalogListeners;
 import dev.auto.blockengine.commands.CatalogCommand;
 import dev.auto.blockengine.commands.DebugCommands;
+import dev.auto.blockengine.commands.OverideFillCommand;
 import dev.auto.blockengine.defaultadapters.DebugBlocks;
-import dev.auto.blockengine.listeners.BlockCommandOverrideListener;
-import dev.auto.blockengine.listeners.ChunkListeners;
 import dev.auto.blockengine.listeners.GameListener;
-import dev.auto.blockengine.mining.BreakAnimationPacketBlocker;
-import dev.auto.blockengine.mining.DebugBreakAnimationManager;
-import dev.auto.blockengine.mining.MiningManager;
 import dev.auto.blockengine.registry.DiscoverySystem;
 import dev.auto.blockengine.resourcepack.ResourcePackManager;
 import dev.auto.blockengine.runtime.BlockEngineMutationBatcher;
+import dev.auto.blockengine.runtime.ChunkEngine;
 import dev.auto.blockengine.visibility.VisibilityManager;
 import io.github.retrooper.packetevents.factory.spigot.SpigotPacketEventsBuilder;
 import lombok.Getter;
 import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
+import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
-import dev.auto.blockengine.runtime.BlockEngineChunkRuntime;
 
 public final class Main extends JavaPlugin {
     @Getter
@@ -31,6 +28,8 @@ public final class Main extends JavaPlugin {
     @Getter
     private static final ObjectMapper jsonMapper = new ObjectMapper()
             .enable(SerializationFeature.INDENT_OUTPUT);
+    @Getter
+    private static final Material backingBlock = Material.BARRIER;
 
     @Override
     public void onLoad() {
@@ -43,7 +42,6 @@ public final class Main extends JavaPlugin {
     @Override
     public void onEnable() {
         PacketEvents.getAPI().init();
-        BreakAnimationPacketBlocker.register();
         configSave(false);
         DiscoverySystem.discoverBlocks();
         DebugBlocks.register();
@@ -55,13 +53,12 @@ public final class Main extends JavaPlugin {
         registerCommand("blockenginedebug", debugCommands);
 
         new CatalogListeners();
-        new BlockCommandOverrideListener();
-        new ChunkListeners();
+        new OverideFillCommand();
         new GameListener();
 
         for (org.bukkit.World world : Bukkit.getWorlds()) {
             for (Chunk chunk : world.getLoadedChunks()) {
-                BlockEngineChunkRuntime.loadChunk(chunk, VisibilityManager.getInstance().config());
+                ChunkEngine.load(chunk, VisibilityManager.getInstance().config());
             }
         }
 
@@ -76,9 +73,6 @@ public final class Main extends JavaPlugin {
         for (Player player : Bukkit.getOnlinePlayers()) {
             VisibilityManager.getInstance().cleanup(player);
         }
-        MiningManager.getInstance().cleanupAll();
-        DebugBreakAnimationManager.getInstance().clearAll();
-        BreakAnimationPacketBlocker.unregister();
         CatalogListeners.cleanup();
         ResourcePackManager.getInstance().stop();
         BlockEngineMutationBatcher.clear();

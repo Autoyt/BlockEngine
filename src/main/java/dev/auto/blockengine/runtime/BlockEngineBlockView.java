@@ -13,7 +13,7 @@ public final class BlockEngineBlockView implements BlockView {
 
     public BlockEngineBlockView(@NotNull Block block) {
         this.block = block;
-        this.blockEngineBlock = BlockEngineChunkRuntime.getBlock(new BlockLocationKey(
+        this.blockEngineBlock = ChunkEngine.getBlock(new BlockLocationKey(
                 block.getWorld().getUID(),
                 block.getX(),
                 block.getY(),

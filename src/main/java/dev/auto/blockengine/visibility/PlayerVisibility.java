@@ -1,8 +1,8 @@
 package dev.auto.blockengine.visibility;
 
 import dev.auto.blockengine.entity.VirtualItemDisplay;
+import dev.auto.blockengine.runtime.ChunkEngine;
 import dev.auto.blockengine.types.BlockLocationKey;
-import dev.auto.blockengine.types.ChunkKey;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -15,7 +15,7 @@ final class PlayerVisibility {
     private final @NotNull ArrayDeque<VirtualItemDisplay> pool = new ArrayDeque<>();
 
     private int lastRecalcTick = -1;
-    private @Nullable ChunkKey centerChunk;
+    private @Nullable ChunkEngine.Key centerChunk;
     private int radius = -1;
 
     @NotNull Map<BlockLocationKey, VirtualItemDisplay> active() {
@@ -34,11 +34,11 @@ final class PlayerVisibility {
         this.lastRecalcTick = lastRecalcTick;
     }
 
-    @Nullable ChunkKey centerChunk() {
+    @Nullable ChunkEngine.Key centerChunk() {
         return centerChunk;
     }
 
-    void centerChunk(@Nullable ChunkKey centerChunk) {
+    void centerChunk(@Nullable ChunkEngine.Key centerChunk) {
         this.centerChunk = centerChunk;
     }
 

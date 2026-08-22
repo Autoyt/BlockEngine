@@ -1,14 +1,12 @@
 package dev.auto.blockengine.visibility;
 
 import dev.auto.blockengine.Main;
-import dev.auto.blockengine.entity.BlockEngineBlockOrchestrator;
+import dev.auto.blockengine.entity.PacketEntityManager;
 import dev.auto.blockengine.entity.VirtualItemDisplay;
 import dev.auto.blockengine.items.BlockEngineDisplayItemManager;
-import dev.auto.blockengine.runtime.LoadedBlockEngineChunk;
+import dev.auto.blockengine.runtime.ChunkEngine;
 import dev.auto.blockengine.runtime.RuntimeBlockView;
-import dev.auto.blockengine.runtime.BlockEngineChunkRuntime;
 import dev.auto.blockengine.types.BlockLocationKey;
-import dev.auto.blockengine.types.ChunkKey;
 import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
 import org.bukkit.Location;
@@ -73,7 +71,7 @@ public final class VisibilityManager {
         recalculate(player, state(player), true);
     }
 
-    public void refreshPlayersNear(@NotNull ChunkKey chunkKey) {
+    public void refreshPlayersNear(@NotNull ChunkEngine.Key chunkKey) {
         for (Player player : Bukkit.getOnlinePlayers()) {
             if (isChunkInPlayerRadius(player, chunkKey)) {
                 forceRecalculate(player);
@@ -81,9 +79,9 @@ public final class VisibilityManager {
         }
     }
 
-    public void refreshPlayersNear(@NotNull Iterable<ChunkKey> chunkKeys) {
+    public void refreshPlayersNear(@NotNull Iterable<ChunkEngine.Key> chunkKeys) {
         for (Player player : Bukkit.getOnlinePlayers()) {
-            for (ChunkKey chunkKey : chunkKeys) {
+            for (ChunkEngine.Key chunkKey : chunkKeys) {
                 if (isChunkInPlayerRadius(player, chunkKey)) {
                     forceRecalculate(player);
                     break;
@@ -92,7 +90,7 @@ public final class VisibilityManager {
         }
     }
 
-    public void removeChunkDisplays(@NotNull ChunkKey chunkKey) {
+    public void removeChunkDisplays(@NotNull ChunkEngine.Key chunkKey) {
         for (Map.Entry<UUID, PlayerVisibility> entry : players.entrySet()) {
             Player player = Bukkit.getPlayer(entry.getKey());
             if (player == null) {
@@ -122,10 +120,10 @@ public final class VisibilityManager {
 
         for (VirtualItemDisplay display : state.active().values()) {
             display.destroy(player);
-            BlockEngineBlockOrchestrator.freeId(display.getId());
+            PacketEntityManager.release(display);
         }
         for (VirtualItemDisplay display : state.pool()) {
-            BlockEngineBlockOrchestrator.freeId(display.getId());
+            PacketEntityManager.release(display);
         }
     }
 
@@ -133,7 +131,7 @@ public final class VisibilityManager {
         VisibilityConfig visibilityConfig = config();
         int radius = visibilityConfig.effectiveChunkRadius();
         Chunk chunk = player.getLocation().getChunk();
-        ChunkKey center = ChunkKey.from(chunk);
+        ChunkEngine.Key center = ChunkEngine.Key.from(chunk);
 
         if (!force && center.equals(state.centerChunk()) && radius == state.radius()) {
             return;
@@ -147,7 +145,7 @@ public final class VisibilityManager {
 
     private @NotNull Map<BlockLocationKey, RuntimeBlockView> collectDesired(
             @NotNull World world,
-            @NotNull ChunkKey center,
+            @NotNull ChunkEngine.Key center,
             int radius,
             @NotNull VisibilityConfig visibilityConfig
     ) {
@@ -166,7 +164,7 @@ public final class VisibilityManager {
                     continue;
                 }
 
-                LoadedBlockEngineChunk loadedChunk = BlockEngineChunkRuntime.get(new ChunkKey(center.worldId(), chunkX, chunkZ));
+                ChunkEngine.LoadedChunk loadedChunk = ChunkEngine.get(new ChunkEngine.Key(center.worldId(), chunkX, chunkZ));
                 if (loadedChunk == null) {
                     continue;
                 }
@@ -217,7 +215,7 @@ public final class VisibilityManager {
         if (display != null) {
             return display;
         }
-        return new VirtualItemDisplay(BlockEngineBlockOrchestrator.nextId());
+        return PacketEntityManager.itemDisplay();
     }
 
     private void recycleOrRelease(@NotNull PlayerVisibility state, @NotNull VirtualItemDisplay display) {
@@ -225,7 +223,7 @@ public final class VisibilityManager {
             state.pool().addLast(display);
             return;
         }
-        BlockEngineBlockOrchestrator.freeId(display.getId());
+        PacketEntityManager.release(display);
     }
 
     private void configure(@NotNull VirtualItemDisplay display, @NotNull World world, @NotNull RuntimeBlockView block) {
@@ -244,7 +242,7 @@ public final class VisibilityManager {
                 && (from.getBlockZ() >> 4) == (to.getBlockZ() >> 4);
     }
 
-    private boolean isChunkInPlayerRadius(@NotNull Player player, @NotNull ChunkKey chunkKey) {
+    private boolean isChunkInPlayerRadius(@NotNull Player player, @NotNull ChunkEngine.Key chunkKey) {
         if (!player.getWorld().getUID().equals(chunkKey.worldId())) {
             return false;
         }

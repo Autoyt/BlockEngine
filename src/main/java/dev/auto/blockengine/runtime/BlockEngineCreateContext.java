@@ -2,7 +2,6 @@ package dev.auto.blockengine.runtime;
 
 import dev.auto.blockengine.api.blocks.BlockCreateContext;
 import dev.auto.blockengine.api.blocks.BlockData;
-import dev.auto.blockengine.pdc.BlockEngineChunkData;
 import org.bukkit.Location;
 import org.bukkit.block.BlockFace;
 import org.bukkit.entity.Player;
@@ -52,6 +51,6 @@ public final class BlockEngineCreateContext implements BlockCreateContext {
 
     @Override
     public @NotNull BlockData createData() {
-        return new BlockEngineChunkData.SimpleBlockData(blockId, defaultState);
+        return new ChunkEngine.SimpleBlockData(blockId, defaultState);
     }
 }

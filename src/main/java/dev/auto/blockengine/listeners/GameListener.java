@@ -2,25 +2,23 @@ package dev.auto.blockengine.listeners;
 
 import dev.auto.blockengine.Main;
 import dev.auto.blockengine.items.BlockEngineItemManager;
-import dev.auto.blockengine.mining.MiningManager;
-import dev.auto.blockengine.placement.BlockEngineBackingBlock;
 import dev.auto.blockengine.placement.PlacementManager;
-import dev.auto.blockengine.placement.BlockEngineVanillaRules;
+import dev.auto.blockengine.placement.PlacementVerificationEngine;
 import dev.auto.blockengine.registry.BlockRegistry;
 import dev.auto.blockengine.registry.NamespaceRegistry;
 import dev.auto.blockengine.resourcepack.ResourcePackManager;
-import dev.auto.blockengine.runtime.LoadedBlockEngineChunk;
 import dev.auto.blockengine.runtime.RuntimeBlockView;
 import dev.auto.blockengine.runtime.BlockEngineBlockContext;
 import dev.auto.blockengine.runtime.BlockDataManager;
 import dev.auto.blockengine.runtime.BlockEngineBlockRemover;
-import dev.auto.blockengine.runtime.BlockEngineChunkRuntime;
 import dev.auto.blockengine.runtime.BlockEngineMutationBatcher;
+import dev.auto.blockengine.runtime.ChunkEngine;
 import dev.auto.blockengine.types.BlockDefinition;
 import dev.auto.blockengine.types.BlockLocationKey;
 import dev.auto.blockengine.visibility.VisibilityManager;
 import io.papermc.paper.event.player.PlayerPickBlockEvent;
 import org.bukkit.Bukkit;
+import org.bukkit.Chunk;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -28,19 +26,12 @@ import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.block.data.Waterlogged;
-import org.bukkit.entity.Entity;
-import org.bukkit.entity.EntityType;
-import org.bukkit.entity.LivingEntity;
-import org.bukkit.entity.Vehicle;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Event;
 import org.bukkit.event.Listener;
-import org.bukkit.event.block.BlockCanBuildEvent;
 import org.bukkit.event.block.BlockBreakEvent;
-import org.bukkit.event.block.BlockDamageAbortEvent;
-import org.bukkit.event.block.BlockDamageEvent;
 import org.bukkit.event.block.BlockExplodeEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
@@ -50,9 +41,10 @@ import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerTeleportEvent;
+import org.bukkit.event.world.ChunkLoadEvent;
+import org.bukkit.event.world.ChunkUnloadEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
-import org.bukkit.util.BoundingBox;
 
 import java.util.HashMap;
 import java.util.HashSet;
@@ -69,8 +61,22 @@ public class GameListener implements Listener {
     }
 
     @EventHandler
+    public void onChunkLoad(ChunkLoadEvent event) {
+        Chunk chunk = event.getChunk();
+        ChunkEngine.load(chunk, VisibilityManager.getInstance().config());
+        VisibilityManager.getInstance().refreshPlayersNear(ChunkEngine.Key.from(chunk));
+    }
+
+    @EventHandler
+    public void onChunkUnload(ChunkUnloadEvent event) {
+        BlockEngineMutationBatcher.flushNow();
+        ChunkEngine.Key key = ChunkEngine.Key.from(event.getChunk());
+        ChunkEngine.unload(event.getChunk());
+        VisibilityManager.getInstance().removeChunkDisplays(key);
+    }
+
+    @EventHandler
     public void onMove(PlayerMoveEvent event) {
-        MiningManager.getInstance().updateAim(event.getPlayer());
         VisibilityManager.getInstance().handleMove(event);
     }
 
@@ -92,29 +98,7 @@ public class GameListener implements Listener {
     public void onQuit(PlayerQuitEvent event) {
         BlockEngineMutationBatcher.flushNow();
         lastPlacementTicks.remove(event.getPlayer().getUniqueId());
-        MiningManager.getInstance().stop(event.getPlayer());
         VisibilityManager.getInstance().cleanup(event.getPlayer());
-    }
-
-    @EventHandler
-    public void onStartBreaking(BlockDamageEvent event) {
-        final Player player = event.getPlayer();
-        RuntimeBlockView block = block(event.getBlock());
-        if (block == null) {
-            return;
-        }
-
-        event.setCancelled(true);
-        if (player.getGameMode() == GameMode.CREATIVE) {
-            MiningManager.getInstance().breakNow(player, event.getBlock(), block);
-            return;
-        }
-        MiningManager.getInstance().start(player, event.getBlock(), block);
-    }
-
-    @EventHandler
-    public void onStopBreaking(BlockDamageAbortEvent event) {
-        MiningManager.getInstance().abort(event.getPlayer());
     }
 
     @EventHandler
@@ -122,9 +106,16 @@ public class GameListener implements Listener {
         RuntimeBlockView block = block(event.getBlock());
         if (block != null) {
             event.setCancelled(true);
-            if (event.getPlayer().getGameMode() == GameMode.CREATIVE) {
-                MiningManager.getInstance().breakNow(event.getPlayer(), event.getBlock(), block);
+            BlockEngineBlockContext context = BlockDataManager.getInstance().context(event.getBlock(), block, event.getPlayer());
+            if (context != null && !context.adapter().onBreak(context)) {
+                BlockDataManager.getInstance().save(event.getBlock(), context);
+                return;
             }
+            BlockEngineBlockRemover.remove(
+                    event.getBlock(),
+                    block,
+                    event.getPlayer().getGameMode() != GameMode.CREATIVE || block.storedBlock().dropInCreative()
+            );
         }
     }
 
@@ -177,14 +168,6 @@ public class GameListener implements Listener {
         }
 
         if (event.getAction() == Action.LEFT_CLICK_BLOCK) {
-            event.setCancelled(true);
-            if (event.getPlayer().getGameMode() == GameMode.CREATIVE) {
-                MiningManager.getInstance().breakNow(event.getPlayer(), event.getClickedBlock(), block);
-                return;
-            }
-            if (!MiningManager.getInstance().active(event.getPlayer(), event.getClickedBlock())) {
-                MiningManager.getInstance().start(event.getPlayer(), event.getClickedBlock(), block);
-            }
             return;
         }
 
@@ -231,7 +214,7 @@ public class GameListener implements Listener {
 
         Set<BlockLocationKey> affected = affectedByExplosion(origin, radius(origin, vanillaBlocks));
         for (BlockLocationKey location : affected) {
-            RuntimeBlockView customBlock = BlockEngineChunkRuntime.getBlock(location);
+            RuntimeBlockView customBlock = ChunkEngine.getBlock(location);
             if (customBlock == null) {
                 continue;
             }
@@ -308,7 +291,7 @@ public class GameListener implements Listener {
             }
 
             BlockLocationKey location = new BlockLocationKey(world.getUID(), blockX, blockY, blockZ);
-            RuntimeBlockView customBlock = BlockEngineChunkRuntime.getBlock(location);
+            RuntimeBlockView customBlock = ChunkEngine.getBlock(location);
             float resistance = customBlock == null
                     ? block.getType().getBlastResistance()
                     : Math.max(0.05f, customBlock.storedBlock().hardness());
@@ -342,7 +325,7 @@ public class GameListener implements Listener {
     }
 
     private RuntimeBlockView block(Block block) {
-        return BlockEngineChunkRuntime.getBlock(new BlockLocationKey(
+        return ChunkEngine.getBlock(new BlockLocationKey(
                 block.getWorld().getUID(),
                 block.getX(),
                 block.getY(),
@@ -371,13 +354,19 @@ public class GameListener implements Listener {
 
         Block clicked = event.getClickedBlock();
         Block target = clicked.isReplaceable() ? clicked : clicked.getRelative(event.getBlockFace());
-        if (!target.isReplaceable()) {
-            event.setCancelled(true);
-            return true;
-        }
         String stateId = BlockEngineItemManager.stateId(item);
         BlockFace placedAgainst = event.getBlockFace().getOppositeFace();
-        if (!canPlace(target, definition, stateId, player, placedAgainst, event.getHand())) {
+        PlacementVerificationEngine.Result verification = PlacementVerificationEngine.verify(
+                new PlacementVerificationEngine.Request(
+                        target,
+                        definition,
+                        stateId,
+                        player,
+                        placedAgainst,
+                        event.getHand()
+                )
+        );
+        if (!verification.allowed()) {
             event.setCancelled(true);
             return true;
         }
@@ -402,59 +391,6 @@ public class GameListener implements Listener {
         return true;
     }
 
-    private boolean canPlace(
-            Block target,
-            BlockDefinition definition,
-            String stateId,
-            Player player,
-            BlockFace placedAgainst,
-            EquipmentSlot hand
-    ) {
-        org.bukkit.block.data.BlockData placementData = BlockEngineVanillaRules.placementData(
-                definition,
-                stateId,
-                player,
-                placedAgainst
-        );
-        BlockCanBuildEvent buildEvent = new BlockCanBuildEvent(
-                target,
-                player,
-                placementData,
-                BlockEngineVanillaRules.canPlace(target, definition, stateId, player, placedAgainst),
-                hand
-        );
-        Bukkit.getPluginManager().callEvent(buildEvent);
-        return buildEvent.isBuildable() && !occupied(target, player);
-    }
-
-    private boolean occupied(Block target, Player player) {
-        BoundingBox blockBox = new BoundingBox(
-                target.getX(),
-                target.getY(),
-                target.getZ(),
-                target.getX() + 1.0,
-                target.getY() + 1.0,
-                target.getZ() + 1.0
-        );
-
-        if (player.getBoundingBox().overlaps(blockBox)) {
-            return true;
-        }
-
-        for (Entity entity : target.getWorld().getNearbyEntities(blockBox)) {
-            if (!entity.isDead()
-                    && !(entity instanceof Player targetPlayer && targetPlayer.getGameMode() == GameMode.SPECTATOR)
-                    && (entity instanceof LivingEntity
-                    || entity instanceof Vehicle
-                    || entity.getType() == EntityType.ARMOR_STAND
-                    || entity.getType() == EntityType.END_CRYSTAL)
-                    && entity.getBoundingBox().overlaps(blockBox)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     private void useHeldItem(PlayerInteractEvent event) {
         event.setUseInteractedBlock(Event.Result.DENY);
         event.setUseItemInHand(Event.Result.ALLOW);
@@ -468,8 +404,6 @@ public class GameListener implements Listener {
         player.updateInventory();
     }
 }
-
-
 
 
 

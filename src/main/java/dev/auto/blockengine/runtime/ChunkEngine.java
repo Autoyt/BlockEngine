@@ -1,9 +1,14 @@
-package dev.auto.blockengine.pdc;
+package dev.auto.blockengine.runtime;
 
+import dev.auto.blockengine.Main;
 import dev.auto.blockengine.api.blocks.BlockData;
+import dev.auto.blockengine.types.BlockLocationKey;
+import dev.auto.blockengine.visibility.VisibilityConfig;
 import org.bukkit.Chunk;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
+import org.bukkit.World;
+import org.bukkit.block.Block;
 import org.bukkit.persistence.PersistentDataAdapterContext;
 import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
@@ -16,86 +21,197 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
 
-public final class BlockEngineChunkData {
-    public static final int VERSION = 5;
-    private static final int MIN_VERSION = 2;
-    public static final PersistentDataType<byte[], BlockEngineChunkData> TYPE = new BlockEngineChunkDataType();
+public final class ChunkEngine {
+    private static final NamespacedKey CHUNK_DATA_KEY = new NamespacedKey(Main.getInstance(), "chunk_data");
+    private static final Map<Key, LoadedChunk> chunks = new HashMap<>();
 
-    private final @NotNull Map<Integer, StoredBlock> blocks = new LinkedHashMap<>();
-
-    public boolean isEmpty() {
-        return blocks.isEmpty();
+    private ChunkEngine() {
     }
 
-    public @NotNull Collection<StoredBlock> blocks() {
-        return Collections.unmodifiableCollection(blocks.values());
-    }
+    public static void load(@NotNull Chunk chunk, @NotNull VisibilityConfig config) {
+        Key key = Key.from(chunk);
+        Data data = Data.load(chunk, CHUNK_DATA_KEY);
 
-    public @Nullable StoredBlock blockAt(int localX, int y, int localZ) {
-        return blocks.get(packBlockKey(localX, y, localZ));
-    }
-
-    public void setBlock(@NotNull StoredBlock block) {
-        blocks.put(packBlockKey(block.localX(), block.y(), block.localZ()), block);
-    }
-
-    public void setBlock(
-            int localX,
-            int y,
-            int localZ,
-            @NotNull BlockData data,
-            @NotNull dev.auto.blockengine.api.blocks.BlockDefinition definition,
-            byte @Nullable [] payload
-    ) {
-        setBlock(StoredBlock.from(localX, y, localZ, data, definition, payload));
-    }
-
-    public void removeBlock(int localX, int y, int localZ) {
-        blocks.remove(packBlockKey(localX, y, localZ));
-    }
-
-    public static @NotNull BlockEngineChunkData load(@NotNull Chunk chunk, @NotNull NamespacedKey key) {
-        Objects.requireNonNull(chunk, "chunk");
-        Objects.requireNonNull(key, "key");
-
-        PersistentDataContainer pdc = chunk.getPersistentDataContainer();
-        BlockEngineChunkData data = pdc.get(key, TYPE);
-        return data == null ? new BlockEngineChunkData() : data;
-    }
-
-    public static void save(@NotNull Chunk chunk, @NotNull NamespacedKey key, @NotNull BlockEngineChunkData data) {
-        Objects.requireNonNull(chunk, "chunk");
-        Objects.requireNonNull(key, "key");
-        Objects.requireNonNull(data, "data");
-
-        PersistentDataContainer pdc = chunk.getPersistentDataContainer();
-        if (data.isEmpty()) {
-            pdc.remove(key);
-            return;
+        LoadedChunk loaded = new LoadedChunk(key);
+        World world = chunk.getWorld();
+        for (StoredBlock block : data.blocks()) {
+            int worldX = (chunk.getX() << 4) + block.localX();
+            int worldZ = (chunk.getZ() << 4) + block.localZ();
+            BlockLocationKey location = new BlockLocationKey(world.getUID(), worldX, block.y(), worldZ);
+            boolean exposed = !config.exposureEnabled() || isExposed(world, worldX, block.y(), worldZ, config);
+            loaded.add(new RuntimeBlockView(key, location, block.fallbackBlock(), block, exposed));
         }
-        pdc.set(key, TYPE, data);
+
+        chunks.put(key, loaded);
     }
 
-    private static int packBlockKey(int localX, int y, int localZ) {
-        validateLocal(localX, y, localZ);
-        return (localX & 0xF) << 24 | ((y + 2048) & 0xFFF) << 12 | (localZ & 0xF) << 8;
+    public static void unload(@NotNull Chunk chunk) {
+        chunks.remove(Key.from(chunk));
     }
 
-    private static void validateLocal(int localX, int y, int localZ) {
-        if (localX < 0 || localX > 15) {
-            throw new IllegalArgumentException("localX must be 0-15: " + localX);
+    public static @Nullable LoadedChunk get(@NotNull Key key) {
+        return chunks.get(key);
+    }
+
+    public static @Nullable RuntimeBlockView getBlock(@NotNull BlockLocationKey location) {
+        LoadedChunk chunk = chunks.get(new Key(location.worldId(), location.x() >> 4, location.z() >> 4));
+        if (chunk == null) {
+            return null;
         }
-        if (localZ < 0 || localZ > 15) {
-            throw new IllegalArgumentException("localZ must be 0-15: " + localZ);
+
+        return chunk.block(location.x() & 15, location.y(), location.z() & 15);
+    }
+
+    public static @NotNull Collection<LoadedChunk> chunks() {
+        return Collections.unmodifiableCollection(chunks.values());
+    }
+
+    public static @NotNull NamespacedKey dataKey() {
+        return CHUNK_DATA_KEY;
+    }
+
+    private static boolean isExposed(@NotNull World world, int x, int y, int z, @NotNull VisibilityConfig config) {
+        return isOpen(world.getBlockAt(x + 1, y, z), config)
+                || isOpen(world.getBlockAt(x - 1, y, z), config)
+                || isOpen(world.getBlockAt(x, y + 1, z), config)
+                || isOpen(world.getBlockAt(x, y - 1, z), config)
+                || isOpen(world.getBlockAt(x, y, z + 1), config)
+                || isOpen(world.getBlockAt(x, y, z - 1), config);
+    }
+
+    private static boolean isOpen(@NotNull Block block, @NotNull VisibilityConfig config) {
+        Material material = block.getType();
+        if (material.isAir()) {
+            return true;
         }
-        if (y < -2048 || y > 2047) {
-            throw new IllegalArgumentException("y is out of supported range: " + y);
+        if (config.treatLiquidAsExposed() && block.isLiquid()) {
+            return true;
+        }
+        if (config.treatPassableAsExposed() && block.isPassable()) {
+            return true;
+        }
+        return config.treatNonSolidAsExposed() && !material.isSolid();
+    }
+
+    public record Key(@NotNull UUID worldId, int x, int z) {
+        public static @NotNull Key from(@NotNull Chunk chunk) {
+            return new Key(chunk.getWorld().getUID(), chunk.getX(), chunk.getZ());
+        }
+
+        public boolean contains(@NotNull BlockLocationKey block) {
+            return worldId.equals(block.worldId()) && (block.x() >> 4) == x && (block.z() >> 4) == z;
+        }
+    }
+
+    public static final class LoadedChunk {
+        private final @NotNull Key key;
+        private final @NotNull List<RuntimeBlockView> blocks = new ArrayList<>();
+        private final @NotNull List<RuntimeBlockView> exposedBlocks = new ArrayList<>();
+        private final @NotNull Map<Long, RuntimeBlockView> byLocalPosition = new HashMap<>();
+
+        public LoadedChunk(@NotNull Key key) {
+            this.key = key;
+        }
+
+        public @NotNull Key key() {
+            return key;
+        }
+
+        public void add(@NotNull RuntimeBlockView block) {
+            blocks.add(block);
+            byLocalPosition.put(localKey(block.location().x() & 15, block.location().y(), block.location().z() & 15), block);
+            if (block.exposed()) {
+                exposedBlocks.add(block);
+            }
+        }
+
+        public @NotNull List<RuntimeBlockView> blocks() {
+            return Collections.unmodifiableList(blocks);
+        }
+
+        public @NotNull List<RuntimeBlockView> exposedBlocks() {
+            return Collections.unmodifiableList(exposedBlocks);
+        }
+
+        public @Nullable RuntimeBlockView block(int localX, int y, int localZ) {
+            return byLocalPosition.get(localKey(localX, y, localZ));
+        }
+
+        private long localKey(int localX, int y, int localZ) {
+            return ((long) localX & 15L) << 36
+                    | ((long) localZ & 15L) << 32
+                    | ((long) y & 0xffffffffL);
+        }
+    }
+
+    public static final class Data {
+        public static final int VERSION = 5;
+        private static final int MIN_VERSION = 2;
+        public static final PersistentDataType<byte[], Data> TYPE = new DataType();
+
+        private final @NotNull Map<Integer, StoredBlock> blocks = new LinkedHashMap<>();
+
+        public boolean isEmpty() {
+            return blocks.isEmpty();
+        }
+
+        public @NotNull Collection<StoredBlock> blocks() {
+            return Collections.unmodifiableCollection(blocks.values());
+        }
+
+        public @Nullable StoredBlock blockAt(int localX, int y, int localZ) {
+            return blocks.get(packBlockKey(localX, y, localZ));
+        }
+
+        public void setBlock(@NotNull StoredBlock block) {
+            blocks.put(packBlockKey(block.localX(), block.y(), block.localZ()), block);
+        }
+
+        public void setBlock(
+                int localX,
+                int y,
+                int localZ,
+                @NotNull BlockData data,
+                @NotNull dev.auto.blockengine.api.blocks.BlockDefinition definition,
+                byte @Nullable [] payload
+        ) {
+            setBlock(StoredBlock.from(localX, y, localZ, data, definition, payload));
+        }
+
+        public void removeBlock(int localX, int y, int localZ) {
+            blocks.remove(packBlockKey(localX, y, localZ));
+        }
+
+        public static @NotNull Data load(@NotNull Chunk chunk, @NotNull NamespacedKey key) {
+            Objects.requireNonNull(chunk, "chunk");
+            Objects.requireNonNull(key, "key");
+
+            PersistentDataContainer pdc = chunk.getPersistentDataContainer();
+            Data data = pdc.get(key, TYPE);
+            return data == null ? new Data() : data;
+        }
+
+        public static void save(@NotNull Chunk chunk, @NotNull NamespacedKey key, @NotNull Data data) {
+            Objects.requireNonNull(chunk, "chunk");
+            Objects.requireNonNull(key, "key");
+            Objects.requireNonNull(data, "data");
+
+            PersistentDataContainer pdc = chunk.getPersistentDataContainer();
+            if (data.isEmpty()) {
+                pdc.remove(key);
+                return;
+            }
+            pdc.set(key, TYPE, data);
         }
     }
 
@@ -237,19 +353,36 @@ public final class BlockEngineChunkData {
         }
     }
 
-    private static final class BlockEngineChunkDataType implements PersistentDataType<byte[], BlockEngineChunkData> {
+    private static int packBlockKey(int localX, int y, int localZ) {
+        validateLocal(localX, y, localZ);
+        return (localX & 0xF) << 24 | ((y + 2048) & 0xFFF) << 12 | (localZ & 0xF) << 8;
+    }
+
+    private static void validateLocal(int localX, int y, int localZ) {
+        if (localX < 0 || localX > 15) {
+            throw new IllegalArgumentException("localX must be 0-15: " + localX);
+        }
+        if (localZ < 0 || localZ > 15) {
+            throw new IllegalArgumentException("localZ must be 0-15: " + localZ);
+        }
+        if (y < -2048 || y > 2047) {
+            throw new IllegalArgumentException("y is out of supported range: " + y);
+        }
+    }
+
+    private static final class DataType implements PersistentDataType<byte[], Data> {
         @Override
         public @NotNull Class<byte[]> getPrimitiveType() {
             return byte[].class;
         }
 
         @Override
-        public @NotNull Class<BlockEngineChunkData> getComplexType() {
-            return BlockEngineChunkData.class;
+        public @NotNull Class<Data> getComplexType() {
+            return Data.class;
         }
 
         @Override
-        public byte @NotNull [] toPrimitive(@NotNull BlockEngineChunkData complex, @NotNull PersistentDataAdapterContext context) {
+        public byte @NotNull [] toPrimitive(@NotNull Data complex, @NotNull PersistentDataAdapterContext context) {
             Objects.requireNonNull(complex, "complex");
             Objects.requireNonNull(context, "context");
 
@@ -257,7 +390,7 @@ public final class BlockEngineChunkData {
                 ByteArrayOutputStream bytes = new ByteArrayOutputStream();
                 DataOutputStream out = new DataOutputStream(bytes);
 
-                out.writeInt(VERSION);
+                out.writeInt(Data.VERSION);
                 out.writeInt(complex.blocks.size());
                 for (StoredBlock block : complex.blocks.values()) {
                     writeBlock(out, block);
@@ -271,18 +404,18 @@ public final class BlockEngineChunkData {
         }
 
         @Override
-        public @NotNull BlockEngineChunkData fromPrimitive(byte @NotNull [] primitive, @NotNull PersistentDataAdapterContext context) {
+        public @NotNull Data fromPrimitive(byte @NotNull [] primitive, @NotNull PersistentDataAdapterContext context) {
             Objects.requireNonNull(primitive, "primitive");
             Objects.requireNonNull(context, "context");
 
             try {
                 DataInputStream in = new DataInputStream(new ByteArrayInputStream(primitive));
                 int version = in.readInt();
-                if (version < MIN_VERSION || version > VERSION) {
+                if (version < Data.MIN_VERSION || version > Data.VERSION) {
                     throw new IllegalStateException("Unsupported BlockEngine chunk data version: " + version);
                 }
 
-                BlockEngineChunkData data = new BlockEngineChunkData();
+                Data data = new Data();
                 int blockCount = in.readInt();
                 for (int i = 0; i < blockCount; i++) {
                     StoredBlock block = readBlock(in, version);
