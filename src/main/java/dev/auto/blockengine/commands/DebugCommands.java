@@ -424,10 +424,10 @@ public final class DebugCommands implements BasicCommand, Listener {
             return;
         }
         if (args.length < 2) {
-            DebugStyle.usage(sender, "/blockengine catalog <namespace>");
-            return;
+            CatalogListeners.open(player);
+        } else {
+            CatalogListeners.open(player, args[1]);
         }
-        CatalogListeners.open(player, args[1]);
     }
 
     private void chunk(@NotNull CommandSender sender, String[] args) {
