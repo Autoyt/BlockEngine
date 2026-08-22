@@ -5,6 +5,7 @@ import dev.auto.blockengine.api.blocks.BlockContext;
 import dev.auto.blockengine.api.blocks.BlockCreateContext;
 import dev.auto.blockengine.api.blocks.BlockData;
 import dev.auto.blockengine.api.blocks.BlockDefinition;
+import dev.auto.blockengine.chat.BlockEngineChat;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
@@ -61,7 +62,7 @@ public final class DemoStateBlockAdapter implements BlockAdapter {
         int index = index(context.stateId());
         String next = STATES[(index + 1) % STATES.length];
         context.setState(next);
-        player.sendMessage("BlockEngine demo: state changed to " + next + ".");
+        BlockEngineChat.success(player, "Demo block state changed to " + next + ".");
         return true;
     }
 

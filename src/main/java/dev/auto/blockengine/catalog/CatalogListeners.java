@@ -1,6 +1,7 @@
 package dev.auto.blockengine.catalog;
 
 import dev.auto.blockengine.Main;
+import dev.auto.blockengine.chat.BlockEngineChat;
 import dev.auto.blockengine.items.ItemManager;
 import dev.auto.blockengine.registry.BlockRegistry;
 import dev.auto.blockengine.types.BlockDefinition;
@@ -56,7 +57,7 @@ public final class CatalogListeners implements Listener {
         registerRecipes();
         List<BlockDefinition> blocks = filteredBlocks(namespace);
         if (blocks.isEmpty()) {
-            player.sendMessage(namespace == null
+            BlockEngineChat.warn(player, namespace == null
                     ? "No BlockEngine custom blocks are registered."
                     : "No BlockEngine custom blocks are registered for namespace '" + namespace + "'.");
             return;
@@ -225,7 +226,11 @@ public final class CatalogListeners implements Listener {
         for (ItemStack item : leftover.values()) {
             player.getWorld().dropItemNaturally(player.getLocation(), item);
         }
-        player.sendMessage("Gave 64x " + block.id() + ".");
+        BlockEngineChat.send(player, BlockEngineChat.status("gave", true)
+                .append(Component.space())
+                .append(BlockEngineChat.value("64x"))
+                .append(Component.space())
+                .append(BlockEngineChat.blockName(block)));
     }
 
     private static @NotNull ItemStack inputItem() {

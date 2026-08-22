@@ -1,6 +1,7 @@
 package dev.auto.blockengine.commands;
 
 import dev.auto.blockengine.Main;
+import dev.auto.blockengine.chat.BlockEngineChat;
 import dev.auto.blockengine.items.ItemManager;
 import dev.auto.blockengine.placement.PlacementManager;
 import dev.auto.blockengine.registry.BlockRegistry;
@@ -61,7 +62,7 @@ public final class OverideFillCommand implements Listener {
             case "fill" -> {
                 Source source = Source.from(sender);
                 if (source == null) {
-                    sender.sendMessage("BlockEngine custom block commands need a world-bound source.");
+                    BlockEngineChat.send(sender, "BlockEngine custom block commands need a world-bound source.");
                     yield true;
                 }
                 yield fill(sender, source, command.args());
@@ -69,7 +70,7 @@ public final class OverideFillCommand implements Listener {
             case "setblock" -> {
                 Source source = Source.from(sender);
                 if (source == null) {
-                    sender.sendMessage("BlockEngine custom block commands need a world-bound source.");
+                    BlockEngineChat.send(sender, "BlockEngine custom block commands need a world-bound source.");
                     yield true;
                 }
                 yield setBlock(sender, source, command.args());
@@ -95,7 +96,7 @@ public final class OverideFillCommand implements Listener {
         }
 
         if (!sender.hasPermission("minecraft.command.give")) {
-            sender.sendMessage("You do not have permission to use /give.");
+            BlockEngineChat.send(sender, "You do not have permission to use /give.");
             return true;
         }
 
@@ -103,7 +104,7 @@ public final class OverideFillCommand implements Listener {
         try {
             definition.apiDefinition().state(stateId);
         } catch (IllegalArgumentException exception) {
-            sender.sendMessage("Unknown BlockEngine block state: " + stateId + ".");
+            BlockEngineChat.send(sender, "Unknown BlockEngine block state: " + stateId + ".");
             return true;
         }
 
@@ -112,14 +113,14 @@ public final class OverideFillCommand implements Listener {
             try {
                 amount = Math.clamp(Integer.parseInt(args[2]), 1, 6400);
             } catch (NumberFormatException ignored) {
-                sender.sendMessage("BlockEngine custom block give amount must be a number.");
+                BlockEngineChat.send(sender, "BlockEngine custom block give amount must be a number.");
                 return true;
             }
         }
 
         Collection<Player> players = players(sender, args[0]);
         if (players.isEmpty()) {
-            sender.sendMessage("No players matched selector '" + args[0] + "'.");
+            BlockEngineChat.send(sender, "No players matched selector '" + args[0] + "'.");
             return true;
         }
 
@@ -129,7 +130,7 @@ public final class OverideFillCommand implements Listener {
             given++;
         }
 
-        sender.sendMessage("Gave " + amount + " " + definition.id() + " to " + given + " player(s).");
+        BlockEngineChat.send(sender, "Gave " + amount + " " + definition.id() + " to " + given + " player(s).");
         return true;
     }
 
@@ -149,20 +150,20 @@ public final class OverideFillCommand implements Listener {
         }
 
         if (!sender.hasPermission("minecraft.command.fill")) {
-            sender.sendMessage("You do not have permission to use /fill.");
+            BlockEngineChat.send(sender, "You do not have permission to use /fill.");
             return true;
         }
 
         Position from = Position.parse(args[0], args[1], args[2], source.location());
         Position to = Position.parse(args[3], args[4], args[5], source.location());
         if (from == null || to == null) {
-            sender.sendMessage("BlockEngine only supports absolute and ~ relative block coordinates for custom block fill.");
+            BlockEngineChat.send(sender, "BlockEngine only supports absolute and ~ relative block coordinates for custom block fill.");
             return true;
         }
 
         String mode = args.length >= 8 ? args[7].toLowerCase(Locale.ROOT) : "replace";
         if (!mode.equals("replace") && !mode.equals("destroy") && !mode.equals("keep")) {
-            sender.sendMessage("BlockEngine custom block fill currently supports replace, destroy, and keep.");
+            BlockEngineChat.send(sender, "BlockEngine custom block fill currently supports replace, destroy, and keep.");
             return true;
         }
 
@@ -174,7 +175,7 @@ public final class OverideFillCommand implements Listener {
         int maxZ = Math.max(from.z(), to.z());
         long count = (long) (maxX - minX + 1) * (maxY - minY + 1) * (maxZ - minZ + 1);
         if (count > MAX_BLOCKS) {
-            sender.sendMessage("Too many BlockEngine blocks in fill area: " + count + " > " + MAX_BLOCKS + ".");
+            BlockEngineChat.send(sender, "Too many BlockEngine blocks in fill area: " + count + " > " + MAX_BLOCKS + ".");
             return true;
         }
 
@@ -194,7 +195,7 @@ public final class OverideFillCommand implements Listener {
             }
         }
 
-        sender.sendMessage("Filled " + changed + " BlockEngine block(s).");
+        BlockEngineChat.send(sender, "Filled " + changed + " BlockEngine block(s).");
         return true;
     }
 
@@ -214,30 +215,30 @@ public final class OverideFillCommand implements Listener {
         }
 
         if (!sender.hasPermission("minecraft.command.setblock")) {
-            sender.sendMessage("You do not have permission to use /setblock.");
+            BlockEngineChat.send(sender, "You do not have permission to use /setblock.");
             return true;
         }
 
         Position position = Position.parse(args[0], args[1], args[2], source.location());
         if (position == null) {
-            sender.sendMessage("BlockEngine only supports absolute and ~ relative block coordinates for custom block setblock.");
+            BlockEngineChat.send(sender, "BlockEngine only supports absolute and ~ relative block coordinates for custom block setblock.");
             return true;
         }
 
         String mode = args.length >= 5 ? args[4].toLowerCase(Locale.ROOT) : "replace";
         if (!mode.equals("replace") && !mode.equals("destroy") && !mode.equals("keep")) {
-            sender.sendMessage("BlockEngine custom block setblock currently supports replace, destroy, and keep.");
+            BlockEngineChat.send(sender, "BlockEngine custom block setblock currently supports replace, destroy, and keep.");
             return true;
         }
 
         Block block = source.world().getBlockAt(position.x(), position.y(), position.z());
         if (mode.equals("keep") && !block.getType().isAir()) {
-            sender.sendMessage("No block was changed.");
+            BlockEngineChat.send(sender, "No block was changed.");
             return true;
         }
 
         boolean changed = place(block, definition, source.player(), target.stateId(), true, mode.equals("destroy"));
-        sender.sendMessage(changed ? "Set BlockEngine block." : "No block was changed.");
+        BlockEngineChat.send(sender, changed ? "Set BlockEngine block." : "No block was changed.");
         return true;
     }
 
@@ -415,5 +416,6 @@ public final class OverideFillCommand implements Listener {
         }
     }
 }
+
 
 

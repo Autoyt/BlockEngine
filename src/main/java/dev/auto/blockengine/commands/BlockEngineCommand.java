@@ -1,6 +1,7 @@
 package dev.auto.blockengine.commands;
 
 import dev.auto.blockengine.Main;
+import dev.auto.blockengine.chat.BlockEngineChat;
 import dev.auto.blockengine.registry.BlockRegistry;
 import dev.auto.blockengine.registry.NamespaceRegistry;
 import dev.auto.blockengine.resourcepack.ResourcePackManager;
@@ -11,7 +12,6 @@ import io.papermc.paper.registry.data.dialog.DialogBase;
 import io.papermc.paper.registry.data.dialog.body.DialogBody;
 import io.papermc.paper.registry.data.dialog.type.DialogType;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.TextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
@@ -29,11 +29,6 @@ import java.util.List;
 import java.util.Locale;
 
 public final class BlockEngineCommand implements BasicCommand {
-    private static final TextColor ORANGE = TextColor.color(0xff9f2e);
-    private static final TextColor ORANGE_LIGHT = TextColor.color(0xffc46b);
-    private static final TextColor GRAY = TextColor.color(0xa8a8a8);
-    private static final TextColor WHITE = TextColor.color(0xf7f7f7);
-    private static final TextColor SUCCESS = TextColor.color(0x72d66b);
     private static final List<String> ROOT = List.of(
             "info", "debug", "packs", "perf", "blocks", "plugins", "give", "catalog", "chunks", "validate", "events", "reload"
     );
@@ -81,43 +76,43 @@ public final class BlockEngineCommand implements BasicCommand {
 
     private void info(@NotNull CommandSender sender) {
         if (!(sender instanceof Player player)) {
-            sender.sendMessage(header("blockengine"));
-            sender.sendMessage(row("version", plugin.getPluginMeta().getVersion()));
-            sender.sendMessage(row("blocks", BlockRegistry.getBlocks().size()));
-            sender.sendMessage(row("namespaces", NamespaceRegistry.loaded().size()));
-            sender.sendMessage(row("resource packs", ResourcePackManager.getInstance().packIds().size()));
+            BlockEngineChat.send(sender, BlockEngineChat.header("blockengine"));
+            BlockEngineChat.send(sender, BlockEngineChat.row("version", plugin.getPluginMeta().getVersion()));
+            BlockEngineChat.send(sender, BlockEngineChat.row("blocks", BlockRegistry.getBlocks().size()));
+            BlockEngineChat.send(sender, BlockEngineChat.row("namespaces", NamespaceRegistry.loaded().size()));
+            BlockEngineChat.send(sender, BlockEngineChat.row("resource packs", ResourcePackManager.getInstance().packIds().size()));
             return;
         }
         player.showDialog(infoDialog());
     }
 
     private @NotNull Dialog infoDialog() {
-        Component title = Component.text("BlockEngine", ORANGE).decorate(TextDecoration.BOLD);
+        Component title = Component.text("BlockEngine", BlockEngineChat.ORANGE).decorate(TextDecoration.BOLD);
         Component summary = Component.text()
-                .append(Component.text("Custom block runtime by ", GRAY))
-                .append(Component.text("AutoYT", ORANGE_LIGHT).decorate(TextDecoration.BOLD))
+                .append(Component.text("Custom block runtime by ", BlockEngineChat.GRAY))
+                .append(Component.text("AutoYT", BlockEngineChat.ORANGE_LIGHT).decorate(TextDecoration.BOLD))
                 .append(Component.newline())
-                .append(Component.text("Version: ", GRAY))
-                .append(Component.text(plugin.getPluginMeta().getVersion(), WHITE))
+                .append(Component.text("Version: ", BlockEngineChat.GRAY))
+                .append(Component.text(plugin.getPluginMeta().getVersion(), BlockEngineChat.WHITE))
                 .append(Component.newline())
-                .append(Component.text("Registered blocks: ", GRAY))
-                .append(Component.text(BlockRegistry.getBlocks().size(), SUCCESS))
+                .append(Component.text("Registered blocks: ", BlockEngineChat.GRAY))
+                .append(Component.text(BlockRegistry.getBlocks().size(), BlockEngineChat.SUCCESS))
                 .append(Component.newline())
-                .append(Component.text("Namespaces: ", GRAY))
-                .append(Component.text(NamespaceRegistry.loaded().size(), SUCCESS))
+                .append(Component.text("Namespaces: ", BlockEngineChat.GRAY))
+                .append(Component.text(NamespaceRegistry.loaded().size(), BlockEngineChat.SUCCESS))
                 .append(Component.newline())
-                .append(Component.text("Resource packs: ", GRAY))
-                .append(Component.text(ResourcePackManager.getInstance().packIds().size(), SUCCESS))
+                .append(Component.text("Resource packs: ", BlockEngineChat.GRAY))
+                .append(Component.text(ResourcePackManager.getInstance().packIds().size(), BlockEngineChat.SUCCESS))
                 .build();
 
         return Dialog.create(factory -> factory.empty()
                 .base(DialogBase.builder(title)
-                        .externalTitle(Component.text("BlockEngine", ORANGE))
+                        .externalTitle(Component.text("BlockEngine", BlockEngineChat.ORANGE))
                         .canCloseWithEscape(true)
                         .pause(false)
                         .body(List.of(
                                 DialogBody.item(infoItem())
-                                        .description(DialogBody.plainMessage(Component.text("AutoYT / BlockEngine", ORANGE_LIGHT), 180))
+                                        .description(DialogBody.plainMessage(Component.text("AutoYT / BlockEngine", BlockEngineChat.ORANGE_LIGHT), 180))
                                         .showDecorations(true)
                                         .showTooltip(true)
                                         .width(64)
@@ -133,30 +128,17 @@ public final class BlockEngineCommand implements BasicCommand {
         ItemStack stack = new ItemStack(Material.PAPER);
         ItemMeta meta = stack.getItemMeta();
         if (meta != null) {
-            meta.itemName(Component.text("BlockEngine", ORANGE).decorate(TextDecoration.BOLD));
-            meta.displayName(Component.text("AutoYT", ORANGE_LIGHT).decorate(TextDecoration.BOLD));
+            meta.itemName(Component.text("BlockEngine", BlockEngineChat.ORANGE).decorate(TextDecoration.BOLD));
+            meta.displayName(Component.text("AutoYT", BlockEngineChat.ORANGE_LIGHT).decorate(TextDecoration.BOLD));
             meta.lore(List.of(
-                    Component.text("Custom block runtime", GRAY),
-                    Component.text("Version " + plugin.getPluginMeta().getVersion(), WHITE),
-                    Component.text(BlockRegistry.getBlocks().size() + " registered blocks", SUCCESS)
+                    Component.text("Custom block runtime", BlockEngineChat.GRAY),
+                    Component.text("Version " + plugin.getPluginMeta().getVersion(), BlockEngineChat.WHITE),
+                    Component.text(BlockRegistry.getBlocks().size() + " registered blocks", BlockEngineChat.SUCCESS)
             ));
             meta.setItemModel(new NamespacedKey(plugin, "info_card"));
             stack.setItemMeta(meta);
         }
         return stack;
-    }
-
-    private static @NotNull Component header(@NotNull String title) {
-        return Component.text("----", GRAY)
-                .append(Component.text(title.toUpperCase(Locale.ROOT), ORANGE).decorate(TextDecoration.BOLD))
-                .append(Component.text("----", GRAY));
-    }
-
-    private static @NotNull Component row(@NotNull String label, @NotNull Object value) {
-        return Component.text("  ▟", GRAY)
-                .append(Component.text("▙ ", ORANGE))
-                .append(Component.text(label + ": ", GRAY))
-                .append(Component.text(String.valueOf(value), WHITE));
     }
 
     private static @NotNull Collection<String> matching(@NotNull Collection<String> values, @NotNull String prefix) {

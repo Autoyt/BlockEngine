@@ -5,6 +5,7 @@ import dev.auto.blockengine.api.blocks.BlockContext;
 import dev.auto.blockengine.api.blocks.BlockCreateContext;
 import dev.auto.blockengine.api.blocks.BlockData;
 import dev.auto.blockengine.api.blocks.BlockDefinition;
+import dev.auto.blockengine.chat.BlockEngineChat;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
@@ -48,7 +49,7 @@ public final class DemoBreakBlockAdapter implements BlockAdapter {
         Player player = context.player();
         if (player != null) {
             player.getInventory().addItem(new ItemStack(Material.EMERALD));
-            player.sendMessage("BlockEngine demo: onBreak gave you a bonus emerald.");
+            BlockEngineChat.success(player, "Demo block gave you a bonus emerald.");
         }
         return true;
     }

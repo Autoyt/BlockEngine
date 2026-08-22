@@ -10,6 +10,7 @@ import dev.auto.blockengine.api.event.BlockEngineBlockRemovedEvent;
 import dev.auto.blockengine.api.event.BlockEngineChunkSaveEvent;
 import dev.auto.blockengine.api.event.BlockEngineChunkSavedEvent;
 import dev.auto.blockengine.catalog.CatalogListeners;
+import dev.auto.blockengine.chat.BlockEngineChat;
 import dev.auto.blockengine.items.ItemManager;
 import dev.auto.blockengine.registry.BlockRegistry;
 import dev.auto.blockengine.registry.NamespaceRegistry;
@@ -23,8 +24,6 @@ import io.papermc.paper.command.brigadier.CommandSourceStack;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.event.ClickEvent;
 import net.kyori.adventure.text.event.HoverEvent;
-import net.kyori.adventure.text.format.TextColor;
-import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
 import org.bukkit.boss.BarColor;
@@ -144,18 +143,18 @@ public final class DebugCommands implements BasicCommand, Listener {
     }
 
     private void usage(@NotNull CommandSender sender) {
-        sender.sendMessage(DebugStyle.header("blockengine debug"));
-        sender.sendMessage(DebugStyle.row("usage", "/blockengine <subcommand>"));
-        sender.sendMessage(DebugStyle.row("main", "info, packs, perf, blocks, plugins, give, catalog, chunks, events"));
-        sender.sendMessage(DebugStyle.row("legacy", "pack, profile, block, plugin, chunk"));
+        BlockEngineChat.send(sender, DebugStyle.header("blockengine debug"));
+        BlockEngineChat.send(sender, DebugStyle.row("usage", "/blockengine <subcommand>"));
+        BlockEngineChat.send(sender, DebugStyle.row("main", "info, packs, perf, blocks, plugins, give, catalog, chunks, events"));
+        BlockEngineChat.send(sender, DebugStyle.row("legacy", "pack, profile, block, plugin, chunk"));
     }
 
     private void info(@NotNull CommandSender sender) {
-        sender.sendMessage(DebugStyle.header("blockengine debug"));
-        sender.sendMessage(DebugStyle.row("blocks", BlockRegistry.getBlocks().size()));
-        sender.sendMessage(DebugStyle.row("namespaces", namespaces().size()));
-        sender.sendMessage(DebugStyle.row("resource packs", ResourcePackManager.getInstance().packIds().size()));
-        sender.sendMessage(DebugStyle.action("packs", "/blockengine packs list", "List resource packs")
+        BlockEngineChat.send(sender, DebugStyle.header("blockengine debug"));
+        BlockEngineChat.send(sender, DebugStyle.row("blocks", BlockRegistry.getBlocks().size()));
+        BlockEngineChat.send(sender, DebugStyle.row("namespaces", namespaces().size()));
+        BlockEngineChat.send(sender, DebugStyle.row("resource packs", ResourcePackManager.getInstance().packIds().size()));
+        BlockEngineChat.send(sender, DebugStyle.action("packs", "/blockengine packs list", "List resource packs")
                 .append(Component.space())
                 .append(DebugStyle.action("plugins", "/blockengine plugins", "List BlockEngine plugins"))
                 .append(Component.space())
@@ -174,9 +173,9 @@ public final class DebugCommands implements BasicCommand, Listener {
             return;
         }
         if (action.equals("list")) {
-            sender.sendMessage(DebugStyle.header("resource packs"));
+            BlockEngineChat.send(sender, DebugStyle.header("resource packs"));
             for (String packId : ResourcePackManager.getInstance().packIds()) {
-                sender.sendMessage(DebugStyle.bullet(DebugStyle.pluginName(packId)
+                BlockEngineChat.send(sender, DebugStyle.bullet(DebugStyle.pluginName(packId)
                         .append(Component.space())
                         .append(DebugStyle.action("resend", "/blockengine packs resend " + packId, "Resend this pack"))));
             }
@@ -241,13 +240,13 @@ public final class DebugCommands implements BasicCommand, Listener {
 
         String target = args.length >= 2 ? args[1].toLowerCase(Locale.ROOT) : "events";
         TimingSnapshot snapshot = timings.snapshot(target);
-        sender.sendMessage(DebugStyle.header("profile " + target));
-        sender.sendMessage(DebugStyle.row("process avg", ms(snapshot.avgNanos()) + "ms"));
-        sender.sendMessage(DebugStyle.row("process p95", ms(snapshot.p95Nanos()) + "ms"));
-        sender.sendMessage(DebugStyle.row("process max", ms(snapshot.maxNanos()) + "ms"));
-        sender.sendMessage(DebugStyle.row("samples", snapshot.samples()));
-        sender.sendMessage(DebugStyle.row("speed", ops(snapshot) + " ops/s"));
-        sender.sendMessage(DebugStyle.action("bossbar", "/blockengine perf live " + target, "Show live bossbar profile")
+        BlockEngineChat.send(sender, DebugStyle.header("profile " + target));
+        BlockEngineChat.send(sender, DebugStyle.row("process avg", ms(snapshot.avgNanos()) + "ms"));
+        BlockEngineChat.send(sender, DebugStyle.row("process p95", ms(snapshot.p95Nanos()) + "ms"));
+        BlockEngineChat.send(sender, DebugStyle.row("process max", ms(snapshot.maxNanos()) + "ms"));
+        BlockEngineChat.send(sender, DebugStyle.row("samples", snapshot.samples()));
+        BlockEngineChat.send(sender, DebugStyle.row("speed", ops(snapshot) + " ops/s"));
+        BlockEngineChat.send(sender, DebugStyle.action("bossbar", "/blockengine perf live " + target, "Show live bossbar profile")
                 .append(Component.space())
                 .append(DebugStyle.action("stop", "/blockengine perf stop", "Stop live bossbar profile")));
     }
@@ -280,12 +279,12 @@ public final class DebugCommands implements BasicCommand, Listener {
             DebugStyle.warn(sender, namespace == null ? "No registered blocks." : "No blocks for namespace '" + namespace + "'.");
             return;
         }
-        sender.sendMessage(DebugStyle.header(namespace == null ? "blocks" : namespace + " blocks"));
+        BlockEngineChat.send(sender, DebugStyle.header(namespace == null ? "blocks" : namespace + " blocks"));
         for (BlockDefinition block : blocks) {
             Component line = DebugStyle.blockName(block)
                     .clickEvent(ClickEvent.runCommand("/blockengine give " + block.id()))
                     .hoverEvent(HoverEvent.showText(Component.text("Click to give yourself this block.")));
-            sender.sendMessage(DebugStyle.bullet(line
+            BlockEngineChat.send(sender, DebugStyle.bullet(line
                     .append(Component.space())
                     .append(DebugStyle.action("give", "/blockengine give " + block.id(), "Give yourself this block"))
                     .append(Component.space())
@@ -317,7 +316,7 @@ public final class DebugCommands implements BasicCommand, Listener {
         stack.setAmount(64);
         player.getInventory().addItem(stack).values()
                 .forEach(leftover -> player.getWorld().dropItemNaturally(player.getLocation(), leftover));
-        sender.sendMessage(DebugStyle.status("gave", true)
+        BlockEngineChat.send(sender, DebugStyle.status("gave", true)
                 .append(Component.space())
                 .append(DebugStyle.value("64x"))
                 .append(Component.space())
@@ -344,15 +343,15 @@ public final class DebugCommands implements BasicCommand, Listener {
             return;
         }
         BlockDefinition definition = BlockRegistry.getBlock(view.storedBlock().blockId());
-        sender.sendMessage(DebugStyle.header("target block"));
-        sender.sendMessage(DebugStyle.row("block", definition == null
+        BlockEngineChat.send(sender, DebugStyle.header("target block"));
+        BlockEngineChat.send(sender, DebugStyle.row("block", definition == null
                 ? DebugStyle.value(view.storedBlock().blockId())
                 : DebugStyle.blockName(definition)));
-        sender.sendMessage(DebugStyle.row("state", view.storedBlock().stateId()));
-        sender.sendMessage(DebugStyle.row("location", target.getWorld().getName() + " "
+        BlockEngineChat.send(sender, DebugStyle.row("state", view.storedBlock().stateId()));
+        BlockEngineChat.send(sender, DebugStyle.row("location", target.getWorld().getName() + " "
                 + target.getX() + " " + target.getY() + " " + target.getZ()));
-        sender.sendMessage(DebugStyle.row("backing type", target.getType()));
-        sender.sendMessage(DebugStyle.row("displays", view.storedBlock().displays().size()));
+        BlockEngineChat.send(sender, DebugStyle.row("backing type", target.getType()));
+        BlockEngineChat.send(sender, DebugStyle.row("displays", view.storedBlock().displays().size()));
     }
 
     private void plugin(@NotNull CommandSender sender, String[] args) {
@@ -361,9 +360,9 @@ public final class DebugCommands implements BasicCommand, Listener {
             return;
         }
         if (args.length < 2 || args[1].equalsIgnoreCase("list")) {
-            sender.sendMessage(DebugStyle.header("plugins"));
+            BlockEngineChat.send(sender, DebugStyle.header("plugins"));
             for (String namespace : namespaces()) {
-                sender.sendMessage(DebugStyle.bullet(DebugStyle.pluginName(namespace)
+                BlockEngineChat.send(sender, DebugStyle.bullet(DebugStyle.pluginName(namespace)
                         .clickEvent(ClickEvent.runCommand("/blockengine plugins " + namespace))
                         .hoverEvent(HoverEvent.showText(Component.text("Inspect " + namespace)))
                         .append(Component.space())
@@ -395,13 +394,13 @@ public final class DebugCommands implements BasicCommand, Listener {
     }
 
     private void pluginInfo(@NotNull CommandSender sender, @NotNull String namespace) {
-        sender.sendMessage(DebugStyle.header("plugin " + namespace));
-        sender.sendMessage(DebugStyle.row("namespace", DebugStyle.pluginName(namespace)));
-        sender.sendMessage(DebugStyle.row("blocks", blocks(namespace).size()));
-        sender.sendMessage(DebugStyle.row("pack", ResourcePackManager.getInstance().packIds().contains(namespace)
+        BlockEngineChat.send(sender, DebugStyle.header("plugin " + namespace));
+        BlockEngineChat.send(sender, DebugStyle.row("namespace", DebugStyle.pluginName(namespace)));
+        BlockEngineChat.send(sender, DebugStyle.row("blocks", blocks(namespace).size()));
+        BlockEngineChat.send(sender, DebugStyle.row("pack", ResourcePackManager.getInstance().packIds().contains(namespace)
                 ? DebugStyle.status("ready", true)
                 : DebugStyle.status("none", false)));
-        sender.sendMessage(DebugStyle.action("blocks", "/blockengine blocks " + namespace, "List this plugin's blocks")
+        BlockEngineChat.send(sender, DebugStyle.action("blocks", "/blockengine blocks " + namespace, "List this plugin's blocks")
                 .append(Component.space())
                 .append(DebugStyle.action("catalog", "/blockengine catalog " + namespace, "Open this plugin's catalog"))
                 .append(Component.space())
@@ -432,10 +431,10 @@ public final class DebugCommands implements BasicCommand, Listener {
         }
         Chunk chunk = player.getLocation().getChunk();
         ChunkEngine.LoadedChunk loaded = ChunkEngine.get(ChunkEngine.Key.from(chunk));
-        sender.sendMessage(DebugStyle.header("chunk " + chunk.getX() + "," + chunk.getZ()));
-        sender.sendMessage(DebugStyle.row("loaded", DebugStyle.status(String.valueOf(loaded != null), loaded != null)));
-        sender.sendMessage(DebugStyle.row("stored blocks", loaded == null ? 0 : loaded.blocks().size()));
-        sender.sendMessage(DebugStyle.row("exposed blocks", loaded == null ? 0 : loaded.exposedBlocks().size()));
+        BlockEngineChat.send(sender, DebugStyle.header("chunk " + chunk.getX() + "," + chunk.getZ()));
+        BlockEngineChat.send(sender, DebugStyle.row("loaded", DebugStyle.status(String.valueOf(loaded != null), loaded != null)));
+        BlockEngineChat.send(sender, DebugStyle.row("stored blocks", loaded == null ? 0 : loaded.blocks().size()));
+        BlockEngineChat.send(sender, DebugStyle.row("exposed blocks", loaded == null ? 0 : loaded.exposedBlocks().size()));
     }
 
     private void validate(@NotNull CommandSender sender, String[] args) {
@@ -455,19 +454,19 @@ public final class DebugCommands implements BasicCommand, Listener {
                 block.getWorld().getUID(), block.getX(), block.getY(), block.getZ()
         ));
         timings.record("validation", System.nanoTime() - started);
-        sender.sendMessage(DebugStyle.header("validation"));
-        sender.sendMessage(DebugStyle.row("location", block.getX() + " " + block.getY() + " " + block.getZ()));
-        sender.sendMessage(DebugStyle.row("real type", block.getType()));
+        BlockEngineChat.send(sender, DebugStyle.header("validation"));
+        BlockEngineChat.send(sender, DebugStyle.row("location", block.getX() + " " + block.getY() + " " + block.getZ()));
+        BlockEngineChat.send(sender, DebugStyle.row("real type", block.getType()));
         if (view == null) {
-            sender.sendMessage(DebugStyle.row("record", DebugStyle.status("none", false)));
+            BlockEngineChat.send(sender, DebugStyle.row("record", DebugStyle.status("none", false)));
             return;
         }
         BlockDefinition definition = BlockRegistry.getBlock(view.storedBlock().blockId());
-        sender.sendMessage(DebugStyle.row("record", definition == null
+        BlockEngineChat.send(sender, DebugStyle.row("record", definition == null
                 ? DebugStyle.value(view.storedBlock().blockId())
                 : DebugStyle.blockName(definition)));
-        sender.sendMessage(DebugStyle.row("state", view.storedBlock().stateId()));
-        sender.sendMessage(DebugStyle.row("exposed", DebugStyle.status(String.valueOf(view.exposed()), view.exposed())));
+        BlockEngineChat.send(sender, DebugStyle.row("state", view.storedBlock().stateId()));
+        BlockEngineChat.send(sender, DebugStyle.row("exposed", DebugStyle.status(String.valueOf(view.exposed()), view.exposed())));
     }
 
     private void events(@NotNull CommandSender sender, String[] args) {
@@ -476,9 +475,9 @@ public final class DebugCommands implements BasicCommand, Listener {
                 DebugStyle.warn(sender, "No BlockEngine events captured.");
                 return;
             }
-            sender.sendMessage(DebugStyle.header("events tail"));
+            BlockEngineChat.send(sender, DebugStyle.header("events tail"));
             for (String event : eventTail) {
-                sender.sendMessage(DebugStyle.bullet(DebugStyle.value(event)));
+                BlockEngineChat.send(sender, DebugStyle.bullet(DebugStyle.value(event)));
             }
             return;
         }
@@ -740,39 +739,23 @@ public final class DebugCommands implements BasicCommand, Listener {
     }
 
     private static final class DebugStyle {
-        private static final TextColor ORANGE = TextColor.color(0xff9f2e);
-        private static final TextColor ORANGE_LIGHT = TextColor.color(0xffc46b);
-        private static final TextColor GRAY = TextColor.color(0xa8a8a8);
-        private static final TextColor DARK_GRAY = TextColor.color(0x555555);
-        private static final TextColor WHITE = TextColor.color(0xf7f7f7);
-        private static final TextColor SUCCESS = TextColor.color(0x72d66b);
-        private static final TextColor ERROR = TextColor.color(0xff4e4e);
-        private static final TextColor WARNING = TextColor.color(0xff6a2e);
-
         private DebugStyle() {
         }
 
         private static @NotNull Component header(@NotNull String title) {
-            return Component.text("----", GRAY)
-                    .append(Component.text(title.toUpperCase(Locale.ROOT), ORANGE)
-                            .decorate(TextDecoration.BOLD))
-                    .append(Component.text("----", GRAY));
+            return BlockEngineChat.header(title);
         }
 
         private static @NotNull Component bullet(@NotNull Component value) {
-            return Component.text("➤ ", ORANGE).append(value);
+            return BlockEngineChat.bullet(value);
         }
 
         private static @NotNull Component row(@NotNull String label, @NotNull Object value) {
-            return row(label, value(value));
+            return BlockEngineChat.row(label, value);
         }
 
         private static @NotNull Component row(@NotNull String label, @NotNull Component value) {
-            return Component.text("  ", DARK_GRAY)
-                    .append(Component.text("▟", GRAY))
-                    .append(Component.text("▙ ", ORANGE))
-                    .append(Component.text(label + ": ", GRAY))
-                    .append(value);
+            return BlockEngineChat.row(label, value);
         }
 
         private static @NotNull Component action(
@@ -780,128 +763,43 @@ public final class DebugCommands implements BasicCommand, Listener {
                 @NotNull String command,
                 @NotNull String hover
         ) {
-            return Component.text(label, ORANGE_LIGHT)
-                    .decorate(TextDecoration.UNDERLINED)
-                    .clickEvent(ClickEvent.runCommand(command))
-                    .hoverEvent(HoverEvent.showText(Component.text(hover, ORANGE_LIGHT)));
+            return BlockEngineChat.action(label, command, hover);
         }
 
         private static @NotNull Component pluginName(@NotNull String namespace) {
-            return Component.text(namespace, namespaceColor(namespace)).decorate(TextDecoration.BOLD);
+            return BlockEngineChat.pluginName(namespace);
         }
 
         private static @NotNull Component blockName(@NotNull BlockDefinition block) {
-            String namespace = namespaceOf(block.id());
-            String path = pathOf(block.id());
-            TextColor color = namespaceColor(namespace);
-            return Component.text(namespace, color).decorate(TextDecoration.BOLD)
-                    .append(Component.text(":", GRAY).decoration(TextDecoration.BOLD, false))
-                    .append(Component.text(path, color).decoration(TextDecoration.BOLD, false));
+            return BlockEngineChat.blockName(block);
         }
 
         private static @NotNull Component status(@NotNull String value, boolean good) {
-            return Component.text(value, good ? SUCCESS : WARNING);
+            return BlockEngineChat.status(value, good);
         }
 
         private static @NotNull Component value(@NotNull Object value) {
-            return Component.text(String.valueOf(value), WHITE);
+            return BlockEngineChat.value(value);
         }
 
         private static @NotNull Component dim(@NotNull String value) {
-            return Component.text(value, GRAY);
+            return BlockEngineChat.dim(value);
         }
 
         private static void usage(@NotNull CommandSender sender, @NotNull String usage) {
-            sender.sendMessage(row("usage", usage));
+            BlockEngineChat.usage(sender, usage);
         }
 
         private static void success(@NotNull CommandSender sender, @NotNull String message) {
-            sender.sendMessage(status("success", true).append(Component.text(" " + message, WHITE)));
+            BlockEngineChat.success(sender, message);
         }
 
         private static void warn(@NotNull CommandSender sender, @NotNull String message) {
-            sender.sendMessage(Component.text("warn ", WARNING).append(Component.text(message, WHITE)));
+            BlockEngineChat.warn(sender, message);
         }
 
         private static void error(@NotNull CommandSender sender, @NotNull String message) {
-            sender.sendMessage(Component.text("error ", ERROR).append(Component.text(message, WHITE)));
-        }
-
-        private static @NotNull TextColor namespaceColor(@NotNull String namespace) {
-            int hash = fnv1a(namespace.toLowerCase(Locale.ROOT));
-            float hue = (hash & 0xFFFF) / 65535.0f;
-            float saturation = 0.58f + (((hash >>> 16) & 0xFF) / 255.0f) * 0.22f;
-            float brightness = 0.72f + (((hash >>> 24) & 0xFF) / 255.0f) * 0.18f;
-            return TextColor.color(hsbToRgb(hue, saturation, brightness));
-        }
-
-        private static int fnv1a(@NotNull String value) {
-            int hash = 0x811C9DC5;
-            for (int i = 0; i < value.length(); i++) {
-                hash ^= value.charAt(i);
-                hash *= 0x01000193;
-            }
-            return hash;
-        }
-
-        private static @NotNull String namespaceOf(@NotNull String blockId) {
-            int split = blockId.indexOf(':');
-            return split <= 0 ? "blockengine" : blockId.substring(0, split);
-        }
-
-        private static @NotNull String pathOf(@NotNull String blockId) {
-            int split = blockId.indexOf(':');
-            return split < 0 || split == blockId.length() - 1 ? blockId : blockId.substring(split + 1);
-        }
-
-        private static int hsbToRgb(float hue, float saturation, float brightness) {
-            int red = 0;
-            int green = 0;
-            int blue = 0;
-            if (saturation == 0.0f) {
-                red = green = blue = Math.round(brightness * 255.0f);
-            } else {
-                float scaledHue = (hue - (float) Math.floor(hue)) * 6.0f;
-                int sector = (int) scaledHue;
-                float fraction = scaledHue - sector;
-                float p = brightness * (1.0f - saturation);
-                float q = brightness * (1.0f - saturation * fraction);
-                float t = brightness * (1.0f - saturation * (1.0f - fraction));
-                switch (sector) {
-                    case 0 -> {
-                        red = Math.round(brightness * 255.0f);
-                        green = Math.round(t * 255.0f);
-                        blue = Math.round(p * 255.0f);
-                    }
-                    case 1 -> {
-                        red = Math.round(q * 255.0f);
-                        green = Math.round(brightness * 255.0f);
-                        blue = Math.round(p * 255.0f);
-                    }
-                    case 2 -> {
-                        red = Math.round(p * 255.0f);
-                        green = Math.round(brightness * 255.0f);
-                        blue = Math.round(t * 255.0f);
-                    }
-                    case 3 -> {
-                        red = Math.round(p * 255.0f);
-                        green = Math.round(q * 255.0f);
-                        blue = Math.round(brightness * 255.0f);
-                    }
-                    case 4 -> {
-                        red = Math.round(t * 255.0f);
-                        green = Math.round(p * 255.0f);
-                        blue = Math.round(brightness * 255.0f);
-                    }
-                    default -> {
-                        red = Math.round(brightness * 255.0f);
-                        green = Math.round(p * 255.0f);
-                        blue = Math.round(q * 255.0f);
-                    }
-                }
-            }
-            return (red << 16) | (green << 8) | blue;
+            BlockEngineChat.error(sender, message);
         }
     }
 }
-
