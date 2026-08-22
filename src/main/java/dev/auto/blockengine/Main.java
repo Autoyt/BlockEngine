@@ -10,6 +10,7 @@ import dev.auto.blockengine.commands.BlockEngineCommand;
 import dev.auto.blockengine.commands.CatalogCommand;
 import dev.auto.blockengine.commands.DebugCommands;
 import dev.auto.blockengine.commands.OverideFillCommand;
+import dev.auto.blockengine.commands.PerfCommand;
 import dev.auto.blockengine.defaultadapters.DebugBlocks;
 import dev.auto.blockengine.entity.ManagedDisplayManager;
 import dev.auto.blockengine.integrity.BlockIntegrityManager;
@@ -66,6 +67,7 @@ public final class Main extends JavaPlugin {
         BlockEngineCommand blockEngineCommand = new BlockEngineCommand(this, debugCommands);
         registerCommand("blockengine", blockEngineCommand);
         registerCommand("be", blockEngineCommand);
+        registerCommand("perf", new PerfCommand(debugCommands));
 
         new CatalogListeners();
         new OverideFillCommand();
@@ -121,4 +123,3 @@ public final class Main extends JavaPlugin {
         return Bukkit.isPrimaryThread();
     }
 }
-

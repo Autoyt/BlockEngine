@@ -58,7 +58,7 @@ public final class DebugCommands implements BasicCommand, Listener {
             "chunk", "visibility", "displays"
     );
     private static final List<String> PROFILE_TARGETS = List.of(
-            "placement", "validation", "chunk-save", "flush", "events", "visibility", "displays", "commands"
+            "overall", "placement", "validation", "chunk-save", "flush", "events", "visibility", "displays", "commands"
     );
     private static final int MAX_EVENT_TAIL = 60;
 
@@ -68,6 +68,7 @@ public final class DebugCommands implements BasicCommand, Listener {
     private final ActivityRegistry activity = new ActivityRegistry();
     private final Queue<String> eventTail = new ArrayDeque<>();
     private boolean eventTailEnabled;
+    private boolean performanceTrackingEnabled = true;
 
     public DebugCommands(@NotNull Main plugin) {
         this.plugin = plugin;
@@ -106,12 +107,46 @@ public final class DebugCommands implements BasicCommand, Listener {
             case "displays" -> DebugStyle.warn(sender, "Display debug commands are planned: nearby, attached, cleanup.");
             default -> usage(sender);
         }
-        timings.record("commands", System.nanoTime() - started);
+        recordTiming("commands", System.nanoTime() - started);
     }
 
     @Override
     public @Nullable String permission() {
         return "blockengine.debug";
+    }
+
+    public void perfShortcut(@NotNull CommandSourceStack source, String[] args) {
+        CommandSender sender = source.getSender();
+        if (!sender.hasPermission("blockengine.debug")) {
+            DebugStyle.error(sender, "You don't have permission to use this command!");
+            return;
+        }
+        if (args.length >= 1 && args[0].equalsIgnoreCase("stop")) {
+            if (sender instanceof Player player) {
+                stopLive(player);
+                DebugStyle.success(sender, "Stopped live BlockEngine profile view.");
+                return;
+            }
+            DebugStyle.error(sender, "Only players can stop a bossbar profile view.");
+            return;
+        }
+        if (args.length >= 1 && (args[0].equalsIgnoreCase("on") || args[0].equalsIgnoreCase("off"))) {
+            performanceTrackingEnabled = args[0].equalsIgnoreCase("on");
+            DebugStyle.success(sender, "BlockEngine performance tracking is now "
+                    + (performanceTrackingEnabled ? "enabled." : "disabled."));
+            return;
+        }
+
+        String target = args.length >= 1 ? args[0].toLowerCase(Locale.ROOT) : "overall";
+        if (!PROFILE_TARGETS.contains(target)) {
+            DebugStyle.error(sender, "Unknown profile target. Try: " + String.join(", ", PROFILE_TARGETS));
+            return;
+        }
+        if (sender instanceof Player player) {
+            startLive(player, target);
+            DebugStyle.success(sender, "Started live BlockEngine profile view for " + target + ".");
+        }
+        perfOverview(sender, target);
     }
 
     @Override
@@ -225,6 +260,12 @@ public final class DebugCommands implements BasicCommand, Listener {
             DebugStyle.error(sender, "Only players can stop a bossbar profile view.");
             return;
         }
+        if (args.length >= 2 && (args[1].equalsIgnoreCase("on") || args[1].equalsIgnoreCase("off"))) {
+            performanceTrackingEnabled = args[1].equalsIgnoreCase("on");
+            DebugStyle.success(sender, "BlockEngine performance tracking is now "
+                    + (performanceTrackingEnabled ? "enabled." : "disabled."));
+            return;
+        }
         if (args.length >= 3 && args[1].equalsIgnoreCase("live")) {
             if (!(sender instanceof Player player)) {
                 DebugStyle.error(sender, "Only players can start a bossbar profile view.");
@@ -241,6 +282,10 @@ public final class DebugCommands implements BasicCommand, Listener {
         }
 
         String target = args.length >= 2 ? args[1].toLowerCase(Locale.ROOT) : "events";
+        if (target.equals("overall")) {
+            perfOverview(sender, target);
+            return;
+        }
         TimingSnapshot snapshot = timings.snapshot(target);
         ActivitySnapshot activitySnapshot = activity.snapshot(target);
         BlockEngineChat.send(sender, DebugStyle.header("profile " + target));
@@ -260,6 +305,56 @@ public final class DebugCommands implements BasicCommand, Listener {
         BlockEngineChat.send(sender, DebugStyle.action("bossbar", "/blockengine debug perf live " + target, "Show live bossbar profile")
                 .append(Component.space())
                 .append(DebugStyle.action("stop", "/blockengine debug perf stop", "Stop live bossbar profile")));
+    }
+
+    private void perfOverview(@NotNull CommandSender sender, @NotNull String target) {
+        PerformanceOverview overview = overview();
+        BlockEngineChat.send(sender, DebugStyle.header("performance overview"));
+        BlockEngineChat.send(sender, DebugStyle.row("tracking", DebugStyle.status(
+                performanceTrackingEnabled ? "enabled" : "disabled",
+                performanceTrackingEnabled
+        )));
+        BlockEngineChat.send(sender, DebugStyle.row("bossbar", sender instanceof Player
+                ? DebugStyle.status("live " + target, true)
+                : DebugStyle.status("player only", false)));
+        BlockEngineChat.send(sender, DebugStyle.row("loaded chunks", overview.loadedChunks()));
+        BlockEngineChat.send(sender, DebugStyle.row("stored blocks", overview.storedBlocks()));
+        BlockEngineChat.send(sender, DebugStyle.row("exposed blocks", overview.exposedBlocks()));
+        BlockEngineChat.send(sender, DebugStyle.row("attached displays", overview.displays()));
+        BlockEngineChat.send(sender, DebugStyle.row("registered blocks", BlockRegistry.getBlocks().size()));
+        BlockEngineChat.send(sender, DebugStyle.row("namespaces", namespaces().size()));
+        BlockEngineChat.send(sender, DebugStyle.row("resource packs", ResourcePackManager.getInstance().packIds().size()));
+        perfTiming(sender, "commands", timings.snapshot("commands"));
+        perfTiming(sender, "validation", timings.snapshot("validation"));
+        perfActivity(sender, "placement", activity.snapshot("placement"));
+        perfActivity(sender, "events", activity.snapshot("events"));
+        perfActivity(sender, "chunk-save", activity.snapshot("chunk-save"));
+        BlockEngineChat.send(sender, DebugStyle.action("stop bossbar", "/perf stop", "Stop the live performance bossbar")
+                .append(Component.space())
+                .append(DebugStyle.action("events tail", "/be debug events tail", "Show recent event tail"))
+                .append(Component.space())
+                .append(DebugStyle.action("debug perf", "/be debug perf overall", "Open debug performance view")));
+    }
+
+    private void perfTiming(@NotNull CommandSender sender, @NotNull String label, @NotNull TimingSnapshot snapshot) {
+        if (snapshot.samples() <= 0) {
+            BlockEngineChat.send(sender, DebugStyle.row(label, DebugStyle.status("idle", false)));
+            return;
+        }
+        BlockEngineChat.send(sender, DebugStyle.row(label,
+                "avg " + ms(snapshot.avgNanos()) + "ms"
+                        + " | p95 " + ms(snapshot.p95Nanos()) + "ms"
+                        + " | max " + ms(snapshot.maxNanos()) + "ms"
+                        + " | " + ops(snapshot) + "/s"
+                        + " | n " + snapshot.samples()
+                        + " | last " + age(snapshot.lastSampleAgeNanos())));
+    }
+
+    private void perfActivity(@NotNull CommandSender sender, @NotNull String label, @NotNull ActivitySnapshot snapshot) {
+        BlockEngineChat.send(sender, DebugStyle.row(label,
+                rate(snapshot) + "/s"
+                        + " | events " + snapshot.samples()
+                        + " | last " + age(snapshot.lastEventAgeNanos())));
     }
 
     private void block(@NotNull CommandSender sender, String[] args) {
@@ -464,7 +559,7 @@ public final class DebugCommands implements BasicCommand, Listener {
         RuntimeBlockView view = ChunkEngine.getBlock(new BlockLocationKey(
                 block.getWorld().getUID(), block.getX(), block.getY(), block.getZ()
         ));
-        timings.record("validation", System.nanoTime() - started);
+        recordTiming("validation", System.nanoTime() - started);
         BlockEngineChat.send(sender, DebugStyle.header("validation"));
         BlockEngineChat.send(sender, DebugStyle.row("location", block.getX() + " " + block.getY() + " " + block.getZ()));
         BlockEngineChat.send(sender, DebugStyle.row("real type", block.getType()));
@@ -516,21 +611,53 @@ public final class DebugCommands implements BasicCommand, Listener {
         BukkitTask task = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
             TimingSnapshot snapshot = timings.snapshot(target);
             ActivitySnapshot activitySnapshot = activity.snapshot(target);
-            if (snapshot.samples() > 0) {
+            if (target.equals("overall")) {
+                PerformanceOverview overview = overview();
+                ActivitySnapshot events = activity.snapshot("events");
+                TimingSnapshot commands = timings.snapshot("commands");
+                double pressure = Math.max(events.ratePerSecond() / 20.0, commands.avgNanos() / 10_000_000.0);
+                bar.setColor(commands.avgNanos() > 5_000_000L ? BarColor.RED : events.active() ? BarColor.GREEN : BarColor.WHITE);
+                bar.setProgress(Math.max(0.05, Math.min(1.0, pressure)));
+                bar.setTitle(overallBossBarTitle(overview, commands, events));
+            } else if (snapshot.samples() > 0) {
                 double avgMs = snapshot.avgNanos() / 1_000_000.0;
                 bar.setColor(snapshot.stale() ? BarColor.WHITE : avgMs > 5.0 ? BarColor.RED : avgMs > 1.0 ? BarColor.YELLOW : BarColor.GREEN);
                 bar.setProgress(snapshot.stale() ? 0.05 : Math.max(0.05, Math.min(1.0, avgMs / 10.0)));
+                bar.setTitle(bossBarTitle(target, snapshot, activitySnapshot));
             } else {
                 bar.setColor(activitySnapshot.active() ? BarColor.GREEN : BarColor.WHITE);
                 bar.setProgress(Math.max(0.05, Math.min(1.0, activitySnapshot.ratePerSecond() / 20.0)));
+                bar.setTitle(bossBarTitle(target, snapshot, activitySnapshot));
             }
-            bar.setTitle(bossBarTitle(target, snapshot, activitySnapshot));
         }, 1L, 20L);
         liveProfiles.put(player.getUniqueId(), new LiveProfile(bar, task));
     }
 
     private @NotNull String bossBarTitle(@NotNull String target) {
+        if (target.equals("overall")) {
+            return overallBossBarTitle(overview(), timings.snapshot("commands"), activity.snapshot("events"));
+        }
         return bossBarTitle(target, timings.snapshot(target), activity.snapshot(target));
+    }
+
+    private @NotNull String overallBossBarTitle(
+            @NotNull PerformanceOverview overview,
+            @NotNull TimingSnapshot commands,
+            @NotNull ActivitySnapshot events
+    ) {
+        return ChatColor.GOLD + "" + ChatColor.BOLD + "BlockEngine "
+                + ChatColor.DARK_GRAY + "» "
+                + ChatColor.YELLOW + "overall"
+                + ChatColor.DARK_GRAY + " | "
+                + ChatColor.GRAY + "cmd " + speedColor(commands.avgNanos()) + ms(commands.avgNanos()) + "ms"
+                + ChatColor.DARK_GRAY + " | "
+                + ChatColor.GRAY + "events " + ChatColor.GREEN + rate(events) + "/s"
+                + ChatColor.DARK_GRAY + " | "
+                + ChatColor.GRAY + "blocks " + ChatColor.WHITE + overview.storedBlocks()
+                + ChatColor.DARK_GRAY + " | "
+                + ChatColor.GRAY + "chunks " + ChatColor.WHITE + overview.loadedChunks()
+                + ChatColor.DARK_GRAY + " | "
+                + ChatColor.GRAY + "displays " + ChatColor.WHITE + overview.displays();
     }
 
     private @NotNull String bossBarTitle(@NotNull String target, @NotNull TimingSnapshot snapshot,
@@ -631,9 +758,11 @@ public final class DebugCommands implements BasicCommand, Listener {
     }
 
     private void recordEvent(@NotNull String target, @NotNull String text) {
-        activity.record(target);
-        if (!target.equals("events")) {
-            activity.record("events");
+        if (performanceTrackingEnabled) {
+            activity.record(target);
+            if (!target.equals("events")) {
+                activity.record("events");
+            }
         }
         if (!eventTailEnabled) {
             return;
@@ -641,6 +770,12 @@ public final class DebugCommands implements BasicCommand, Listener {
         eventTail.add(text);
         while (eventTail.size() > MAX_EVENT_TAIL) {
             eventTail.poll();
+        }
+    }
+
+    private void recordTiming(@NotNull String target, long nanos) {
+        if (performanceTrackingEnabled) {
+            timings.record(target, nanos);
         }
     }
 
@@ -663,6 +798,8 @@ public final class DebugCommands implements BasicCommand, Listener {
     private @NotNull Collection<String> suggestProfile(String[] args) {
         if (args.length == 2) {
             List<String> options = new ArrayList<>(PROFILE_TARGETS);
+            options.add("on");
+            options.add("off");
             options.add("live");
             options.add("stop");
             return matching(options, args[1]);
@@ -744,7 +881,7 @@ public final class DebugCommands implements BasicCommand, Listener {
         return result;
     }
 
-    private static @NotNull Collection<String> matching(@NotNull Collection<String> values, @NotNull String prefix) {
+    static @NotNull Collection<String> matching(@NotNull Collection<String> values, @NotNull String prefix) {
         String lower = prefix.toLowerCase(Locale.ROOT);
         return values.stream()
                 .filter(value -> value.toLowerCase(Locale.ROOT).startsWith(lower))
@@ -777,6 +914,25 @@ public final class DebugCommands implements BasicCommand, Listener {
     }
 
     private record LiveProfile(@NotNull BossBar bar, @NotNull BukkitTask task) {
+    }
+
+    private @NotNull PerformanceOverview overview() {
+        int loadedChunks = 0;
+        int storedBlocks = 0;
+        int exposedBlocks = 0;
+        int displays = 0;
+        for (ChunkEngine.LoadedChunk chunk : ChunkEngine.chunks()) {
+            loadedChunks++;
+            storedBlocks += chunk.blocks().size();
+            exposedBlocks += chunk.exposedBlocks().size();
+            for (RuntimeBlockView block : chunk.blocks()) {
+                displays += block.storedBlock().displays().size();
+            }
+        }
+        return new PerformanceOverview(loadedChunks, storedBlocks, exposedBlocks, displays);
+    }
+
+    private record PerformanceOverview(int loadedChunks, int storedBlocks, int exposedBlocks, int displays) {
     }
 
     private static final class TimingRegistry {
