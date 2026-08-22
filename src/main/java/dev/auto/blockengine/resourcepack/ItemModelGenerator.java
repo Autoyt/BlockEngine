@@ -9,6 +9,8 @@ import org.bukkit.Material;
 import org.jetbrains.annotations.NotNull;
 
 import javax.imageio.ImageIO;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.InputStream;
@@ -71,6 +73,7 @@ public final class ItemModelGenerator {
     }
 
     public static void infoCard(@NotNull Path root) throws IOException {
+        int fontTextureSize = 256;
         String namespace = Main.getInstance().getName().toLowerCase(Locale.ROOT);
         Path texture = root.resolve("assets")
                 .resolve(namespace)
@@ -80,7 +83,17 @@ public final class ItemModelGenerator {
         Files.createDirectories(texture.getParent());
         try (InputStream input = Main.getInstance().getResource("assets/pfp.png")) {
             if (input != null) {
-                Files.copy(input, texture, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                BufferedImage source = ImageIO.read(input);
+                if (source != null) {
+                    BufferedImage image = new BufferedImage(fontTextureSize, fontTextureSize, BufferedImage.TYPE_INT_ARGB);
+                    Graphics2D graphics = image.createGraphics();
+                    graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+                    graphics.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+                    graphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                    graphics.drawImage(source, 0, 0, fontTextureSize, fontTextureSize, null);
+                    graphics.dispose();
+                    ImageIO.write(image, "png", texture.toFile());
+                }
             }
         }
 
