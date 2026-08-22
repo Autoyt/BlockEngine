@@ -1,17 +1,16 @@
 package dev.auto.blockengine.runtime;
 
-import dev.auto.blockengine.api.blocks.BlockView;
 import dev.auto.blockengine.types.BlockLocationKey;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-public final class BlockEngineBlockView implements BlockView {
+public final class BlockView implements dev.auto.blockengine.api.blocks.BlockView {
     private final @NotNull Block block;
     private final @Nullable RuntimeBlockView blockEngineBlock;
 
-    public BlockEngineBlockView(@NotNull Block block) {
+    public BlockView(@NotNull Block block) {
         this.block = block;
         this.blockEngineBlock = ChunkEngine.getBlock(new BlockLocationKey(
                 block.getWorld().getUID(),

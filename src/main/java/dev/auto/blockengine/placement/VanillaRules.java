@@ -14,8 +14,8 @@ import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-public final class BlockEngineVanillaRules {
-    private BlockEngineVanillaRules() {
+public final class VanillaRules {
+    private VanillaRules() {
     }
 
     public static @NotNull BlockData blockData(@NotNull RuntimeBlockView block) {

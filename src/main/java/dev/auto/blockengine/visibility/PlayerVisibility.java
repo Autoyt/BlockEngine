@@ -2,23 +2,23 @@ package dev.auto.blockengine.visibility;
 
 import dev.auto.blockengine.entity.VirtualItemDisplay;
 import dev.auto.blockengine.runtime.ChunkEngine;
-import dev.auto.blockengine.types.BlockLocationKey;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayDeque;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
 final class PlayerVisibility {
-    private final @NotNull Map<BlockLocationKey, VirtualItemDisplay> active = new HashMap<>();
+    private final @NotNull Map<UUID, VirtualItemDisplay> active = new HashMap<>();
     private final @NotNull ArrayDeque<VirtualItemDisplay> pool = new ArrayDeque<>();
 
     private int lastRecalcTick = -1;
     private @Nullable ChunkEngine.Key centerChunk;
     private int radius = -1;
 
-    @NotNull Map<BlockLocationKey, VirtualItemDisplay> active() {
+    @NotNull Map<UUID, VirtualItemDisplay> active() {
         return active;
     }
 

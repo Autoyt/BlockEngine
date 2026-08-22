@@ -1,10 +1,10 @@
 package dev.auto.blockengine.commands;
 
 import dev.auto.blockengine.Main;
-import dev.auto.blockengine.items.BlockEngineItemManager;
+import dev.auto.blockengine.items.ItemManager;
 import dev.auto.blockengine.placement.PlacementManager;
 import dev.auto.blockengine.registry.BlockRegistry;
-import dev.auto.blockengine.runtime.BlockEngineBlockRemover;
+import dev.auto.blockengine.runtime.BlockRemover;
 import dev.auto.blockengine.runtime.ChunkEngine;
 import dev.auto.blockengine.types.BlockDefinition;
 import dev.auto.blockengine.types.BlockLocationKey;
@@ -254,7 +254,7 @@ public final class OverideFillCommand implements Listener {
                 block.getX(),
                 block.getY(),
                 block.getZ()
-        )) != null && !BlockEngineBlockRemover.remove(block, dropExisting)) {
+        )) != null && !BlockRemover.remove(block, dropExisting)) {
             return false;
         }
 
@@ -292,7 +292,7 @@ public final class OverideFillCommand implements Listener {
     ) {
         int remaining = amount;
         while (remaining > 0) {
-            ItemStack stack = BlockEngineItemManager.create(definition, stateId);
+            ItemStack stack = ItemManager.create(definition, stateId);
             stack.setAmount(Math.min(64, remaining));
             Map<Integer, ItemStack> leftovers = player.getInventory().addItem(stack);
             for (ItemStack leftover : leftovers.values()) {

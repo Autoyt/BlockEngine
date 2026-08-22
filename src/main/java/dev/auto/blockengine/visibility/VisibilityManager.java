@@ -1,12 +1,13 @@
 package dev.auto.blockengine.visibility;
 
 import dev.auto.blockengine.Main;
+import dev.auto.blockengine.entity.ManagedDisplayManager;
+import dev.auto.blockengine.entity.ManagedDisplayManager.DesiredDisplay;
 import dev.auto.blockengine.entity.PacketEntityManager;
 import dev.auto.blockengine.entity.VirtualItemDisplay;
-import dev.auto.blockengine.items.BlockEngineDisplayItemManager;
+import dev.auto.blockengine.items.ItemManager;
 import dev.auto.blockengine.runtime.ChunkEngine;
 import dev.auto.blockengine.runtime.RuntimeBlockView;
-import dev.auto.blockengine.types.BlockLocationKey;
 import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
 import org.bukkit.Location;
@@ -14,6 +15,7 @@ import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.HashMap;
 import java.util.Iterator;
@@ -98,10 +100,10 @@ public final class VisibilityManager {
             }
 
             PlayerVisibility state = entry.getValue();
-            Iterator<Map.Entry<BlockLocationKey, VirtualItemDisplay>> iterator = state.active().entrySet().iterator();
+            Iterator<Map.Entry<UUID, VirtualItemDisplay>> iterator = state.active().entrySet().iterator();
             while (iterator.hasNext()) {
-                Map.Entry<BlockLocationKey, VirtualItemDisplay> active = iterator.next();
-                if (!chunkKey.contains(active.getKey())) {
+                Map.Entry<UUID, VirtualItemDisplay> active = iterator.next();
+                if (!inChunk(active.getValue().getLocation(), chunkKey)) {
                     continue;
                 }
 
@@ -137,20 +139,21 @@ public final class VisibilityManager {
             return;
         }
 
-        Map<BlockLocationKey, RuntimeBlockView> desired = collectDesired(player.getWorld(), center, radius, visibilityConfig);
+        Map<UUID, DesiredDisplay> desired = collectDesired(player, center, radius, visibilityConfig);
         reconcile(player, state, desired);
         state.centerChunk(center);
         state.radius(radius);
     }
 
-    private @NotNull Map<BlockLocationKey, RuntimeBlockView> collectDesired(
-            @NotNull World world,
+    private @NotNull Map<UUID, DesiredDisplay> collectDesired(
+            @NotNull Player player,
             @NotNull ChunkEngine.Key center,
             int radius,
             @NotNull VisibilityConfig visibilityConfig
     ) {
-        Map<BlockLocationKey, RuntimeBlockView> desired = new HashMap<>();
+        Map<UUID, DesiredDisplay> desired = new HashMap<>();
         int radiusSquared = radius * radius;
+        World world = player.getWorld();
 
         for (int dx = -radius; dx <= radius; dx++) {
             for (int dz = -radius; dz <= radius; dz++) {
@@ -170,8 +173,27 @@ public final class VisibilityManager {
                 }
 
                 for (RuntimeBlockView block : loadedChunk.exposedBlocks()) {
-                    desired.put(block.location(), block);
+                    DesiredDisplay display = ManagedDisplayManager.getInstance()
+                            .defaultBlockDisplay(block.location(), ItemManager.display(block));
+                    desired.put(display.id(), display);
                 }
+            }
+        }
+
+        for (ManagedDisplayManager.ManagedDisplay display : ManagedDisplayManager.getInstance().loadedDisplays()) {
+            if (!display.spec().audience().visibleTo(player.getUniqueId())) {
+                continue;
+            }
+            if (!display.spec().worldId().equals(world.getUID())) {
+                continue;
+            }
+            int chunkX = floor(display.spec().x()) >> 4;
+            int chunkZ = floor(display.spec().z()) >> 4;
+            int dx = chunkX - center.x();
+            int dz = chunkZ - center.z();
+            if (dx * dx + dz * dz <= radiusSquared) {
+                DesiredDisplay desiredDisplay = ManagedDisplayManager.getInstance().desired(display);
+                desired.put(desiredDisplay.id(), desiredDisplay);
             }
         }
 
@@ -181,11 +203,11 @@ public final class VisibilityManager {
     private void reconcile(
             @NotNull Player player,
             @NotNull PlayerVisibility state,
-            @NotNull Map<BlockLocationKey, RuntimeBlockView> desired
+            @NotNull Map<UUID, DesiredDisplay> desired
     ) {
-        Iterator<Map.Entry<BlockLocationKey, VirtualItemDisplay>> iterator = state.active().entrySet().iterator();
+        Iterator<Map.Entry<UUID, VirtualItemDisplay>> iterator = state.active().entrySet().iterator();
         while (iterator.hasNext()) {
-            Map.Entry<BlockLocationKey, VirtualItemDisplay> entry = iterator.next();
+            Map.Entry<UUID, VirtualItemDisplay> entry = iterator.next();
             if (desired.containsKey(entry.getKey())) {
                 continue;
             }
@@ -195,18 +217,18 @@ public final class VisibilityManager {
             iterator.remove();
         }
 
-        for (RuntimeBlockView block : desired.values()) {
-            VirtualItemDisplay activeDisplay = state.active().get(block.location());
+        for (DesiredDisplay desiredDisplay : desired.values()) {
+            VirtualItemDisplay activeDisplay = state.active().get(desiredDisplay.id());
             if (activeDisplay != null) {
-                configure(activeDisplay, player.getWorld(), block);
+                configure(activeDisplay, desiredDisplay);
                 activeDisplay.updateMetadata(player);
                 continue;
             }
 
             VirtualItemDisplay display = takeDisplay(state);
-            configure(display, player.getWorld(), block);
+            configure(display, desiredDisplay);
             display.spawn(player);
-            state.active().put(block.location(), display);
+            state.active().put(desiredDisplay.id(), display);
         }
     }
 
@@ -226,12 +248,8 @@ public final class VisibilityManager {
         PacketEntityManager.release(display);
     }
 
-    private void configure(@NotNull VirtualItemDisplay display, @NotNull World world, @NotNull RuntimeBlockView block) {
-        BlockLocationKey location = block.location();
-        display.location(new Location(world, location.x() + 0.5, location.y() + 0.5, location.z() + 0.5, 0.0f, 0.0f))
-                .itemStack(BlockEngineDisplayItemManager.create(block))
-                .scale(2.0f, 2.0f, 2.0f)
-                .displayContext(VirtualItemDisplay.DISPLAY_CONTEXT_FIXED);
+    private void configure(@NotNull VirtualItemDisplay display, @NotNull DesiredDisplay desired) {
+        ManagedDisplayManager.getInstance().apply(display, desired.spec());
     }
 
     private boolean sameChunk(@NotNull Location from, @NotNull Location to) {
@@ -252,6 +270,19 @@ public final class VisibilityManager {
         int dx = chunkKey.x() - center.getX();
         int dz = chunkKey.z() - center.getZ();
         return dx * dx + dz * dz <= radius * radius;
+    }
+
+    private boolean inChunk(@Nullable Location location, @NotNull ChunkEngine.Key chunkKey) {
+        if (location == null || location.getWorld() == null || !location.getWorld().getUID().equals(chunkKey.worldId())) {
+            return false;
+        }
+        return (floor(location.getX()) >> 4) == chunkKey.x()
+                && (floor(location.getZ()) >> 4) == chunkKey.z();
+    }
+
+    private int floor(double value) {
+        int integer = (int) value;
+        return value < integer ? integer - 1 : integer;
     }
 
     private @NotNull PlayerVisibility state(@NotNull Player player) {

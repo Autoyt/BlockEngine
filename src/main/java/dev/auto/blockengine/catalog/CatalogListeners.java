@@ -1,7 +1,7 @@
 package dev.auto.blockengine.catalog;
 
 import dev.auto.blockengine.Main;
-import dev.auto.blockengine.items.BlockEngineItemManager;
+import dev.auto.blockengine.items.ItemManager;
 import dev.auto.blockengine.registry.BlockRegistry;
 import dev.auto.blockengine.types.BlockDefinition;
 import io.papermc.paper.event.player.PlayerStonecutterRecipeSelectEvent;
@@ -23,9 +23,11 @@ import org.bukkit.inventory.RecipeChoice;
 import org.bukkit.inventory.StonecuttingRecipe;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -44,15 +46,25 @@ public final class CatalogListeners implements Listener {
     }
 
     public static void open(@NotNull Player player) {
+        open(player, null);
+    }
+
+    public static void open(@NotNull Player player, @Nullable String namespace) {
         registerRecipes();
-        if (recipes.isEmpty()) {
-            player.sendMessage("No BlockEngine custom blocks are registered.");
+        List<BlockDefinition> blocks = filteredBlocks(namespace);
+        if (blocks.isEmpty()) {
+            player.sendMessage(namespace == null
+                    ? "No BlockEngine custom blocks are registered."
+                    : "No BlockEngine custom blocks are registered for namespace '" + namespace + "'.");
             return;
         }
 
-        player.discoverRecipes(recipes.keySet());
-        BlockDefinition first = recipes.values().iterator().next();
-        sessions.put(player.getUniqueId(), new Session(first));
+        Collection<NamespacedKey> keys = blocks.stream()
+                .map(block -> new NamespacedKey(Main.getInstance(), "catalog/" + safe(block.id())))
+                .toList();
+        player.discoverRecipes(keys);
+        BlockDefinition first = blocks.getFirst();
+        sessions.put(player.getUniqueId(), new Session(first, keys));
 
         InventoryView view = MenuType.STONECUTTER.create(player, TITLE);
         player.openInventory(view);
@@ -64,7 +76,7 @@ public final class CatalogListeners implements Listener {
         for (UUID playerId : sessions.keySet().toArray(UUID[]::new)) {
             Player player = Bukkit.getPlayer(playerId);
             if (player != null) {
-                player.undiscoverRecipes(recipes.keySet());
+                player.undiscoverRecipes(sessions.get(playerId).recipes());
             }
         }
         sessions.clear();
@@ -86,6 +98,10 @@ public final class CatalogListeners implements Listener {
         }
 
         session.selected(block);
+        if (!session.recipes().contains(key)) {
+            event.setCancelled(true);
+            return;
+        }
         event.getStonecutterInventory().setInputItem(inputItem());
         event.getStonecutterInventory().setResult(output(block));
     }
@@ -126,7 +142,7 @@ public final class CatalogListeners implements Listener {
     public void onClose(InventoryCloseEvent event) {
         Session session = sessions.remove(event.getPlayer().getUniqueId());
         if (session != null && event.getPlayer() instanceof Player player) {
-            player.undiscoverRecipes(recipes.keySet());
+            player.undiscoverRecipes(session.recipes());
         }
         if (sessions.isEmpty()) {
             clearRecipes();
@@ -137,11 +153,19 @@ public final class CatalogListeners implements Listener {
     public void onLeave(PlayerQuitEvent event) {
         Session session = sessions.remove(event.getPlayer().getUniqueId());
         if (session != null) {
-            event.getPlayer().undiscoverRecipes(recipes.keySet());
+            event.getPlayer().undiscoverRecipes(session.recipes());
         }
         if (sessions.isEmpty()) {
             clearRecipes();
         }
+    }
+
+    private static @NotNull List<BlockDefinition> filteredBlocks(@Nullable String namespace) {
+        return BlockRegistry.getBlocks().stream()
+                .filter(block -> block.apiDefinition().catalog())
+                .filter(block -> namespace == null || block.name().namespace().equalsIgnoreCase(namespace))
+                .sorted(Comparator.comparing(BlockDefinition::id))
+                .toList();
     }
 
     private static void registerRecipes() {
@@ -155,7 +179,7 @@ public final class CatalogListeners implements Listener {
             NamespacedKey key = new NamespacedKey(Main.getInstance(), "catalog/" + safe(block.id()));
             StonecuttingRecipe recipe = new StonecuttingRecipe(
                     key,
-                    BlockEngineItemManager.create(block),
+                    ItemManager.create(block),
                     new RecipeChoice.MaterialChoice(Main.getBackingBlock())
             );
             recipe.setGroup("BlockEngine_catalog");
@@ -175,13 +199,13 @@ public final class CatalogListeners implements Listener {
         if (event.getView().getTopInventory().getType() != InventoryType.STONECUTTER) {
             return;
         }
-        if (event.getRawSlot() == OUTPUT_SLOT && BlockEngineItemManager.blockId(event.getCurrentItem()) != null) {
+        if (event.getRawSlot() == OUTPUT_SLOT && ItemManager.blockId(event.getCurrentItem()) != null) {
             event.setCancelled(true);
         }
     }
 
     private static void give(@NotNull Player player, @NotNull BlockDefinition block) {
-        ItemStack stack = BlockEngineItemManager.create(block);
+        ItemStack stack = ItemManager.create(block);
         stack.setAmount(64);
         Map<Integer, ItemStack> leftover = player.getInventory().addItem(stack);
         for (ItemStack item : leftover.values()) {
@@ -199,7 +223,7 @@ public final class CatalogListeners implements Listener {
     }
 
     private static @NotNull ItemStack output(@NotNull BlockDefinition block) {
-        ItemStack item = BlockEngineItemManager.create(block);
+        ItemStack item = ItemManager.create(block);
         item.setAmount(64);
         return item;
     }
@@ -214,13 +238,19 @@ public final class CatalogListeners implements Listener {
 
     private static final class Session {
         private @NotNull BlockDefinition selected;
+        private final @NotNull Collection<NamespacedKey> recipes;
 
-        private Session(@NotNull BlockDefinition selected) {
+        private Session(@NotNull BlockDefinition selected, @NotNull Collection<NamespacedKey> recipes) {
             this.selected = selected;
+            this.recipes = List.copyOf(recipes);
         }
 
         private @NotNull BlockDefinition selected() {
             return selected;
+        }
+
+        private @NotNull Collection<NamespacedKey> recipes() {
+            return recipes;
         }
 
         private void selected(@NotNull BlockDefinition selected) {

@@ -1,17 +1,21 @@
 package dev.auto.blockengine.listeners;
 
 import dev.auto.blockengine.Main;
-import dev.auto.blockengine.items.BlockEngineItemManager;
+import dev.auto.blockengine.api.event.BlockEngineBlockBreakEvent;
+import dev.auto.blockengine.api.event.BlockEngineBlockBrokenEvent;
+import dev.auto.blockengine.api.event.BlockEngineBlockRemovedEvent;
+import dev.auto.blockengine.event.BlockEngineEvents;
+import dev.auto.blockengine.items.ItemManager;
+import dev.auto.blockengine.integrity.BlockIntegrityManager;
 import dev.auto.blockengine.placement.PlacementManager;
 import dev.auto.blockengine.placement.PlacementVerificationEngine;
 import dev.auto.blockengine.registry.BlockRegistry;
 import dev.auto.blockengine.registry.NamespaceRegistry;
 import dev.auto.blockengine.resourcepack.ResourcePackManager;
 import dev.auto.blockengine.runtime.RuntimeBlockView;
-import dev.auto.blockengine.runtime.BlockEngineBlockContext;
+import dev.auto.blockengine.runtime.BlockContext;
 import dev.auto.blockengine.runtime.BlockDataManager;
-import dev.auto.blockengine.runtime.BlockEngineBlockRemover;
-import dev.auto.blockengine.runtime.BlockEngineMutationBatcher;
+import dev.auto.blockengine.runtime.BlockRemover;
 import dev.auto.blockengine.runtime.ChunkEngine;
 import dev.auto.blockengine.types.BlockDefinition;
 import dev.auto.blockengine.types.BlockLocationKey;
@@ -25,15 +29,22 @@ import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
-import org.bukkit.block.data.Waterlogged;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Event;
 import org.bukkit.event.Listener;
+import org.bukkit.event.EventPriority;
+import org.bukkit.event.block.BlockBurnEvent;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockExplodeEvent;
+import org.bukkit.event.block.BlockFadeEvent;
+import org.bukkit.event.block.BlockFromToEvent;
+import org.bukkit.event.block.BlockPhysicsEvent;
+import org.bukkit.event.block.BlockPistonExtendEvent;
+import org.bukkit.event.block.BlockPistonRetractEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
+import org.bukkit.event.entity.EntityChangeBlockEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.player.PlayerInteractEvent;
@@ -47,7 +58,6 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
 
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -64,12 +74,13 @@ public class GameListener implements Listener {
     public void onChunkLoad(ChunkLoadEvent event) {
         Chunk chunk = event.getChunk();
         ChunkEngine.load(chunk, VisibilityManager.getInstance().config());
+        BlockIntegrityManager.getInstance().enqueue(chunk);
         VisibilityManager.getInstance().refreshPlayersNear(ChunkEngine.Key.from(chunk));
     }
 
     @EventHandler
     public void onChunkUnload(ChunkUnloadEvent event) {
-        BlockEngineMutationBatcher.flushNow();
+        ChunkEngine.flushNow();
         ChunkEngine.Key key = ChunkEngine.Key.from(event.getChunk());
         ChunkEngine.unload(event.getChunk());
         VisibilityManager.getInstance().removeChunkDisplays(key);
@@ -96,26 +107,51 @@ public class GameListener implements Listener {
 
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
-        BlockEngineMutationBatcher.flushNow();
+        ChunkEngine.flushNow();
         lastPlacementTicks.remove(event.getPlayer().getUniqueId());
         VisibilityManager.getInstance().cleanup(event.getPlayer());
     }
 
     @EventHandler
     public void onBreak(BlockBreakEvent event) {
+        if (BlockIntegrityManager.getInstance().verifyInteraction(event.getBlock())) {
+            return;
+        }
         RuntimeBlockView block = block(event.getBlock());
         if (block != null) {
             event.setCancelled(true);
-            BlockEngineBlockContext context = BlockDataManager.getInstance().context(event.getBlock(), block, event.getPlayer());
+            BlockContext context = BlockDataManager.getInstance().context(event.getBlock(), block, event.getPlayer());
+            if (context != null && BlockEngineEvents.callCancellable(new BlockEngineBlockBreakEvent(
+                    event.getBlock(),
+                    context,
+                    event.getPlayer()
+            ))) {
+                BlockDataManager.getInstance().save(event.getBlock(), context);
+                return;
+            }
             if (context != null && !context.adapter().onBreak(context)) {
                 BlockDataManager.getInstance().save(event.getBlock(), context);
                 return;
             }
-            BlockEngineBlockRemover.remove(
+            boolean drop = event.getPlayer().getGameMode() != GameMode.CREATIVE || block.storedBlock().dropInCreative();
+            String blockId = block.storedBlock().blockId();
+            String stateId = block.storedBlock().stateId();
+            if (BlockRemover.remove(
                     event.getBlock(),
                     block,
-                    event.getPlayer().getGameMode() != GameMode.CREATIVE || block.storedBlock().dropInCreative()
-            );
+                    drop,
+                    Material.AIR,
+                    false,
+                    BlockEngineBlockRemovedEvent.Reason.PLAYER_BREAK
+            )) {
+                BlockEngineEvents.call(new BlockEngineBlockBrokenEvent(
+                        event.getBlock(),
+                        event.getPlayer(),
+                        blockId,
+                        stateId,
+                        drop && block.storedBlock().dropsItem()
+                ));
+            }
         }
     }
 
@@ -134,8 +170,65 @@ public class GameListener implements Listener {
         PlacementManager.getInstance().place(event);
     }
 
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)
+    public void onBreakPostVerify(BlockBreakEvent event) {
+        postVerify(event.getBlock());
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)
+    public void onPlacePostVerify(BlockPlaceEvent event) {
+        postVerify(event.getBlockPlaced());
+        postVerify(event.getBlockReplacedState().getBlock());
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)
+    public void onPhysicsPostVerify(BlockPhysicsEvent event) {
+        postVerify(event.getBlock());
+        postVerify(event.getSourceBlock());
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)
+    public void onBurnPostVerify(BlockBurnEvent event) {
+        postVerify(event.getBlock());
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)
+    public void onFadePostVerify(BlockFadeEvent event) {
+        postVerify(event.getBlock());
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)
+    public void onFromToPostVerify(BlockFromToEvent event) {
+        postVerify(event.getBlock());
+        postVerify(event.getToBlock());
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)
+    public void onEntityChangeBlockPostVerify(EntityChangeBlockEvent event) {
+        postVerify(event.getBlock());
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)
+    public void onPistonExtendPostVerify(BlockPistonExtendEvent event) {
+        for (Block moved : event.getBlocks()) {
+            postVerify(moved);
+            postVerify(moved.getRelative(event.getDirection()));
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)
+    public void onPistonRetractPostVerify(BlockPistonRetractEvent event) {
+        for (Block moved : event.getBlocks()) {
+            postVerify(moved);
+            postVerify(moved.getRelative(event.getDirection()));
+        }
+    }
+
     @EventHandler
     public void onPickBlock(PlayerPickBlockEvent event) {
+        if (BlockIntegrityManager.getInstance().verifyInteraction(event.getBlock())) {
+            return;
+        }
         RuntimeBlockView customBlock = block(event.getBlock());
         if (customBlock == null) {
             return;
@@ -151,13 +244,18 @@ public class GameListener implements Listener {
             return;
         }
 
-        ItemStack stack = BlockEngineItemManager.create(definition, customBlock.storedBlock().stateId());
+        ItemStack stack = ItemManager.create(definition, customBlock.storedBlock().stateId());
         pick(event.getPlayer(), stack, event.getTargetSlot());
     }
 
     @EventHandler
     public void onInteract(PlayerInteractEvent event) {
         if (event.getClickedBlock() == null) {
+            return;
+        }
+
+        if (BlockIntegrityManager.getInstance().verifyInteraction(event.getClickedBlock())) {
+            placeHeld(event);
             return;
         }
 
@@ -191,7 +289,7 @@ public class GameListener implements Listener {
             return;
         }
 
-        BlockEngineBlockContext context = BlockDataManager.getInstance().context(event.getClickedBlock(), block, event.getPlayer());
+        BlockContext context = BlockDataManager.getInstance().context(event.getClickedBlock(), block, event.getPlayer());
         if (context != null && context.adapter().onInteract(context, event.getPlayer())) {
             event.setCancelled(true);
             BlockDataManager.getInstance().save(event.getClickedBlock(), context);
@@ -212,7 +310,7 @@ public class GameListener implements Listener {
             return;
         }
 
-        Set<BlockLocationKey> affected = affectedByExplosion(origin, radius(origin, vanillaBlocks));
+        Set<BlockLocationKey> affected = ExplosionImpactCalculator.affectedByExplosion(origin, vanillaBlocks);
         for (BlockLocationKey location : affected) {
             RuntimeBlockView customBlock = ChunkEngine.getBlock(location);
             if (customBlock == null) {
@@ -226,102 +324,15 @@ public class GameListener implements Listener {
                     customBlock.location().y(),
                     customBlock.location().z()
             );
-            BlockEngineBlockRemover.remove(block, customBlock, customBlock.storedBlock().dropsItem());
+            BlockRemover.remove(
+                    block,
+                    customBlock,
+                    customBlock.storedBlock().dropsItem(),
+                    Material.AIR,
+                    false,
+                    BlockEngineBlockRemovedEvent.Reason.EXPLOSION
+            );
         }
-    }
-
-    private double radius(Location origin, List<Block> blocks) {
-        double radius = 4.0;
-        for (Block block : blocks) {
-            radius = Math.max(radius, block.getLocation().add(0.5, 0.5, 0.5).distance(origin));
-        }
-        return radius + 1.0;
-    }
-
-    private Set<BlockLocationKey> affectedByExplosion(Location origin, double radius) {
-        Set<BlockLocationKey> affected = new HashSet<>();
-        World world = origin.getWorld();
-        if (world == null) {
-            return affected;
-        }
-
-        double power = Math.max(0.5, radius / 2.0);
-        int samples = 16;
-        for (int x = 0; x < samples; x++) {
-            for (int y = 0; y < samples; y++) {
-                for (int z = 0; z < samples; z++) {
-                    if (x != 0 && x != samples - 1
-                            && y != 0 && y != samples - 1
-                            && z != 0 && z != samples - 1) {
-                        continue;
-                    }
-                    ray(origin, world, affected, power, dir(x, samples), dir(y, samples), dir(z, samples));
-                }
-            }
-        }
-        return affected;
-    }
-
-    private void ray(
-            Location origin,
-            World world,
-            Set<BlockLocationKey> affected,
-            double explosionPower,
-            double dx,
-            double dy,
-            double dz
-    ) {
-        double length = Math.sqrt(dx * dx + dy * dy + dz * dz);
-        dx /= length;
-        dy /= length;
-        dz /= length;
-
-        double power = explosionPower * (0.7 + Math.random() * 0.6);
-        double x = origin.getX();
-        double y = origin.getY();
-        double z = origin.getZ();
-
-        while (power > 0.0) {
-            int blockX = floor(x);
-            int blockY = floor(y);
-            int blockZ = floor(z);
-            Block block = world.getBlockAt(blockX, blockY, blockZ);
-            if (protectedByWater(block)) {
-                return;
-            }
-
-            BlockLocationKey location = new BlockLocationKey(world.getUID(), blockX, blockY, blockZ);
-            RuntimeBlockView customBlock = ChunkEngine.getBlock(location);
-            float resistance = customBlock == null
-                    ? block.getType().getBlastResistance()
-                    : Math.max(0.05f, customBlock.storedBlock().hardness());
-            if (!block.getType().isAir() || customBlock != null) {
-                power -= (resistance + 0.3f) * 0.3f;
-            }
-
-            if (power > 0.0) {
-                affected.add(location);
-            }
-
-            x += dx * 0.3;
-            y += dy * 0.3;
-            z += dz * 0.3;
-            power -= 0.225;
-        }
-    }
-
-    private boolean protectedByWater(Block block) {
-        return block.getType() == Material.WATER
-                || block.getBlockData() instanceof Waterlogged waterlogged && waterlogged.isWaterlogged();
-    }
-
-    private double dir(int value, int samples) {
-        return (value / (double) (samples - 1)) * 2.0 - 1.0;
-    }
-
-    private int floor(double value) {
-        int integer = (int) value;
-        return value < integer ? integer - 1 : integer;
     }
 
     private RuntimeBlockView block(Block block) {
@@ -333,19 +344,25 @@ public class GameListener implements Listener {
         ));
     }
 
+    private void postVerify(Block block) {
+        if (BlockIntegrityManager.getInstance().config().listenToBlockUpdates()) {
+            BlockIntegrityManager.getInstance().verifyNextTick(block);
+        }
+    }
+
     private boolean placeHeld(PlayerInteractEvent event) {
         if (event.getAction() != Action.RIGHT_CLICK_BLOCK || event.getHand() != EquipmentSlot.HAND) {
             return false;
         }
 
         ItemStack item = event.getItem();
-        String blockId = BlockEngineItemManager.blockId(item);
-        if (blockId == null || !BlockEngineItemManager.placeable(item)) {
+        String blockId = ItemManager.blockId(item);
+        if (blockId == null || !ItemManager.placeable(item)) {
             return false;
         }
 
         Player player = event.getPlayer();
-        String namespace = BlockEngineItemManager.namespace(item);
+        String namespace = ItemManager.namespace(item);
         BlockDefinition definition = BlockRegistry.getBlock(blockId);
         if (namespace == null || !NamespaceRegistry.loaded(namespace) || definition == null) {
             event.setCancelled(true);
@@ -354,7 +371,7 @@ public class GameListener implements Listener {
 
         Block clicked = event.getClickedBlock();
         Block target = clicked.isReplaceable() ? clicked : clicked.getRelative(event.getBlockFace());
-        String stateId = BlockEngineItemManager.stateId(item);
+        String stateId = ItemManager.stateId(item);
         BlockFace placedAgainst = event.getBlockFace().getOppositeFace();
         PlacementVerificationEngine.Result verification = PlacementVerificationEngine.verify(
                 new PlacementVerificationEngine.Request(
@@ -404,10 +421,5 @@ public class GameListener implements Listener {
         player.updateInventory();
     }
 }
-
-
-
-
-
 
 

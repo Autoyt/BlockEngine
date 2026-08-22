@@ -50,6 +50,15 @@ public class BlockRegistry {
         return blocks.get(name);
     }
 
+    public static BlockDefinition getBlock(@NotNull BlockAdapter adapter) {
+        for (BlockDefinition definition : blocks.values()) {
+            if (definition.adapter() == adapter) {
+                return definition;
+            }
+        }
+        return null;
+    }
+
     public static Collection<BlockDefinition> getBlocks() {
         return Collections.unmodifiableCollection(blocks.values());
     }

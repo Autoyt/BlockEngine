@@ -1,27 +1,16 @@
 visibility:
   enabled: true
-  chunks:
-    radius: 5
-    clamp-to-server-view-distance: true
-    loaded-chunks-only: true
-  entities:
-    recycle: true
-  exposure:
-    enabled: true
-    treat-liquid-as-exposed: true
-    treat-passable-as-exposed: true
-    treat-non-solid-as-exposed: true
+  chunk-radius: 5
 
 resource-pack:
   enabled: true
-  generate-on-startup: true
-  hosting:
-    enabled: true
-    host: "0.0.0.0"
-    port: 8123
-    public-url: ""
-    file-name: "blockengine-resource-pack.zip"
-  send:
-    on-join: true
-    required: false
-    prompt: "This server uses BlockEngine custom block resources."
+  port: 8123
+  public-url: ""
+  required: false
+
+integrity:
+  reconcile-on-chunk-load: true
+  reconcile-on-interaction: true
+  post-tick-verification: true
+  listen-to-block-updates: true
+  chunks-per-tick: 2

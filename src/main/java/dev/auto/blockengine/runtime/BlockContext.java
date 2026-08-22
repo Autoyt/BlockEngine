@@ -1,9 +1,7 @@
 package dev.auto.blockengine.runtime;
 
 import dev.auto.blockengine.api.blocks.BlockAdapter;
-import dev.auto.blockengine.api.blocks.BlockContext;
 import dev.auto.blockengine.api.blocks.BlockData;
-import dev.auto.blockengine.api.blocks.BlockView;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.entity.Player;
@@ -12,11 +10,11 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 
-public final class BlockEngineBlockContext extends BlockContext {
+public final class BlockContext extends dev.auto.blockengine.api.blocks.BlockContext {
     private final @NotNull Block block;
     private final @Nullable Player player;
 
-    public BlockEngineBlockContext(
+    public BlockContext(
             @NotNull BlockAdapter adapter,
             @NotNull BlockData data,
             @NotNull Block block,
@@ -33,17 +31,17 @@ public final class BlockEngineBlockContext extends BlockContext {
     }
 
     @Override
-    public @NotNull BlockView relative(int dx, int dy, int dz) {
-        return new BlockEngineBlockView(block.getRelative(dx, dy, dz));
+    public @NotNull dev.auto.blockengine.api.blocks.BlockView relative(int dx, int dy, int dz) {
+        return new BlockView(block.getRelative(dx, dy, dz));
     }
 
     @Override
-    public @NotNull BlockView neighbor(@NotNull BlockFace face) {
-        return new BlockEngineBlockView(block.getRelative(face));
+    public @NotNull dev.auto.blockengine.api.blocks.BlockView neighbor(@NotNull BlockFace face) {
+        return new BlockView(block.getRelative(face));
     }
 
     @Override
-    public @NotNull List<BlockView> neighbors() {
+    public @NotNull List<dev.auto.blockengine.api.blocks.BlockView> neighbors() {
         return List.of(
                 neighbor(BlockFace.NORTH),
                 neighbor(BlockFace.SOUTH),
@@ -55,7 +53,7 @@ public final class BlockEngineBlockContext extends BlockContext {
     }
 
     @Override
-    public @NotNull List<BlockView> horizontalNeighbors() {
+    public @NotNull List<dev.auto.blockengine.api.blocks.BlockView> horizontalNeighbors() {
         return List.of(
                 neighbor(BlockFace.NORTH),
                 neighbor(BlockFace.SOUTH),

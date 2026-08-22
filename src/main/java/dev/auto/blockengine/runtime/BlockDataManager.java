@@ -1,8 +1,12 @@
 package dev.auto.blockengine.runtime;
 
 import dev.auto.blockengine.api.blocks.BlockData;
+import dev.auto.blockengine.api.event.BlockEngineBlockDataSaveEvent;
+import dev.auto.blockengine.api.event.BlockEngineBlockDataSavedEvent;
+import dev.auto.blockengine.event.BlockEngineEvents;
 import dev.auto.blockengine.registry.BlockRegistry;
 import dev.auto.blockengine.types.BlockDefinition;
+import dev.auto.blockengine.types.BlockLocationKey;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
@@ -18,7 +22,7 @@ public final class BlockDataManager {
         return instance;
     }
 
-    public @Nullable BlockEngineBlockContext context(
+    public @Nullable BlockContext context(
             @NotNull Block block,
             @NotNull RuntimeBlockView view,
             @Nullable Player player
@@ -32,17 +36,32 @@ public final class BlockDataManager {
         if (data == null) {
             data = ChunkEngine.SimpleBlockData.copyOf(view.storedBlock().data());
         }
-        return new BlockEngineBlockContext(definition.adapter(), data, block, player);
+        return new BlockContext(definition.adapter(), data, block, player);
     }
 
-    public void save(@NotNull Block block, @NotNull BlockEngineBlockContext context) {
+    public void save(@NotNull Block block, @NotNull BlockContext context) {
         BlockDefinition definition = BlockRegistry.getBlock(context.blockId());
         if (definition == null) {
             return;
         }
         definition.apiDefinition().state(context.stateId());
 
-        ChunkEngine.Data chunkData = BlockEngineMutationBatcher.data(block.getChunk());
+        RuntimeBlockView previous = ChunkEngine.getBlock(new BlockLocationKey(
+                block.getWorld().getUID(),
+                block.getX(),
+                block.getY(),
+                block.getZ()
+        ));
+        if (BlockEngineEvents.callCancellable(new BlockEngineBlockDataSaveEvent(
+                block,
+                context,
+                previous == null ? null : previous.storedBlock().blockId(),
+                previous == null ? null : previous.storedBlock().stateId()
+        ))) {
+            return;
+        }
+
+        ChunkEngine.Data chunkData = ChunkEngine.data(block.getChunk());
         chunkData.setBlock(
                 block.getX() & 15,
                 block.getY(),
@@ -51,7 +70,13 @@ public final class BlockDataManager {
                 definition.apiDefinition(),
                 definition.adapter().save(context.data())
         );
-        BlockEngineMutationBatcher.changed(block);
+        ChunkEngine.changed(block);
+        BlockEngineEvents.call(new BlockEngineBlockDataSavedEvent(
+                block,
+                context.data(),
+                previous == null ? null : previous.storedBlock().blockId(),
+                previous == null ? null : previous.storedBlock().stateId()
+        ));
     }
 }
 

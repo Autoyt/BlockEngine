@@ -1,6 +1,11 @@
 package dev.auto.blockengine.runtime;
 
-import dev.auto.blockengine.items.BlockEngineItemManager;
+import dev.auto.blockengine.items.ItemManager;
+import dev.auto.blockengine.entity.ManagedDisplayManager;
+import dev.auto.blockengine.api.event.BlockEngineBlockRemovedEvent;
+import dev.auto.blockengine.api.event.BlockEngineModificationEvent;
+import dev.auto.blockengine.event.BlockEngineEvents;
+import dev.auto.blockengine.integrity.BlockIntegrityManager;
 import dev.auto.blockengine.registry.BlockRegistry;
 import dev.auto.blockengine.types.BlockDefinition;
 import dev.auto.blockengine.types.BlockLocationKey;
@@ -13,8 +18,8 @@ import org.bukkit.block.Block;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-public final class BlockEngineBlockRemover {
-    private BlockEngineBlockRemover() {
+public final class BlockRemover {
+    private BlockRemover() {
     }
 
     public static boolean remove(@NotNull Block block, boolean drop) {
@@ -50,6 +55,17 @@ public final class BlockEngineBlockRemover {
             @NotNull Material replacement,
             boolean applyPhysics
     ) {
+        return remove(block, customBlock, drop, replacement, applyPhysics, BlockEngineBlockRemovedEvent.Reason.PLUGIN_REQUEST);
+    }
+
+    public static boolean remove(
+            @NotNull Block block,
+            @NotNull RuntimeBlockView customBlock,
+            boolean drop,
+            @NotNull Material replacement,
+            boolean applyPhysics,
+            @NotNull BlockEngineBlockRemovedEvent.Reason reason
+    ) {
         if (customBlock.storedBlock().unbreakable()) {
             return false;
         }
@@ -59,11 +75,32 @@ public final class BlockEngineBlockRemover {
         }
         sound(block, customBlock);
 
-        ChunkEngine.Data data = BlockEngineMutationBatcher.data(block.getChunk());
+        ChunkEngine.Data data = ChunkEngine.data(block.getChunk());
         data.removeBlock(block.getX() & 15, block.getY(), block.getZ() & 15);
+        ManagedDisplayManager.getInstance().removeBlockAttached(new BlockLocationKey(
+                block.getWorld().getUID(),
+                block.getX(),
+                block.getY(),
+                block.getZ()
+        ));
 
         block.setType(replacement, applyPhysics);
-        BlockEngineMutationBatcher.changed(block);
+        ChunkEngine.changed(block);
+        BlockEngineEvents.call(new BlockEngineBlockRemovedEvent(
+                block,
+                customBlock.storedBlock().blockId(),
+                customBlock.storedBlock().stateId(),
+                reason,
+                drop && customBlock.storedBlock().dropsItem()
+        ));
+        BlockIntegrityManager.getInstance().callEvent(
+                BlockEngineModificationEvent.Action.REMOVE_CUSTOM_BLOCK,
+                block,
+                customBlock.storedBlock().blockId(),
+                customBlock.storedBlock().stateId(),
+                null,
+                null
+        );
         return true;
     }
 
@@ -74,7 +111,7 @@ public final class BlockEngineBlockRemover {
         }
 
         Location location = block.getLocation().add(0.5, 0.5, 0.5);
-        block.getWorld().dropItemNaturally(location, BlockEngineItemManager.create(definition));
+        block.getWorld().dropItemNaturally(location, ItemManager.create(definition));
     }
 
     private static void sound(@NotNull Block block, @NotNull RuntimeBlockView customBlock) {

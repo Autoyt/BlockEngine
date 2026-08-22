@@ -2,6 +2,7 @@ package dev.auto.blockengine.items;
 
 import dev.auto.blockengine.Main;
 import dev.auto.blockengine.registry.BlockRegistry;
+import dev.auto.blockengine.runtime.RuntimeBlockView;
 import dev.auto.blockengine.types.BlockDefinition;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -16,12 +17,12 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.Locale;
 
-public final class BlockEngineItemManager {
+public final class ItemManager {
     private static final NamespacedKey BLOCK_ID_KEY = new NamespacedKey(Main.getInstance(), "block_id");
     private static final NamespacedKey STATE_ID_KEY = new NamespacedKey(Main.getInstance(), "state_id");
     private static final MiniMessage MINI = MiniMessage.miniMessage();
 
-    private BlockEngineItemManager() {
+    private ItemManager() {
     }
 
     public static @NotNull ItemStack create(@NotNull BlockDefinition block) {
@@ -35,14 +36,14 @@ public final class BlockEngineItemManager {
         ItemMeta meta = stack.getItemMeta();
         meta.getPersistentDataContainer().set(BLOCK_ID_KEY, PersistentDataType.STRING, block.id());
         meta.getPersistentDataContainer().set(STATE_ID_KEY, PersistentDataType.STRING, stateId);
-        BlockEngineDisplayItemManager.itemModel(meta, BlockEngineDisplayItemManager.modelKey(
+        itemModel(meta, modelKey(
                 block,
                 stateId
         ));
 
         meta.displayName(name(item.name(), block));
         if (!item.lore().isEmpty()) {
-            meta.lore(item.lore().stream().map(BlockEngineItemManager::rich).toList());
+            meta.lore(item.lore().stream().map(ItemManager::rich).toList());
         }
         if (item.glint()) {
             meta.setEnchantmentGlintOverride(true);
@@ -83,6 +84,30 @@ public final class BlockEngineItemManager {
         }
         BlockDefinition block = BlockRegistry.getBlock(blockId);
         return block != null && block.apiDefinition().item().placeable();
+    }
+
+    public static @NotNull ItemStack display(@NotNull RuntimeBlockView block) {
+        BlockDefinition definition = BlockRegistry.getBlock(block.storedBlock().blockId());
+        if (definition == null) {
+            return new ItemStack(block.displayMaterial());
+        }
+        return display(definition, block.storedBlock().stateId());
+    }
+
+    public static @NotNull ItemStack display(@NotNull BlockDefinition definition, @NotNull String stateId) {
+        ItemStack stack = new ItemStack(definition.apiDefinition().item().material());
+        ItemMeta meta = stack.getItemMeta();
+        itemModel(meta, modelKey(definition, stateId));
+        stack.setItemMeta(meta);
+        return stack;
+    }
+
+    public static @NotNull NamespacedKey modelKey(@NotNull BlockDefinition definition, @NotNull String stateId) {
+        return new NamespacedKey(definition.name().namespace(), "block/" + definition.name().name() + "/" + stateId);
+    }
+
+    static void itemModel(@NotNull ItemMeta meta, @NotNull NamespacedKey key) {
+        meta.setItemModel(key);
     }
 
     private static @NotNull Component name(@Nullable String name, @NotNull BlockDefinition block) {

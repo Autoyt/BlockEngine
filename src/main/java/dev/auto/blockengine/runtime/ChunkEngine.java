@@ -2,16 +2,28 @@ package dev.auto.blockengine.runtime;
 
 import dev.auto.blockengine.Main;
 import dev.auto.blockengine.api.blocks.BlockData;
+import dev.auto.blockengine.api.display.DisplayAudience;
+import dev.auto.blockengine.api.display.DisplayPersistence;
+import dev.auto.blockengine.api.display.DisplaySpec;
+import dev.auto.blockengine.api.event.BlockEngineChunkSaveEvent;
+import dev.auto.blockengine.api.event.BlockEngineChunkSavedEvent;
+import dev.auto.blockengine.entity.ManagedDisplayManager;
+import dev.auto.blockengine.event.BlockEngineEvents;
 import dev.auto.blockengine.types.BlockLocationKey;
 import dev.auto.blockengine.visibility.VisibilityConfig;
+import dev.auto.blockengine.visibility.VisibilityManager;
+import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.World;
 import org.bukkit.block.Block;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.persistence.PersistentDataAdapterContext;
 import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
+import org.bukkit.util.io.BukkitObjectInputStream;
+import org.bukkit.util.io.BukkitObjectOutputStream;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -29,11 +41,17 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
 
 public final class ChunkEngine {
     private static final NamespacedKey CHUNK_DATA_KEY = new NamespacedKey(Main.getInstance(), "chunk_data");
     private static final Map<Key, LoadedChunk> chunks = new HashMap<>();
+    private static final Map<Key, ChunkEdit> pendingChunks = new HashMap<>();
+    private static final Map<BlockLocationKey, Block> changedBlocks = new HashMap<>();
+    private static final List<Runnable> afterFlush = new ArrayList<>();
+    private static boolean flushScheduled;
 
     private ChunkEngine() {
     }
@@ -53,10 +71,13 @@ public final class ChunkEngine {
         }
 
         chunks.put(key, loaded);
+        ManagedDisplayManager.getInstance().loadChunk(key, data);
     }
 
     public static void unload(@NotNull Chunk chunk) {
-        chunks.remove(Key.from(chunk));
+        Key key = Key.from(chunk);
+        chunks.remove(key);
+        ManagedDisplayManager.getInstance().unloadChunk(key);
     }
 
     public static @Nullable LoadedChunk get(@NotNull Key key) {
@@ -80,6 +101,104 @@ public final class ChunkEngine {
         return CHUNK_DATA_KEY;
     }
 
+    public static @NotNull Data data(@NotNull Chunk chunk) {
+        return edit(chunk).data();
+    }
+
+    public static void changed(@NotNull Block block) {
+        changedBlocks.put(location(block), block);
+        edit(block.getChunk());
+        scheduleFlush();
+    }
+
+    public static void changed(@NotNull Chunk chunk) {
+        edit(chunk);
+        scheduleFlush();
+    }
+
+    public static void afterFlush(@NotNull Runnable runnable) {
+        afterFlush.add(runnable);
+        scheduleFlush();
+    }
+
+    public static void flushNow() {
+        if (pendingChunks.isEmpty() && changedBlocks.isEmpty() && afterFlush.isEmpty()) {
+            flushScheduled = false;
+            return;
+        }
+
+        Set<Key> touched = new HashSet<>();
+        for (Map.Entry<Key, ChunkEdit> entry : pendingChunks.entrySet()) {
+            ChunkEdit edit = entry.getValue();
+            int blockCount = edit.data().blocks().size();
+            int displayCount = edit.data().displays().size();
+            boolean empty = edit.data().isEmpty();
+            BlockEngineEvents.call(new BlockEngineChunkSaveEvent(edit.chunk(), blockCount, displayCount, empty));
+            Data.save(edit.chunk(), dataKey(), edit.data());
+            BlockEngineEvents.call(new BlockEngineChunkSavedEvent(edit.chunk(), blockCount, displayCount, empty));
+            load(edit.chunk(), VisibilityManager.getInstance().config());
+            touched.add(entry.getKey());
+        }
+
+        for (Block block : changedBlocks.values()) {
+            BlockUpdates.update(block);
+        }
+
+        if (!touched.isEmpty()) {
+            VisibilityManager.getInstance().refreshPlayersNear(touched);
+        }
+
+        pendingChunks.clear();
+        changedBlocks.clear();
+        flushScheduled = false;
+
+        List<Runnable> callbacks = new ArrayList<>(afterFlush);
+        afterFlush.clear();
+        for (Runnable callback : callbacks) {
+            runAfterFlush(callback);
+        }
+    }
+
+    public static void clear() {
+        pendingChunks.clear();
+        changedBlocks.clear();
+        afterFlush.clear();
+        flushScheduled = false;
+    }
+
+    private static @NotNull ChunkEdit edit(@NotNull Chunk chunk) {
+        Key key = Key.from(chunk);
+        return pendingChunks.computeIfAbsent(key, ignored -> new ChunkEdit(
+                chunk,
+                Data.load(chunk, dataKey())
+        ));
+    }
+
+    private static void scheduleFlush() {
+        if (flushScheduled) {
+            return;
+        }
+        flushScheduled = true;
+        Bukkit.getScheduler().runTask(Main.getInstance(), ChunkEngine::flushNow);
+    }
+
+    private static void runAfterFlush(@NotNull Runnable callback) {
+        try {
+            callback.run();
+        } catch (RuntimeException exception) {
+            Main.getInstance().getLogger().warning("BlockEngine mutation callback failed: " + exception.getMessage());
+        }
+    }
+
+    private static @NotNull BlockLocationKey location(@NotNull Block block) {
+        return new BlockLocationKey(
+                block.getWorld().getUID(),
+                block.getX(),
+                block.getY(),
+                block.getZ()
+        );
+    }
+
     private static boolean isExposed(@NotNull World world, int x, int y, int z, @NotNull VisibilityConfig config) {
         return isOpen(world.getBlockAt(x + 1, y, z), config)
                 || isOpen(world.getBlockAt(x - 1, y, z), config)
@@ -101,6 +220,9 @@ public final class ChunkEngine {
             return true;
         }
         return config.treatNonSolidAsExposed() && !material.isSolid();
+    }
+
+    private record ChunkEdit(@NotNull Chunk chunk, @NotNull Data data) {
     }
 
     public record Key(@NotNull UUID worldId, int x, int z) {
@@ -155,18 +277,23 @@ public final class ChunkEngine {
     }
 
     public static final class Data {
-        public static final int VERSION = 5;
+        public static final int VERSION = 6;
         private static final int MIN_VERSION = 2;
         public static final PersistentDataType<byte[], Data> TYPE = new DataType();
 
         private final @NotNull Map<Integer, StoredBlock> blocks = new LinkedHashMap<>();
+        private final @NotNull Map<UUID, StoredDisplay> displays = new LinkedHashMap<>();
 
         public boolean isEmpty() {
-            return blocks.isEmpty();
+            return blocks.isEmpty() && displays.isEmpty();
         }
 
         public @NotNull Collection<StoredBlock> blocks() {
             return Collections.unmodifiableCollection(blocks.values());
+        }
+
+        public @NotNull Collection<StoredDisplay> displays() {
+            return Collections.unmodifiableCollection(displays.values());
         }
 
         public @Nullable StoredBlock blockAt(int localX, int y, int localZ) {
@@ -190,6 +317,28 @@ public final class ChunkEngine {
 
         public void removeBlock(int localX, int y, int localZ) {
             blocks.remove(packBlockKey(localX, y, localZ));
+        }
+
+        public void setDisplay(@NotNull StoredDisplay display) {
+            displays.put(display.id(), display);
+        }
+
+        public void removeDisplay(@NotNull UUID id) {
+            displays.remove(id);
+        }
+
+        public void setBlockDisplay(int localX, int y, int localZ, @NotNull StoredDisplay display) {
+            StoredBlock block = blockAt(localX, y, localZ);
+            if (block != null) {
+                setBlock(block.withDisplay(display));
+            }
+        }
+
+        public void removeBlockDisplay(int localX, int y, int localZ, @NotNull UUID id) {
+            StoredBlock block = blockAt(localX, y, localZ);
+            if (block != null) {
+                setBlock(block.withoutDisplay(id));
+            }
         }
 
         public static @NotNull Data load(@NotNull Chunk chunk, @NotNull NamespacedKey key) {
@@ -226,13 +375,15 @@ public final class ChunkEngine {
             boolean dropsItem,
             boolean dropInCreative,
             @NotNull SimpleBlockData data,
-            byte @NotNull [] payload
+            byte @NotNull [] payload,
+            @NotNull List<StoredDisplay> displays
     ) {
         public StoredBlock {
             validateLocal(localX, y, localZ);
             Objects.requireNonNull(fallbackBlock, "fallbackBlock");
             Objects.requireNonNull(data, "data");
             payload = payload == null ? new byte[0] : payload.clone();
+            displays = List.copyOf(displays);
         }
 
         public @NotNull String blockId() {
@@ -246,6 +397,31 @@ public final class ChunkEngine {
         @Override
         public byte @NotNull [] payload() {
             return payload.clone();
+        }
+
+        public @NotNull StoredBlock withDisplay(@NotNull StoredDisplay display) {
+            List<StoredDisplay> updated = new ArrayList<>();
+            boolean replaced = false;
+            for (StoredDisplay existing : displays) {
+                if (existing.id().equals(display.id()) || Objects.equals(existing.ownerKey(), display.ownerKey())) {
+                    updated.add(display);
+                    replaced = true;
+                } else {
+                    updated.add(existing);
+                }
+            }
+            if (!replaced) {
+                updated.add(display);
+            }
+            return new StoredBlock(localX, y, localZ, fallbackBlock, hardness, miningSpeed, unbreakable,
+                    dropsItem, dropInCreative, data, payload, updated);
+        }
+
+        public @NotNull StoredBlock withoutDisplay(@NotNull UUID id) {
+            return new StoredBlock(localX, y, localZ, fallbackBlock, hardness, miningSpeed, unbreakable,
+                    dropsItem, dropInCreative, data, payload, displays.stream()
+                    .filter(display -> !display.id().equals(id))
+                    .toList());
         }
 
         public static @NotNull StoredBlock from(
@@ -272,12 +448,16 @@ public final class ChunkEngine {
                     state.dropsItem(),
                     state.dropInCreative(),
                     data,
-                    payload
+                    payload,
+                    List.of()
             );
         }
 
         public @NotNull StoredBlock refreshSnapshot(@NotNull dev.auto.blockengine.api.blocks.BlockDefinition definition) {
-            return from(localX, y, localZ, data, definition, payload);
+            StoredBlock refreshed = from(localX, y, localZ, data, definition, payload);
+            return new StoredBlock(localX, y, localZ, refreshed.fallbackBlock(), refreshed.hardness(), refreshed.miningSpeed(),
+                    refreshed.unbreakable(), refreshed.dropsItem(), refreshed.dropInCreative(), refreshed.data(),
+                    refreshed.payload(), displays);
         }
 
         public @Nullable SimpleBlockData loadData(@NotNull dev.auto.blockengine.types.BlockDefinition definition) {
@@ -294,6 +474,28 @@ public final class ChunkEngine {
                 }
                 return null;
             }
+        }
+    }
+
+    public record StoredDisplay(
+            @NotNull UUID id,
+            @NotNull DisplayPersistence persistence,
+            @Nullable BlockLocationKey owner,
+            @Nullable String ownerKey,
+            @NotNull DisplaySpec spec
+    ) {
+        public StoredDisplay {
+            Objects.requireNonNull(id, "id");
+            Objects.requireNonNull(persistence, "persistence");
+            Objects.requireNonNull(spec, "spec");
+        }
+
+        public static @NotNull StoredDisplay from(@NotNull ManagedDisplayManager.ManagedDisplay display) {
+            return new StoredDisplay(display.id(), display.persistence(), display.owner(), display.ownerKey(), display.spec());
+        }
+
+        public @NotNull StoredDisplay withOwner(@Nullable BlockLocationKey owner) {
+            return new StoredDisplay(id, persistence, owner, ownerKey, spec);
         }
     }
 
@@ -395,6 +597,10 @@ public final class ChunkEngine {
                 for (StoredBlock block : complex.blocks.values()) {
                     writeBlock(out, block);
                 }
+                out.writeInt(complex.displays.size());
+                for (StoredDisplay display : complex.displays.values()) {
+                    writeDisplay(out, display);
+                }
 
                 out.flush();
                 return bytes.toByteArray();
@@ -421,6 +627,12 @@ public final class ChunkEngine {
                     StoredBlock block = readBlock(in, version);
                     data.setBlock(block);
                 }
+                if (version >= 6) {
+                    int displayCount = in.readInt();
+                    for (int i = 0; i < displayCount; i++) {
+                        data.setDisplay(readDisplay(in));
+                    }
+                }
                 return data;
             } catch (IOException exception) {
                 throw new UncheckedIOException("Failed to decode BlockEngine chunk data.", exception);
@@ -442,6 +654,11 @@ public final class ChunkEngine {
             byte[] payload = block.payload();
             out.writeInt(payload.length);
             out.write(payload);
+
+            out.writeInt(block.displays().size());
+            for (StoredDisplay display : block.displays()) {
+                writeDisplay(out, display);
+            }
         }
 
         private static @NotNull StoredBlock readBlock(@NotNull DataInputStream in, int version) throws IOException {
@@ -459,8 +676,163 @@ public final class ChunkEngine {
             boolean dropInCreative = version >= 4 && in.readBoolean();
             SimpleBlockData data = readBlockData(in);
             byte[] payload = in.readNBytes(in.readInt());
+            List<StoredDisplay> displays = new ArrayList<>();
+            if (version >= 6) {
+                int displayCount = in.readInt();
+                for (int i = 0; i < displayCount; i++) {
+                    displays.add(readDisplay(in));
+                }
+            }
 
-            return new StoredBlock(localX, y, localZ, fallbackBlock, hardness, miningSpeed, unbreakable, dropsItem, dropInCreative, data, payload);
+            return new StoredBlock(localX, y, localZ, fallbackBlock, hardness, miningSpeed,
+                    unbreakable, dropsItem, dropInCreative, data, payload, displays);
+        }
+
+        private static void writeDisplay(@NotNull DataOutputStream out, @NotNull StoredDisplay display) throws IOException {
+            out.writeLong(display.id().getMostSignificantBits());
+            out.writeLong(display.id().getLeastSignificantBits());
+            out.writeUTF(display.persistence().name());
+            out.writeBoolean(display.owner() != null);
+            if (display.owner() != null) {
+                writeLocationKey(out, display.owner());
+            }
+            out.writeBoolean(display.ownerKey() != null);
+            if (display.ownerKey() != null) {
+                out.writeUTF(display.ownerKey());
+            }
+            writeSpec(out, display.spec());
+        }
+
+        private static @NotNull StoredDisplay readDisplay(@NotNull DataInputStream in) throws IOException {
+            UUID id = new UUID(in.readLong(), in.readLong());
+            DisplayPersistence persistence = DisplayPersistence.valueOf(in.readUTF());
+            BlockLocationKey owner = in.readBoolean() ? readLocationKey(in) : null;
+            String ownerKey = in.readBoolean() ? in.readUTF() : null;
+            return new StoredDisplay(id, persistence, owner, ownerKey, readSpec(in));
+        }
+
+        private static void writeSpec(@NotNull DataOutputStream out, @NotNull DisplaySpec spec) throws IOException {
+            out.writeLong(spec.worldId().getMostSignificantBits());
+            out.writeLong(spec.worldId().getLeastSignificantBits());
+            out.writeDouble(spec.x());
+            out.writeDouble(spec.y());
+            out.writeDouble(spec.z());
+            out.writeFloat(spec.yaw());
+            out.writeFloat(spec.pitch());
+            writeItemStack(out, spec.itemStack());
+            out.writeBoolean(spec.itemModel() != null);
+            if (spec.itemModel() != null) {
+                out.writeUTF(spec.itemModel().toString());
+            }
+            out.writeByte(spec.displayContext());
+            out.writeInt(spec.brightness());
+            out.writeFloat(spec.scaleX());
+            out.writeFloat(spec.scaleY());
+            out.writeFloat(spec.scaleZ());
+            out.writeFloat(spec.translationX());
+            out.writeFloat(spec.translationY());
+            out.writeFloat(spec.translationZ());
+            out.writeFloat(spec.viewRange());
+            out.writeFloat(spec.leftRotationX());
+            out.writeFloat(spec.leftRotationY());
+            out.writeFloat(spec.leftRotationZ());
+            out.writeFloat(spec.leftRotationW());
+            out.writeFloat(spec.rightRotationX());
+            out.writeFloat(spec.rightRotationY());
+            out.writeFloat(spec.rightRotationZ());
+            out.writeFloat(spec.rightRotationW());
+            out.writeByte(spec.billboard());
+            out.writeInt(spec.transformationInterpolationDelay());
+            out.writeInt(spec.transformationInterpolationDuration());
+            out.writeInt(spec.posRotInterpolationDuration());
+            out.writeFloat(spec.shadowRadius());
+            out.writeFloat(spec.shadowStrength());
+            out.writeFloat(spec.width());
+            out.writeFloat(spec.height());
+            out.writeBoolean(spec.glowing());
+            out.writeBoolean(spec.invisible());
+            out.writeInt(spec.glowColorOverride());
+            out.writeUTF(spec.audience().mode().name());
+            out.writeInt(spec.audience().players().size());
+            for (UUID playerId : spec.audience().players()) {
+                out.writeLong(playerId.getMostSignificantBits());
+                out.writeLong(playerId.getLeastSignificantBits());
+            }
+        }
+
+        private static @NotNull DisplaySpec readSpec(@NotNull DataInputStream in) throws IOException {
+            UUID worldId = new UUID(in.readLong(), in.readLong());
+            double x = in.readDouble();
+            double y = in.readDouble();
+            double z = in.readDouble();
+            float yaw = in.readFloat();
+            float pitch = in.readFloat();
+            DisplaySpec.Builder builder = DisplaySpec.builder(worldId, x, y, z, yaw, pitch);
+            builder.itemStack(readItemStack(in));
+            if (in.readBoolean()) {
+                builder.itemModel(NamespacedKey.fromString(in.readUTF()));
+            }
+            builder.displayContext(in.readByte())
+                    .brightness(in.readInt())
+                    .scale(in.readFloat(), in.readFloat(), in.readFloat())
+                    .translation(in.readFloat(), in.readFloat(), in.readFloat())
+                    .viewRange(in.readFloat())
+                    .leftRotation(in.readFloat(), in.readFloat(), in.readFloat(), in.readFloat())
+                    .rightRotation(in.readFloat(), in.readFloat(), in.readFloat(), in.readFloat())
+                    .billboard(in.readByte())
+                    .transformationInterpolationDelay(in.readInt())
+                    .transformationInterpolationDuration(in.readInt())
+                    .posRotInterpolationDuration(in.readInt())
+                    .shadowRadius(in.readFloat())
+                    .shadowStrength(in.readFloat())
+                    .dimensions(in.readFloat(), in.readFloat())
+                    .glowing(in.readBoolean())
+                    .invisible(in.readBoolean())
+                    .glowColorOverride(in.readInt());
+            DisplayAudience.Mode mode = DisplayAudience.Mode.valueOf(in.readUTF());
+            int audienceSize = in.readInt();
+            Set<UUID> audiencePlayers = new HashSet<>();
+            for (int i = 0; i < audienceSize; i++) {
+                audiencePlayers.add(new UUID(in.readLong(), in.readLong()));
+            }
+            builder.audience(switch (mode) {
+                case EVERYONE -> DisplayAudience.everyone();
+                case INCLUDE -> DisplayAudience.only(audiencePlayers);
+                case EXCLUDE -> DisplayAudience.except(audiencePlayers);
+            });
+            return builder.build();
+        }
+
+        private static void writeLocationKey(@NotNull DataOutputStream out, @NotNull BlockLocationKey key) throws IOException {
+            out.writeLong(key.worldId().getMostSignificantBits());
+            out.writeLong(key.worldId().getLeastSignificantBits());
+            out.writeInt(key.x());
+            out.writeInt(key.y());
+            out.writeInt(key.z());
+        }
+
+        private static @NotNull BlockLocationKey readLocationKey(@NotNull DataInputStream in) throws IOException {
+            return new BlockLocationKey(new UUID(in.readLong(), in.readLong()), in.readInt(), in.readInt(), in.readInt());
+        }
+
+        private static void writeItemStack(@NotNull DataOutputStream out, @NotNull ItemStack stack) throws IOException {
+            ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+            try (BukkitObjectOutputStream objectOut = new BukkitObjectOutputStream(bytes)) {
+                objectOut.writeObject(stack);
+            }
+            byte[] encoded = bytes.toByteArray();
+            out.writeInt(encoded.length);
+            out.write(encoded);
+        }
+
+        private static @NotNull ItemStack readItemStack(@NotNull DataInputStream in) throws IOException {
+            byte[] encoded = in.readNBytes(in.readInt());
+            try (BukkitObjectInputStream objectIn = new BukkitObjectInputStream(new ByteArrayInputStream(encoded))) {
+                Object object = objectIn.readObject();
+                return object instanceof ItemStack stack ? stack : new ItemStack(Material.AIR);
+            } catch (ClassNotFoundException exception) {
+                throw new IOException("Failed to decode display item stack.", exception);
+            }
         }
 
         private static @NotNull Material readMaterial(@NotNull String name) {

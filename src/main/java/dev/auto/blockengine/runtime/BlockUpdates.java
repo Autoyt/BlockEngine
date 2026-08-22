@@ -6,7 +6,7 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
 
-public final class BlockEngineBlockUpdates {
+public final class BlockUpdates {
     private static final List<BlockFace> FACES = List.of(
             BlockFace.NORTH,
             BlockFace.SOUTH,
@@ -16,7 +16,7 @@ public final class BlockEngineBlockUpdates {
             BlockFace.DOWN
     );
 
-    private BlockEngineBlockUpdates() {
+    private BlockUpdates() {
     }
 
     public static void update(@NotNull Block block) {

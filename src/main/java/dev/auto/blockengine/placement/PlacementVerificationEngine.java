@@ -32,7 +32,7 @@ public final class PlacementVerificationEngine {
                     state = State.VANILLA_RULES;
                 }
                 case VANILLA_RULES -> {
-                    if (!BlockEngineVanillaRules.canPlace(
+                    if (!VanillaRules.canPlace(
                             request.target(),
                             request.definition(),
                             request.stateId(),
@@ -44,7 +44,7 @@ public final class PlacementVerificationEngine {
                     state = State.BLOCK_CAN_BUILD_EVENT;
                 }
                 case BLOCK_CAN_BUILD_EVENT -> {
-                    org.bukkit.block.data.BlockData placementData = BlockEngineVanillaRules.placementData(
+                    org.bukkit.block.data.BlockData placementData = VanillaRules.placementData(
                             request.definition(),
                             request.stateId(),
                             request.player(),

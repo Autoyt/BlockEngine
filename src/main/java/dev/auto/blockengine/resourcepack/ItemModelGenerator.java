@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import dev.auto.blockengine.Main;
 import dev.auto.blockengine.api.blocks.BlockDefinition;
+import dev.auto.blockengine.api.resourcepack.GeneratedItemModel;
 import org.bukkit.Material;
 import org.jetbrains.annotations.NotNull;
 
@@ -63,6 +64,37 @@ public final class ItemModelGenerator {
                 .addObject()
                 .put("model", "minecraft:block/" + assetName);
         Main.getJsonMapper().writeValue(blockStatePath.toFile(), blockState);
+    }
+
+    public static void generateItemModel(@NotNull Path root, @NotNull GeneratedItemModel generated) throws IOException {
+        Path modelPath = root.resolve("assets")
+                .resolve(generated.key().getNamespace())
+                .resolve("models")
+                .resolve("item")
+                .resolve(generated.key().getKey() + ".json");
+        Files.createDirectories(modelPath.getParent());
+
+        ObjectNode model = Main.getJsonMapper().createObjectNode();
+        model.put("parent", generated.parent());
+        if (!generated.textures().isEmpty()) {
+            ObjectNode textures = model.putObject("textures");
+            for (var entry : generated.textures().entrySet()) {
+                textures.put(entry.getKey(), normalizeTexture(generated.key(), entry.getValue()));
+            }
+        }
+        Main.getJsonMapper().writeValue(modelPath.toFile(), model);
+
+        Path itemPath = root.resolve("assets")
+                .resolve(generated.key().getNamespace())
+                .resolve("items")
+                .resolve(generated.key().getKey() + ".json");
+        Files.createDirectories(itemPath.getParent());
+
+        ObjectNode rootNode = Main.getJsonMapper().createObjectNode();
+        ObjectNode itemModel = rootNode.putObject("model");
+        itemModel.put("type", "minecraft:model");
+        itemModel.put("model", generated.key().getNamespace() + ":item/" + generated.key().getKey());
+        Main.getJsonMapper().writeValue(itemPath.toFile(), rootNode);
     }
 
     static @NotNull String backingBlockAssetName() {
@@ -169,6 +201,20 @@ public final class ItemModelGenerator {
             normalized = "block/" + normalized;
         }
         return definition.namespace() + ":" + normalized;
+    }
+
+    private static @NotNull String normalizeTexture(@NotNull org.bukkit.NamespacedKey key, @NotNull String path) {
+        if (path.contains(":")) {
+            return path;
+        }
+        String normalized = path.replace('\\', '/').toLowerCase(Locale.ROOT);
+        if (normalized.endsWith(".png")) {
+            normalized = normalized.substring(0, normalized.length() - 4);
+        }
+        if (!normalized.startsWith("block/") && !normalized.startsWith("item/")) {
+            normalized = "item/" + normalized;
+        }
+        return key.getNamespace() + ":" + normalized;
     }
 
     private static void transform(ObjectNode node, double rx, double ry, double rz, double tx, double ty, double tz, double scale) {

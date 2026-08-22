@@ -8,14 +8,14 @@ import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-public final class BlockEngineCreateContext implements BlockCreateContext {
+public final class CreateContext implements BlockCreateContext {
     private final @NotNull Location location;
     private final @Nullable Player player;
     private final @Nullable BlockFace placedAgainst;
     private final @NotNull String blockId;
     private final @NotNull String defaultState;
 
-    public BlockEngineCreateContext(
+    public CreateContext(
             @NotNull Location location,
             @Nullable Player player,
             @Nullable BlockFace placedAgainst,
