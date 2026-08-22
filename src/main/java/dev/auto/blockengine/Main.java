@@ -62,8 +62,6 @@ public final class Main extends JavaPlugin {
         registerCommand("catalog", new CatalogCommand());
         DebugCommands debugCommands = new DebugCommands(this);
         registerCommand("blockengine", new BlockEngineCommand(this, debugCommands));
-        registerCommand("debug", debugCommands);
-        registerCommand("blockenginedebug", debugCommands);
 
         new CatalogListeners();
         new OverideFillCommand();
@@ -118,7 +116,6 @@ public final class Main extends JavaPlugin {
         return Bukkit.isPrimaryThread();
     }
 }
-
 
 
 
