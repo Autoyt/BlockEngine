@@ -19,6 +19,9 @@ import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.entity.Player;
+import org.bukkit.NamespacedKey;
+import org.bukkit.SoundCategory;
+import org.bukkit.World;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -125,6 +128,7 @@ public final class PlacementManager {
         block.setType(Main.getBackingBlock(), false);
         ChunkEngine.changed(block);
 
+        sound(block, definition, data.stateId());
         definition.adapter().onPlace(new BlockContext(definition.adapter(), data, block, player));
         BlockEngineEvents.call(new BlockEngineBlockPlacedEvent(
                 block,
@@ -144,6 +148,34 @@ public final class PlacementManager {
                 data.stateId()
         );
         return true;
+    }
+
+    private void sound(@NotNull Block block, @NotNull BlockDefinition definition, @NotNull String stateId) {
+        String sound = placeSound(definition, stateId);
+        if (sound == null) {
+            return;
+        }
+
+        World world = block.getWorld();
+        world.playSound(
+                block.getLocation().add(0.5, 0.5, 0.5),
+                sound,
+                SoundCategory.BLOCKS,
+                0.8f,
+                1.0f
+        );
+    }
+
+    private @Nullable String placeSound(@NotNull BlockDefinition definition, @NotNull String stateId) {
+        try {
+            String sound = definition.apiDefinition()
+                    .state(stateId)
+                    .sounds()
+                    .place();
+            return sound == null || NamespacedKey.fromString(sound) == null ? null : sound;
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
     }
 }
 

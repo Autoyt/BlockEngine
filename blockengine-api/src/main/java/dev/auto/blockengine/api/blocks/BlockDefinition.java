@@ -279,10 +279,20 @@ public final class BlockDefinition {
     }
 
     public static final class ItemBuilder {
+        private @NotNull Material material = Material.KNOWLEDGE_BOOK;
         private @Nullable String name;
         private final @NotNull List<String> lore = new ArrayList<>();
         private boolean glint = false;
         private boolean placeable = true;
+
+        public @NotNull ItemBuilder material(@NotNull Material material) {
+            Objects.requireNonNull(material, "material");
+            if (!material.isItem()) {
+                throw new IllegalArgumentException("Block item material must be an item material: " + material);
+            }
+            this.material = material;
+            return this;
+        }
 
         public @NotNull ItemBuilder name(@Nullable String name) {
             this.name = name;
@@ -311,7 +321,7 @@ public final class BlockDefinition {
         }
 
         private @NotNull Item build() {
-            return new Item(Material.KNOWLEDGE_BOOK, name, lore, glint, placeable);
+            return new Item(material, name, lore, glint, placeable);
         }
     }
 

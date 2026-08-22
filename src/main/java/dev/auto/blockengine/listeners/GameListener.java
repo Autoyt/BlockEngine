@@ -32,6 +32,7 @@ import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
+import org.bukkit.SoundCategory;
 import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
@@ -53,6 +54,7 @@ import org.bukkit.event.block.BlockPistonExtendEvent;
 import org.bukkit.event.block.BlockPistonRetractEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityChangeBlockEvent;
+import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.player.PlayerInteractEvent;
@@ -102,6 +104,16 @@ public class GameListener implements Listener {
     @EventHandler
     public void onMove(PlayerMoveEvent event) {
         VisibilityManager.getInstance().handleMove(event);
+        Location to = event.getTo();
+        if (to == null || event.getFrom().getBlockX() == to.getBlockX()
+                && event.getFrom().getBlockY() == to.getBlockY()
+                && event.getFrom().getBlockZ() == to.getBlockZ()) {
+            return;
+        }
+        if (!event.getPlayer().isOnGround()) {
+            return;
+        }
+        playCustomSound(block(to.clone().subtract(0.0, 0.1, 0.0).getBlock()), "step");
     }
 
     @EventHandler
@@ -136,6 +148,7 @@ public class GameListener implements Listener {
             return;
         }
         event.setCancelled(true);
+        playCustomSound(block, "hit");
         breakOrStartMining(event.getPlayer(), event.getBlock(), block);
     }
 
@@ -154,6 +167,14 @@ public class GameListener implements Listener {
             event.setCancelled(true);
             breakCustomBlock(event.getBlock(), block, event.getPlayer());
         }
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onFall(EntityDamageEvent event) {
+        if (!(event.getEntity() instanceof Player player) || event.getCause() != EntityDamageEvent.DamageCause.FALL) {
+            return;
+        }
+        playCustomSound(block(player.getLocation().clone().subtract(0.0, 0.1, 0.0).getBlock()), "fall");
     }
 
     @EventHandler
@@ -391,6 +412,10 @@ public class GameListener implements Listener {
         }
 
         session.advance(progressPerTick(session.customBlock()));
+        session.tick();
+        if (session.ticks() % 4 == 0) {
+            playCustomSound(session.customBlock(), "mining");
+        }
         byte stage = stage(session.progress());
         if (session.stage(stage)) {
             sendBreakStage(session, stage);
@@ -462,6 +487,50 @@ public class GameListener implements Listener {
         float hardness = Math.max(0.05f, customBlock.storedBlock().hardness());
         float speed = Math.max(0.05f, customBlock.storedBlock().miningSpeed());
         return Math.min(1.0f, speed / (hardness * 20.0f));
+    }
+
+    private void playCustomSound(@Nullable RuntimeBlockView customBlock, @NotNull String type) {
+        String sound = customSound(customBlock, type);
+        if (sound == null || customBlock == null) {
+            return;
+        }
+        World world = Bukkit.getWorld(customBlock.location().worldId());
+        if (world == null) {
+            return;
+        }
+        world.playSound(
+                new Location(world, customBlock.location().x() + 0.5, customBlock.location().y() + 0.5, customBlock.location().z() + 0.5),
+                sound,
+                SoundCategory.BLOCKS,
+                0.6f,
+                1.0f
+        );
+    }
+
+    private @Nullable String customSound(@Nullable RuntimeBlockView customBlock, @NotNull String type) {
+        if (customBlock == null) {
+            return null;
+        }
+        BlockDefinition definition = BlockRegistry.getBlock(customBlock.storedBlock().blockId());
+        if (definition == null) {
+            return null;
+        }
+
+        try {
+            var sounds = definition.apiDefinition()
+                    .state(customBlock.storedBlock().stateId())
+                    .sounds();
+            String sound = switch (type) {
+                case "hit" -> sounds.hit();
+                case "mining" -> sounds.mining();
+                case "step" -> sounds.step();
+                case "fall" -> sounds.fall();
+                default -> null;
+            };
+            return sound == null || NamespacedKey.fromString(sound) == null ? null : sound;
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
     }
 
     private boolean sameStoredBlock(@NotNull RuntimeBlockView current, @NotNull RuntimeBlockView original) {
@@ -628,6 +697,7 @@ public class GameListener implements Listener {
         private final int animationId;
         private byte stage = -1;
         private float progress;
+        private int ticks;
         private @Nullable BukkitTask task;
         private @Nullable VirtualItemDisplay overlay;
 
@@ -672,6 +742,14 @@ public class GameListener implements Listener {
 
         private void advance(float amount) {
             progress = Math.min(1.0f, progress + amount);
+        }
+
+        private void tick() {
+            ticks++;
+        }
+
+        private int ticks() {
+            return ticks;
         }
 
         private void task(@NotNull BukkitTask task) {

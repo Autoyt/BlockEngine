@@ -16,6 +16,7 @@ import dev.auto.blockengine.integrity.BlockIntegrityManager;
 import dev.auto.blockengine.listeners.GameListener;
 import dev.auto.blockengine.registry.DiscoverySystem;
 import dev.auto.blockengine.resourcepack.ResourcePackManager;
+import dev.auto.blockengine.runtime.BlockTicker;
 import dev.auto.blockengine.runtime.ChunkEngine;
 import dev.auto.blockengine.visibility.VisibilityManager;
 import dev.auto.blockengine.world.ManagedWorld;
@@ -59,6 +60,7 @@ public final class Main extends JavaPlugin {
         ResourcePackManager.getInstance().reload();
         VisibilityManager.getInstance().register(this);
         BlockIntegrityManager.getInstance().register(this);
+        BlockTicker.getInstance().register(this);
         registerCommand("catalog", new CatalogCommand());
         DebugCommands debugCommands = new DebugCommands(this);
         BlockEngineCommand blockEngineCommand = new BlockEngineCommand(this, debugCommands);
@@ -90,6 +92,7 @@ public final class Main extends JavaPlugin {
         CatalogListeners.cleanup();
         ResourcePackManager.getInstance().stop();
         BlockIntegrityManager.getInstance().stop();
+        BlockTicker.getInstance().stop();
         ManagedDisplayManager.getInstance().clear();
         BlockEngine.clearManagedDisplayService();
         BlockEngine.clearManagedWorldFactory();
@@ -118,5 +121,4 @@ public final class Main extends JavaPlugin {
         return Bukkit.isPrimaryThread();
     }
 }
-
 
