@@ -1,6 +1,6 @@
 param(
     [string] $Path = "src/main/resources/assets/pfp.png",
-    [int] $Size = 256
+    [int] $Size = 32
 )
 
 $ErrorActionPreference = "Stop"
