@@ -19,7 +19,10 @@ final class ExplosionImpactCalculator {
     }
 
     static @NotNull Set<BlockLocationKey> affectedByExplosion(@NotNull Location origin, @NotNull List<Block> blocks) {
-        return affectedByExplosion(origin, radius(origin, blocks));
+        double radius = radius(origin, blocks);
+        Set<BlockLocationKey> affected = affectedByExplosion(origin, radius);
+        affected.addAll(storedCustomBlocksInRange(origin, radius));
+        return affected;
     }
 
     private static double radius(@NotNull Location origin, @NotNull List<Block> blocks) {
@@ -48,6 +51,31 @@ final class ExplosionImpactCalculator {
                         continue;
                     }
                     ray(origin, world, affected, power, dir(x, samples), dir(y, samples), dir(z, samples));
+                }
+            }
+        }
+        return affected;
+    }
+
+    private static @NotNull Set<BlockLocationKey> storedCustomBlocksInRange(@NotNull Location origin, double radius) {
+        Set<BlockLocationKey> affected = new HashSet<>();
+        World world = origin.getWorld();
+        if (world == null) {
+            return affected;
+        }
+
+        double radiusSquared = radius * radius;
+        for (ChunkEngine.LoadedChunk chunk : ChunkEngine.chunks()) {
+            for (RuntimeBlockView block : chunk.blocks()) {
+                BlockLocationKey location = block.location();
+                if (!location.worldId().equals(world.getUID())) {
+                    continue;
+                }
+                double dx = location.x() + 0.5 - origin.getX();
+                double dy = location.y() + 0.5 - origin.getY();
+                double dz = location.z() + 0.5 - origin.getZ();
+                if (dx * dx + dy * dy + dz * dz <= radiusSquared) {
+                    affected.add(location);
                 }
             }
         }
