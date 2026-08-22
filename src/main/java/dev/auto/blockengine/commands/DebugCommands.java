@@ -24,6 +24,7 @@ import io.papermc.paper.command.brigadier.CommandSourceStack;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.event.ClickEvent;
 import net.kyori.adventure.text.event.HoverEvent;
+import net.kyori.adventure.text.format.TextColor;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Chunk;
@@ -281,7 +282,7 @@ public final class DebugCommands implements BasicCommand, Listener {
             return;
         }
 
-        String target = args.length >= 2 ? args[1].toLowerCase(Locale.ROOT) : "events";
+        String target = args.length >= 2 ? args[1].toLowerCase(Locale.ROOT) : "overall";
         if (target.equals("overall")) {
             perfOverview(sender, target);
             return;
@@ -309,14 +310,23 @@ public final class DebugCommands implements BasicCommand, Listener {
 
     private void perfOverview(@NotNull CommandSender sender, @NotNull String target) {
         PerformanceOverview overview = overview();
+        TimingSnapshot commands = timings.snapshot("commands");
+        TimingSnapshot validation = timings.snapshot("validation");
+        ActivitySnapshot placement = activity.snapshot("placement");
+        ActivitySnapshot events = activity.snapshot("events");
+        ActivitySnapshot chunkSave = activity.snapshot("chunk-save");
+
         BlockEngineChat.send(sender, DebugStyle.header("performance overview"));
+        BlockEngineChat.send(sender, DebugStyle.row("health", perfHealth(commands, validation, events)));
         BlockEngineChat.send(sender, DebugStyle.row("tracking", DebugStyle.status(
                 performanceTrackingEnabled ? "enabled" : "disabled",
                 performanceTrackingEnabled
         )));
-        BlockEngineChat.send(sender, DebugStyle.row("bossbar", sender instanceof Player
-                ? DebugStyle.status("live " + target, true)
+        BlockEngineChat.send(sender, DebugStyle.row("bossbar", sender instanceof Player player
+                ? DebugStyle.status(liveProfiles.containsKey(player.getUniqueId()) ? "running" : "ready", true)
                 : DebugStyle.status("player only", false)));
+
+        BlockEngineChat.send(sender, DebugStyle.header("runtime load"));
         BlockEngineChat.send(sender, DebugStyle.row("loaded chunks", overview.loadedChunks()));
         BlockEngineChat.send(sender, DebugStyle.row("stored blocks", overview.storedBlocks()));
         BlockEngineChat.send(sender, DebugStyle.row("exposed blocks", overview.exposedBlocks()));
@@ -324,30 +334,74 @@ public final class DebugCommands implements BasicCommand, Listener {
         BlockEngineChat.send(sender, DebugStyle.row("registered blocks", BlockRegistry.getBlocks().size()));
         BlockEngineChat.send(sender, DebugStyle.row("namespaces", namespaces().size()));
         BlockEngineChat.send(sender, DebugStyle.row("resource packs", ResourcePackManager.getInstance().packIds().size()));
-        perfTiming(sender, "commands", timings.snapshot("commands"));
-        perfTiming(sender, "validation", timings.snapshot("validation"));
-        perfActivity(sender, "placement", activity.snapshot("placement"));
-        perfActivity(sender, "events", activity.snapshot("events"));
-        perfActivity(sender, "chunk-save", activity.snapshot("chunk-save"));
-        BlockEngineChat.send(sender, DebugStyle.action("stop bossbar", "/perf stop", "Stop the live performance bossbar")
+
+        BlockEngineChat.send(sender, DebugStyle.header("process phases"));
+        perfTiming(sender, "commands", commands);
+        perfTiming(sender, "validation", validation);
+        perfTiming(sender, "chunk flush", timings.snapshot("flush"));
+        perfTiming(sender, "visibility", timings.snapshot("visibility"));
+        perfTiming(sender, "displays", timings.snapshot("displays"));
+
+        BlockEngineChat.send(sender, DebugStyle.header("event phases"));
+        perfActivity(sender, "placement", placement);
+        perfActivity(sender, "events", events);
+        perfActivity(sender, "chunk-save", chunkSave);
+
+        BlockEngineChat.send(sender, DebugStyle.header("controls"));
+        BlockEngineChat.send(sender, DebugStyle.action("start bossbar", "/be debug perf live " + target, "Start the live performance bossbar")
                 .append(Component.space())
-                .append(DebugStyle.action("events tail", "/be debug events tail", "Show recent event tail"))
+                .append(DebugStyle.action("stop bossbar", "/be debug perf stop", "Stop the live performance bossbar"))
                 .append(Component.space())
-                .append(DebugStyle.action("debug perf", "/be debug perf overall", "Open debug performance view")));
+                .append(DebugStyle.action(performanceTrackingEnabled ? "tracking off" : "tracking on",
+                        "/be debug perf " + (performanceTrackingEnabled ? "off" : "on"),
+                        "Toggle BlockEngine performance recording")));
+        BlockEngineChat.send(sender, DebugStyle.action("live overall", "/be debug perf live overall", "Show overall live performance")
+                .append(Component.space())
+                .append(DebugStyle.action("live validation", "/be debug perf live validation", "Show validation live performance")
+                )
+                .append(Component.space())
+                .append(DebugStyle.action("live events", "/be debug perf live events", "Show event live performance")));
+        BlockEngineChat.send(sender,
+                DebugStyle.action("events tail", "/be debug events tail", "Show recent event tail")
+                .append(Component.space())
+                .append(DebugStyle.action("debug info", "/be debug info", "Open BlockEngine debug info")));
+    }
+
+    private @NotNull Component perfHealth(
+            @NotNull TimingSnapshot commands,
+            @NotNull TimingSnapshot validation,
+            @NotNull ActivitySnapshot events
+    ) {
+        long worst = Math.max(commands.avgNanos(), validation.avgNanos());
+        boolean good = worst <= 1_000_000L;
+        boolean active = events.active() || commands.samples() > 0 || validation.samples() > 0;
+        String label = !performanceTrackingEnabled ? "tracking disabled"
+                : !active ? "idle"
+                : good ? "healthy"
+                : worst <= 5_000_000L ? "warm" : "slow";
+        return DebugStyle.status(label, performanceTrackingEnabled && (good || !active));
     }
 
     private void perfTiming(@NotNull CommandSender sender, @NotNull String label, @NotNull TimingSnapshot snapshot) {
         if (snapshot.samples() <= 0) {
-            BlockEngineChat.send(sender, DebugStyle.row(label, DebugStyle.status("idle", false)));
+            BlockEngineChat.send(sender, DebugStyle.row(label, DebugStyle.status("idle", false)
+                    .append(Component.space())
+                    .append(DebugStyle.dim("no samples"))));
             return;
         }
         BlockEngineChat.send(sender, DebugStyle.row(label,
-                "avg " + ms(snapshot.avgNanos()) + "ms"
-                        + " | p95 " + ms(snapshot.p95Nanos()) + "ms"
-                        + " | max " + ms(snapshot.maxNanos()) + "ms"
-                        + " | " + ops(snapshot) + "/s"
-                        + " | n " + snapshot.samples()
-                        + " | last " + age(snapshot.lastSampleAgeNanos())));
+                Component.text("avg ", BlockEngineChat.GRAY)
+                        .append(Component.text(ms(snapshot.avgNanos()) + "ms", speedTextColor(snapshot.avgNanos())))
+                        .append(Component.text(" | p95 ", BlockEngineChat.GRAY))
+                        .append(Component.text(ms(snapshot.p95Nanos()) + "ms", speedTextColor(snapshot.p95Nanos())))
+                        .append(Component.text(" | max ", BlockEngineChat.GRAY))
+                        .append(Component.text(ms(snapshot.maxNanos()) + "ms", speedTextColor(snapshot.maxNanos())))
+                        .append(Component.text(" | speed ", BlockEngineChat.GRAY))
+                        .append(DebugStyle.value(ops(snapshot) + "/s"))
+                        .append(Component.text(" | samples ", BlockEngineChat.GRAY))
+                        .append(DebugStyle.value(snapshot.samples()))
+                        .append(Component.text(" | last ", BlockEngineChat.GRAY))
+                        .append(DebugStyle.value(age(snapshot.lastSampleAgeNanos())))));
     }
 
     private void perfActivity(@NotNull CommandSender sender, @NotNull String label, @NotNull ActivitySnapshot snapshot) {
@@ -700,6 +754,17 @@ public final class DebugCommands implements BasicCommand, Listener {
             return ChatColor.YELLOW;
         }
         return ChatColor.GREEN;
+    }
+
+    private @NotNull TextColor speedTextColor(long nanos) {
+        double ms = nanos / 1_000_000.0;
+        if (ms > 5.0) {
+            return BlockEngineChat.ERROR;
+        }
+        if (ms > 1.0) {
+            return BlockEngineChat.WARNING;
+        }
+        return BlockEngineChat.SUCCESS;
     }
 
     private void stopLive(@NotNull Player player) {

@@ -29,11 +29,10 @@ public final class BlockEngineChat {
     }
 
     public static void send(@NotNull CommandSender sender, @NotNull Component message) {
-        sender.sendMessage(prefix()
-                .append(Component.space()
-                        .clickEvent(null)
-                        .hoverEvent(null))
-                .append(message));
+        sender.sendMessage(Component.empty()
+                .append(prefix())
+                .append(Component.space())
+                .append(message.clickEvent(null).hoverEvent(null)));
     }
 
     public static void success(@NotNull CommandSender sender, @NotNull String message) {
@@ -53,11 +52,11 @@ public final class BlockEngineChat {
     }
 
     public static @NotNull Component prefix() {
-        return Component.text("[", DARK_GRAY)
+        return Component.empty().append(Component.text("[", DARK_GRAY)
                 .append(Component.text("BlockEngine", ORANGE).decorate(TextDecoration.BOLD))
                 .append(Component.text("]", DARK_GRAY))
                 .clickEvent(ClickEvent.runCommand("/be info"))
-                .hoverEvent(HoverEvent.showText(Component.text("Open BlockEngine info", ORANGE_LIGHT)));
+                .hoverEvent(HoverEvent.showText(Component.text("Open BlockEngine info", ORANGE_LIGHT))));
     }
 
     public static @NotNull Component header(@NotNull String title) {
@@ -87,10 +86,10 @@ public final class BlockEngineChat {
             @NotNull String command,
             @NotNull String hover
     ) {
-        return Component.text(label, ORANGE_LIGHT)
+        return Component.empty().append(Component.text(label, ORANGE_LIGHT)
                 .decorate(TextDecoration.UNDERLINED)
                 .clickEvent(ClickEvent.runCommand(command))
-                .hoverEvent(HoverEvent.showText(Component.text(hover, ORANGE_LIGHT)));
+                .hoverEvent(HoverEvent.showText(Component.text(hover, ORANGE_LIGHT))));
     }
 
     public static @NotNull Component pluginName(@NotNull String namespace) {
