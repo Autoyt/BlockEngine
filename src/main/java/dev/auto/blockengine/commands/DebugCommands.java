@@ -64,8 +64,8 @@ public final class DebugCommands implements BasicCommand, Listener {
 
     private final Main plugin;
     private final Map<UUID, LiveProfile> liveProfiles = new HashMap<>();
-    private final Map<String, Long> lastEventNanos = new HashMap<>();
     private final TimingRegistry timings = new TimingRegistry();
+    private final ActivityRegistry activity = new ActivityRegistry();
     private final Queue<String> eventTail = new ArrayDeque<>();
     private boolean eventTailEnabled;
 
@@ -241,12 +241,21 @@ public final class DebugCommands implements BasicCommand, Listener {
 
         String target = args.length >= 2 ? args[1].toLowerCase(Locale.ROOT) : "events";
         TimingSnapshot snapshot = timings.snapshot(target);
+        ActivitySnapshot activitySnapshot = activity.snapshot(target);
         BlockEngineChat.send(sender, DebugStyle.header("profile " + target));
-        BlockEngineChat.send(sender, DebugStyle.row("process avg", ms(snapshot.avgNanos()) + "ms"));
-        BlockEngineChat.send(sender, DebugStyle.row("process p95", ms(snapshot.p95Nanos()) + "ms"));
-        BlockEngineChat.send(sender, DebugStyle.row("process max", ms(snapshot.maxNanos()) + "ms"));
-        BlockEngineChat.send(sender, DebugStyle.row("samples", snapshot.samples()));
-        BlockEngineChat.send(sender, DebugStyle.row("speed", ops(snapshot) + " ops/s"));
+        if (snapshot.samples() > 0) {
+            BlockEngineChat.send(sender, DebugStyle.row("process avg", ms(snapshot.avgNanos()) + "ms"));
+            BlockEngineChat.send(sender, DebugStyle.row("process p95", ms(snapshot.p95Nanos()) + "ms"));
+            BlockEngineChat.send(sender, DebugStyle.row("process max", ms(snapshot.maxNanos()) + "ms"));
+            BlockEngineChat.send(sender, DebugStyle.row("samples", snapshot.samples()));
+            BlockEngineChat.send(sender, DebugStyle.row("last sample", age(snapshot.lastSampleAgeNanos())));
+            BlockEngineChat.send(sender, DebugStyle.row("speed", ops(snapshot) + " ops/s"));
+        } else {
+            BlockEngineChat.send(sender, DebugStyle.row("process", DebugStyle.status("idle", false)));
+        }
+        BlockEngineChat.send(sender, DebugStyle.row("event rate", rate(activitySnapshot) + " events/s"));
+        BlockEngineChat.send(sender, DebugStyle.row("events", activitySnapshot.samples()));
+        BlockEngineChat.send(sender, DebugStyle.row("last event", age(activitySnapshot.lastEventAgeNanos())));
         BlockEngineChat.send(sender, DebugStyle.action("bossbar", "/blockengine perf live " + target, "Show live bossbar profile")
                 .append(Component.space())
                 .append(DebugStyle.action("stop", "/blockengine perf stop", "Stop live bossbar profile")));
@@ -501,19 +510,41 @@ public final class DebugCommands implements BasicCommand, Listener {
 
     private void startLive(@NotNull Player player, @NotNull String target) {
         stopLive(player);
-        BossBar bar = Bukkit.createBossBar(bossBarTitle(target, timings.snapshot(target)), BarColor.GREEN, BarStyle.SOLID);
+        BossBar bar = Bukkit.createBossBar(bossBarTitle(target), BarColor.GREEN, BarStyle.SOLID);
         bar.addPlayer(player);
         BukkitTask task = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
             TimingSnapshot snapshot = timings.snapshot(target);
-            double avgMs = snapshot.avgNanos() / 1_000_000.0;
-            bar.setColor(avgMs > 5.0 ? BarColor.RED : avgMs > 1.0 ? BarColor.YELLOW : BarColor.GREEN);
-            bar.setProgress(Math.max(0.05, Math.min(1.0, avgMs / 10.0)));
-            bar.setTitle(bossBarTitle(target, snapshot));
+            ActivitySnapshot activitySnapshot = activity.snapshot(target);
+            if (snapshot.samples() > 0) {
+                double avgMs = snapshot.avgNanos() / 1_000_000.0;
+                bar.setColor(snapshot.stale() ? BarColor.WHITE : avgMs > 5.0 ? BarColor.RED : avgMs > 1.0 ? BarColor.YELLOW : BarColor.GREEN);
+                bar.setProgress(snapshot.stale() ? 0.05 : Math.max(0.05, Math.min(1.0, avgMs / 10.0)));
+            } else {
+                bar.setColor(activitySnapshot.active() ? BarColor.GREEN : BarColor.WHITE);
+                bar.setProgress(Math.max(0.05, Math.min(1.0, activitySnapshot.ratePerSecond() / 20.0)));
+            }
+            bar.setTitle(bossBarTitle(target, snapshot, activitySnapshot));
         }, 1L, 20L);
         liveProfiles.put(player.getUniqueId(), new LiveProfile(bar, task));
     }
 
-    private @NotNull String bossBarTitle(@NotNull String target, @NotNull TimingSnapshot snapshot) {
+    private @NotNull String bossBarTitle(@NotNull String target) {
+        return bossBarTitle(target, timings.snapshot(target), activity.snapshot(target));
+    }
+
+    private @NotNull String bossBarTitle(@NotNull String target, @NotNull TimingSnapshot snapshot,
+                                         @NotNull ActivitySnapshot activitySnapshot) {
+        if (snapshot.samples() <= 0) {
+            return ChatColor.GOLD + "" + ChatColor.BOLD + "BlockEngine "
+                    + ChatColor.DARK_GRAY + "» "
+                    + ChatColor.YELLOW + target
+                    + ChatColor.DARK_GRAY + " | "
+                    + ChatColor.GRAY + "rate " + ChatColor.GREEN + rate(activitySnapshot) + "/s"
+                    + ChatColor.DARK_GRAY + " | "
+                    + ChatColor.GRAY + "events " + ChatColor.WHITE + activitySnapshot.samples()
+                    + ChatColor.DARK_GRAY + " | "
+                    + ChatColor.GRAY + "last " + ChatColor.WHITE + age(activitySnapshot.lastEventAgeNanos());
+        }
         ChatColor speedColor = speedColor(snapshot.avgNanos());
         return ChatColor.GOLD + "" + ChatColor.BOLD + "BlockEngine "
                 + ChatColor.DARK_GRAY + "» "
@@ -527,7 +558,9 @@ public final class DebugCommands implements BasicCommand, Listener {
                 + ChatColor.DARK_GRAY + " | "
                 + ChatColor.GRAY + "ops " + ChatColor.WHITE + ops(snapshot) + "/s"
                 + ChatColor.DARK_GRAY + " | "
-                + ChatColor.GRAY + "n " + ChatColor.WHITE + snapshot.samples();
+                + ChatColor.GRAY + "n " + ChatColor.WHITE + snapshot.samples()
+                + ChatColor.DARK_GRAY + " | "
+                + ChatColor.GRAY + "last " + ChatColor.WHITE + age(snapshot.lastSampleAgeNanos());
     }
 
     private @NotNull ChatColor speedColor(long nanos) {
@@ -597,9 +630,10 @@ public final class DebugCommands implements BasicCommand, Listener {
     }
 
     private void recordEvent(@NotNull String target, @NotNull String text) {
-        long now = System.nanoTime();
-        Long previous = lastEventNanos.put(target, now);
-        timings.record(target, previous == null ? 0L : now - previous);
+        activity.record(target);
+        if (!target.equals("events")) {
+            activity.record("events");
+        }
         if (!eventTailEnabled) {
             return;
         }
@@ -727,16 +761,33 @@ public final class DebugCommands implements BasicCommand, Listener {
         return String.format(Locale.ROOT, "%.2f", 1_000_000_000.0 / snapshot.avgNanos());
     }
 
+    private static @NotNull String rate(@NotNull ActivitySnapshot snapshot) {
+        return String.format(Locale.ROOT, "%.2f", snapshot.ratePerSecond());
+    }
+
+    private static @NotNull String age(long nanos) {
+        if (nanos < 0L) {
+            return "never";
+        }
+        if (nanos < 1_000_000_000L) {
+            return ms(nanos) + "ms";
+        }
+        return String.format(Locale.ROOT, "%.1fs", nanos / 1_000_000_000.0);
+    }
+
     private record LiveProfile(@NotNull BossBar bar, @NotNull BukkitTask task) {
     }
 
     private static final class TimingRegistry {
         private static final int WINDOW = 120;
+        private static final long STALE_NANOS = 5_000_000_000L;
         private final Map<String, ArrayDeque<Long>> samples = new HashMap<>();
+        private final Map<String, Long> lastRecorded = new HashMap<>();
 
         private void record(@NotNull String target, long nanos) {
             ArrayDeque<Long> queue = samples.computeIfAbsent(target, ignored -> new ArrayDeque<>());
             queue.add(nanos);
+            lastRecorded.put(target, System.nanoTime());
             while (queue.size() > WINDOW) {
                 queue.poll();
             }
@@ -745,7 +796,7 @@ public final class DebugCommands implements BasicCommand, Listener {
         private @NotNull TimingSnapshot snapshot(@NotNull String target) {
             List<Long> values = new ArrayList<>(samples.getOrDefault(target, new ArrayDeque<>()));
             if (values.isEmpty()) {
-                return new TimingSnapshot(0, 0, 0, 0);
+                return new TimingSnapshot(0, 0, 0, 0, -1L);
             }
             values.sort(Long::compareTo);
             long total = 0;
@@ -755,11 +806,53 @@ public final class DebugCommands implements BasicCommand, Listener {
                 max = Math.max(max, value);
             }
             long p95 = values.get(Math.min(values.size() - 1, (int) Math.floor(values.size() * 0.95)));
-            return new TimingSnapshot(values.size(), total / values.size(), p95, max);
+            long lastAge = System.nanoTime() - lastRecorded.getOrDefault(target, System.nanoTime());
+            return new TimingSnapshot(values.size(), total / values.size(), p95, max, lastAge);
         }
     }
 
-    private record TimingSnapshot(int samples, long avgNanos, long p95Nanos, long maxNanos) {
+    private record TimingSnapshot(int samples, long avgNanos, long p95Nanos, long maxNanos, long lastSampleAgeNanos) {
+        private boolean stale() {
+            return lastSampleAgeNanos > TimingRegistry.STALE_NANOS;
+        }
+    }
+
+    private static final class ActivityRegistry {
+        private static final int WINDOW = 240;
+        private static final long WINDOW_NANOS = 10_000_000_000L;
+        private static final long ACTIVE_NANOS = 2_000_000_000L;
+        private final Map<String, ArrayDeque<Long>> samples = new HashMap<>();
+
+        private void record(@NotNull String target) {
+            long now = System.nanoTime();
+            ArrayDeque<Long> queue = samples.computeIfAbsent(target, ignored -> new ArrayDeque<>());
+            queue.add(now);
+            trim(queue, now);
+        }
+
+        private @NotNull ActivitySnapshot snapshot(@NotNull String target) {
+            long now = System.nanoTime();
+            ArrayDeque<Long> queue = samples.getOrDefault(target, new ArrayDeque<>());
+            trim(queue, now);
+            if (queue.isEmpty()) {
+                return new ActivitySnapshot(0, -1L, 0.0);
+            }
+            long last = queue.peekLast() == null ? now : queue.peekLast();
+            return new ActivitySnapshot(queue.size(), now - last, queue.size() / (WINDOW_NANOS / 1_000_000_000.0));
+        }
+
+        private void trim(@NotNull ArrayDeque<Long> queue, long now) {
+            long cutoff = now - WINDOW_NANOS;
+            while (!queue.isEmpty() && (queue.peekFirst() < cutoff || queue.size() > WINDOW)) {
+                queue.poll();
+            }
+        }
+    }
+
+    private record ActivitySnapshot(int samples, long lastEventAgeNanos, double ratePerSecond) {
+        private boolean active() {
+            return lastEventAgeNanos >= 0L && lastEventAgeNanos <= ActivityRegistry.ACTIVE_NANOS;
+        }
     }
 
     private static final class DebugStyle {
