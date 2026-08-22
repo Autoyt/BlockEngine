@@ -136,7 +136,7 @@ public class GameListener implements Listener {
             return;
         }
         event.setCancelled(true);
-        startMining(event.getPlayer(), event.getBlock(), block);
+        breakOrStartMining(event.getPlayer(), event.getBlock(), block);
     }
 
     @EventHandler
@@ -269,7 +269,7 @@ public class GameListener implements Listener {
         if (event.getAction() == Action.LEFT_CLICK_BLOCK) {
             event.setCancelled(true);
             if (!block.storedBlock().unbreakable()) {
-                startMining(event.getPlayer(), event.getClickedBlock(), block);
+                breakOrStartMining(event.getPlayer(), event.getClickedBlock(), block);
             }
             return;
         }
@@ -359,6 +359,19 @@ public class GameListener implements Listener {
         MiningSession session = new MiningSession(player, block, customBlock);
         session.task(Bukkit.getScheduler().runTaskTimer(Main.getInstance(), () -> tickMining(session), 1L, 1L));
         miningSessions.put(player.getUniqueId(), session);
+    }
+
+    private void breakOrStartMining(@NotNull Player player, @NotNull Block block, @NotNull RuntimeBlockView customBlock) {
+        if (player.getGameMode() != GameMode.CREATIVE) {
+            startMining(player, block, customBlock);
+            return;
+        }
+
+        stopMining(player, block);
+        RuntimeBlockView current = block(block);
+        if (current != null && sameStoredBlock(current, customBlock)) {
+            breakCustomBlock(block, current, player);
+        }
     }
 
     private void tickMining(@NotNull MiningSession session) {
