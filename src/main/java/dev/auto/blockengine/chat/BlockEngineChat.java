@@ -29,7 +29,11 @@ public final class BlockEngineChat {
     }
 
     public static void send(@NotNull CommandSender sender, @NotNull Component message) {
-        sender.sendMessage(prefix().append(Component.space()).append(message));
+        sender.sendMessage(prefix()
+                .append(Component.space()
+                        .clickEvent(null)
+                        .hoverEvent(null))
+                .append(message));
     }
 
     public static void success(@NotNull CommandSender sender, @NotNull String message) {

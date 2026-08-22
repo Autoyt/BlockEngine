@@ -25,6 +25,7 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.event.ClickEvent;
 import net.kyori.adventure.text.event.HoverEvent;
 import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
 import org.bukkit.Chunk;
 import org.bukkit.boss.BarColor;
 import org.bukkit.boss.BarStyle;
@@ -500,21 +501,44 @@ public final class DebugCommands implements BasicCommand, Listener {
 
     private void startLive(@NotNull Player player, @NotNull String target) {
         stopLive(player);
-        BossBar bar = Bukkit.createBossBar("BlockEngine " + target, BarColor.GREEN, BarStyle.SOLID);
+        BossBar bar = Bukkit.createBossBar(bossBarTitle(target, timings.snapshot(target)), BarColor.GREEN, BarStyle.SOLID);
         bar.addPlayer(player);
         BukkitTask task = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
             TimingSnapshot snapshot = timings.snapshot(target);
             double avgMs = snapshot.avgNanos() / 1_000_000.0;
             bar.setColor(avgMs > 5.0 ? BarColor.RED : avgMs > 1.0 ? BarColor.YELLOW : BarColor.GREEN);
             bar.setProgress(Math.max(0.05, Math.min(1.0, avgMs / 10.0)));
-            bar.setTitle("BlockEngine " + target
-                    + " | avg " + ms(snapshot.avgNanos())
-                    + "ms | p95 " + ms(snapshot.p95Nanos())
-                    + "ms | max " + ms(snapshot.maxNanos())
-                    + "ms | " + ops(snapshot) + "/s"
-                    + " | n " + snapshot.samples());
+            bar.setTitle(bossBarTitle(target, snapshot));
         }, 1L, 20L);
         liveProfiles.put(player.getUniqueId(), new LiveProfile(bar, task));
+    }
+
+    private @NotNull String bossBarTitle(@NotNull String target, @NotNull TimingSnapshot snapshot) {
+        ChatColor speedColor = speedColor(snapshot.avgNanos());
+        return ChatColor.GOLD + "" + ChatColor.BOLD + "BlockEngine "
+                + ChatColor.DARK_GRAY + "» "
+                + ChatColor.YELLOW + target
+                + ChatColor.DARK_GRAY + " | "
+                + ChatColor.GRAY + "avg " + speedColor + ms(snapshot.avgNanos()) + "ms"
+                + ChatColor.DARK_GRAY + " | "
+                + ChatColor.GRAY + "p95 " + speedColor(snapshot.p95Nanos()) + ms(snapshot.p95Nanos()) + "ms"
+                + ChatColor.DARK_GRAY + " | "
+                + ChatColor.GRAY + "max " + speedColor(snapshot.maxNanos()) + ms(snapshot.maxNanos()) + "ms"
+                + ChatColor.DARK_GRAY + " | "
+                + ChatColor.GRAY + "ops " + ChatColor.WHITE + ops(snapshot) + "/s"
+                + ChatColor.DARK_GRAY + " | "
+                + ChatColor.GRAY + "n " + ChatColor.WHITE + snapshot.samples();
+    }
+
+    private @NotNull ChatColor speedColor(long nanos) {
+        double ms = nanos / 1_000_000.0;
+        if (ms > 5.0) {
+            return ChatColor.RED;
+        }
+        if (ms > 1.0) {
+            return ChatColor.YELLOW;
+        }
+        return ChatColor.GREEN;
     }
 
     private void stopLive(@NotNull Player player) {
