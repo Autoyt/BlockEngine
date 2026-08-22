@@ -75,7 +75,7 @@ public final class ItemModelGenerator {
         Path texture = root.resolve("assets")
                 .resolve(namespace)
                 .resolve("textures")
-                .resolve("item")
+                .resolve("font")
                 .resolve("pfp.png");
         Files.createDirectories(texture.getParent());
         try (InputStream input = Main.getInstance().getResource("assets/pfp.png")) {
@@ -94,7 +94,7 @@ public final class ItemModelGenerator {
         ArrayNode providers = font.putArray("providers");
         ObjectNode provider = providers.addObject();
         provider.put("type", "bitmap");
-        provider.put("file", namespace + ":item/pfp.png");
+        provider.put("file", namespace + ":font/pfp.png");
         provider.put("ascent", 80);
         provider.put("height", 96);
         provider.putArray("chars").add("\uE000");
