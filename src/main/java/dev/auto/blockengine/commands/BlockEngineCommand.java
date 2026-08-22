@@ -11,9 +11,7 @@ import io.papermc.paper.dialog.Dialog;
 import io.papermc.paper.registry.data.dialog.DialogBase;
 import io.papermc.paper.registry.data.dialog.body.DialogBody;
 import io.papermc.paper.registry.data.dialog.type.DialogType;
-import net.kyori.adventure.key.Key;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -27,7 +25,6 @@ import java.util.List;
 import java.util.Locale;
 
 public final class BlockEngineCommand implements BasicCommand {
-    private static final String INFO_GLYPH = "\uE000";
     private static final List<String> ROOT = List.of(
             "info", "catalog", "packs", "debug"
     );
@@ -123,17 +120,10 @@ public final class BlockEngineCommand implements BasicCommand {
                         .canCloseWithEscape(true)
                         .pause(false)
                         .body(List.of(
-                                DialogBody.plainMessage(Component.text(INFO_GLYPH)
-                                        .color(NamedTextColor.WHITE)
-                                        .font(Key.key(infoNamespace(), "pfp")), 260),
                                 DialogBody.plainMessage(summary, 260)
                         ))
                         .build())
                 .type(DialogType.notice()));
-    }
-
-    private @NotNull String infoNamespace() {
-        return plugin.getName().toLowerCase(Locale.ROOT);
     }
 
     private static @NotNull Collection<String> matching(@NotNull Collection<String> values, @NotNull String prefix) {

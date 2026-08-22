@@ -11,7 +11,6 @@ import org.jetbrains.annotations.NotNull;
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Locale;
@@ -67,39 +66,6 @@ public final class ItemModelGenerator {
         Main.getJsonMapper().writeValue(blockStatePath.toFile(), blockState);
 
         breakOverlays(root);
-        infoCard(root);
-    }
-
-    public static void infoCard(@NotNull Path root) throws IOException {
-        String namespace = Main.getInstance().getName().toLowerCase(Locale.ROOT);
-        Path texture = root.resolve("assets")
-                .resolve(namespace)
-                .resolve("textures")
-                .resolve("font")
-                .resolve("pfp.png");
-        Files.createDirectories(texture.getParent());
-        try (InputStream input = Main.getInstance().getResource("assets/pfp.png")) {
-            if (input != null) {
-                Files.copy(input, texture, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-            }
-        }
-
-        Path fontPath = root.resolve("assets")
-                .resolve(namespace)
-                .resolve("font")
-                .resolve("pfp.json");
-        Files.createDirectories(fontPath.getParent());
-
-        ObjectNode font = Main.getJsonMapper().createObjectNode();
-        ArrayNode providers = font.putArray("providers");
-        ObjectNode provider = providers.addObject();
-        provider.put("type", "bitmap");
-        provider.put("file", namespace + ":font/pfp.png");
-        provider.put("ascent", 80);
-        provider.put("height", 96);
-        provider.putArray("chars").add("\uE000");
-
-        Main.getJsonMapper().writeValue(fontPath.toFile(), font);
     }
 
     public static void breakOverlays(@NotNull Path root) throws IOException {
