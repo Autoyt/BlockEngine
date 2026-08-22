@@ -84,30 +84,22 @@ public final class ItemModelGenerator {
             }
         }
 
-        Path modelPath = root.resolve("assets")
+        Path fontPath = root.resolve("assets")
                 .resolve(namespace)
-                .resolve("models")
-                .resolve("item")
-                .resolve("info_card.json");
-        Files.createDirectories(modelPath.getParent());
+                .resolve("font")
+                .resolve("pfp.json");
+        Files.createDirectories(fontPath.getParent());
 
-        ObjectNode model = Main.getJsonMapper().createObjectNode();
-        model.put("parent", "minecraft:item/generated");
-        ObjectNode textures = model.putObject("textures");
-        textures.put("layer0", namespace + ":item/pfp");
-        Main.getJsonMapper().writeValue(modelPath.toFile(), model);
+        ObjectNode font = Main.getJsonMapper().createObjectNode();
+        ArrayNode providers = font.putArray("providers");
+        ObjectNode provider = providers.addObject();
+        provider.put("type", "bitmap");
+        provider.put("file", namespace + ":item/pfp.png");
+        provider.put("ascent", 80);
+        provider.put("height", 96);
+        provider.putArray("chars").add("\uE000");
 
-        Path itemPath = root.resolve("assets")
-                .resolve(namespace)
-                .resolve("items")
-                .resolve("info_card.json");
-        Files.createDirectories(itemPath.getParent());
-
-        ObjectNode item = Main.getJsonMapper().createObjectNode();
-        ObjectNode itemModel = item.putObject("model");
-        itemModel.put("type", "minecraft:model");
-        itemModel.put("model", namespace + ":item/info_card");
-        Main.getJsonMapper().writeValue(itemPath.toFile(), item);
+        Main.getJsonMapper().writeValue(fontPath.toFile(), font);
     }
 
     public static void breakOverlays(@NotNull Path root) throws IOException {
