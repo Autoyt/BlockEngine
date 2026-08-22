@@ -3,6 +3,7 @@ package dev.auto.blockengine;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.github.retrooper.packetevents.PacketEvents;
+import com.github.retrooper.packetevents.settings.PacketEventsSettings;
 import dev.auto.blockengine.api.BlockEngine;
 import dev.auto.blockengine.catalog.CatalogListeners;
 import dev.auto.blockengine.commands.CatalogCommand;
@@ -37,8 +38,12 @@ public final class Main extends JavaPlugin {
     @Override
     public void onLoad() {
         instance = this;
-        PacketEvents.setAPI(SpigotPacketEventsBuilder.build(this));
-        PacketEvents.getAPI().getSettings().checkForUpdates(false);
+        PacketEvents.setAPI(SpigotPacketEventsBuilder.build(
+                this,
+                new PacketEventsSettings()
+                        .checkForUpdates(false)
+                        .bStats(false)
+        ));
         PacketEvents.getAPI().load();
     }
 
@@ -111,8 +116,6 @@ public final class Main extends JavaPlugin {
         return Bukkit.isPrimaryThread();
     }
 }
-
-
 
 
 
