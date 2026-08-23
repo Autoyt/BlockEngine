@@ -4,6 +4,7 @@ import dev.auto.blockengine.api.blocks.BlockData;
 import dev.auto.blockengine.api.event.BlockEngineBlockDataSaveEvent;
 import dev.auto.blockengine.api.event.BlockEngineBlockDataSavedEvent;
 import dev.auto.blockengine.event.BlockEngineEvents;
+import dev.auto.blockengine.listeners.GameListener;
 import dev.auto.blockengine.registry.BlockRegistry;
 import dev.auto.blockengine.types.BlockDefinition;
 import dev.auto.blockengine.types.BlockLocationKey;
@@ -41,10 +42,10 @@ public final class BlockDataManager {
         return new BlockContext(definition.adapter(), data, block, player);
     }
 
-    public void save(@NotNull Block block, @NotNull BlockContext context) {
+    public boolean save(@NotNull Block block, @NotNull BlockContext context) {
         BlockDefinition definition = BlockRegistry.getBlock(context.blockId());
         if (definition == null) {
-            return;
+            return false;
         }
         definition.apiDefinition().state(context.stateId());
 
@@ -60,7 +61,7 @@ public final class BlockDataManager {
                 previous == null ? null : previous.storedBlock().blockId(),
                 previous == null ? null : previous.storedBlock().stateId()
         ))) {
-            return;
+            return false;
         }
 
         ChunkEngine.Data chunkData = ChunkEngine.data(block.getChunk());
@@ -77,12 +78,15 @@ public final class BlockDataManager {
                 payload
         );
         ChunkEngine.changed(block);
+        GameListener.queueRedstoneUpdate(block);
+        GameListener.refreshRedstoneOutput(block);
         BlockEngineEvents.call(new BlockEngineBlockDataSavedEvent(
                 block,
                 context.data(),
                 previous == null ? null : previous.storedBlock().blockId(),
                 previous == null ? null : previous.storedBlock().stateId()
         ));
+        return true;
     }
 }
 

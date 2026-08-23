@@ -14,7 +14,6 @@ import dev.auto.blockengine.commands.PerfCommand;
 import dev.auto.blockengine.defaultadapters.DebugBlocks;
 import dev.auto.blockengine.entity.ManagedDisplayManager;
 import dev.auto.blockengine.integrity.BlockIntegrityManager;
-import dev.auto.blockengine.listeners.GravityListener;
 import dev.auto.blockengine.listeners.GameListener;
 import dev.auto.blockengine.registry.DiscoverySystem;
 import dev.auto.blockengine.resourcepack.ResourcePackManager;
@@ -38,7 +37,6 @@ public final class Main extends JavaPlugin {
             .enable(SerializationFeature.INDENT_OUTPUT);
     @Getter
     private static final Material backingBlock = Material.BARRIER;
-    private GravityListener gravityListener;
 
     @Override
     public void onLoad() {
@@ -73,13 +71,13 @@ public final class Main extends JavaPlugin {
 
         new CatalogListeners();
         new OverideFillCommand();
-        gravityListener = new GravityListener();
         new GameListener();
 
         for (org.bukkit.World world : Bukkit.getWorlds()) {
             for (Chunk chunk : world.getLoadedChunks()) {
                 ChunkEngine.load(chunk, VisibilityManager.getInstance().config());
                 BlockIntegrityManager.getInstance().enqueue(chunk);
+                GameListener.queueChunkRedstoneUpdate(chunk);
             }
         }
 
@@ -98,10 +96,7 @@ public final class Main extends JavaPlugin {
         ResourcePackManager.getInstance().stop();
         BlockIntegrityManager.getInstance().stop();
         BlockTicker.getInstance().stop();
-        if (gravityListener != null) {
-            gravityListener.clear();
-            gravityListener = null;
-        }
+        GameListener.shutdown();
         ManagedDisplayManager.getInstance().clear();
         BlockEngine.clearManagedDisplayService();
         BlockEngine.clearManagedWorldFactory();

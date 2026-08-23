@@ -138,7 +138,6 @@ public final class PlacementVerificationEngine {
         PLAYER,
         DISPENSER,
         GRAVITY,
-        PISTON,
         PLUGIN
     }
 

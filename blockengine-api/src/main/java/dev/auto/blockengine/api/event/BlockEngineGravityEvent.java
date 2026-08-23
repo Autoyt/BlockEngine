@@ -11,6 +11,9 @@ import java.util.Objects;
 
 /**
  * Fired when BlockEngine detects a custom block should fall.
+ * <p>
+ * External listeners may cancel this event to keep the block in place, or
+ * change {@link #stopBlock()} before BlockEngine performs the move.
  */
 public class BlockEngineGravityEvent extends Event implements Cancellable {
     private static final HandlerList HANDLERS = new HandlerList();

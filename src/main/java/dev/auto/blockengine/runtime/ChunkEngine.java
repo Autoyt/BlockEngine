@@ -87,12 +87,38 @@ public final class ChunkEngine {
     }
 
     public static @Nullable RuntimeBlockView getBlock(@NotNull BlockLocationKey location) {
-        LoadedChunk chunk = chunks.get(new Key(location.worldId(), location.x() >> 4, location.z() >> 4));
+        Key key = new Key(location.worldId(), location.x() >> 4, location.z() >> 4);
+        LoadedChunk chunk = chunks.get(key);
         if (chunk == null) {
             return null;
         }
 
-        return chunk.block(location.x() & 15, location.y(), location.z() & 15);
+        int localX = location.x() & 15;
+        int localZ = location.z() & 15;
+        ChunkEdit pending = pendingChunks.get(key);
+        if (pending == null) {
+            return chunk.block(localX, location.y(), localZ);
+        }
+
+        // Mutations are staged until the next flush. Movement and placement can
+        // perform several reads in that window, so the staged data must be the
+        // authoritative view or the same source block can be moved twice.
+        StoredBlock stored = pending.data().blockAt(localX, location.y(), localZ);
+        if (stored == null) {
+            return null;
+        }
+
+        RuntimeBlockView loaded = chunk.block(localX, location.y(), localZ);
+        boolean exposed = loaded != null && loaded.storedBlock() == stored
+                ? loaded.exposed()
+                : isExposed(
+                        pending.chunk().getWorld(),
+                        location.x(),
+                        location.y(),
+                        location.z(),
+                        VisibilityManager.getInstance().config()
+                );
+        return new RuntimeBlockView(key, location, stored.fallbackBlock(), stored, exposed);
     }
 
     public static @NotNull Collection<LoadedChunk> chunks() {

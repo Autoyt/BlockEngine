@@ -7,6 +7,7 @@ import dev.auto.blockengine.api.event.BlockEngineModificationEvent;
 import dev.auto.blockengine.event.BlockEngineEvents;
 import dev.auto.blockengine.Main;
 import dev.auto.blockengine.integrity.BlockIntegrityManager;
+import dev.auto.blockengine.listeners.GameListener;
 import dev.auto.blockengine.items.ItemManager;
 import dev.auto.blockengine.registry.BlockRegistry;
 import dev.auto.blockengine.registry.NamespaceRegistry;
@@ -133,6 +134,7 @@ public final class PlacementManager {
 
         block.setType(Main.getBackingBlock(), false);
         ChunkEngine.changed(block);
+        GameListener.queueRedstoneUpdate(block);
 
         sound(block, definition, data.stateId());
         definition.adapter().onPlace(new BlockContext(definition.adapter(), data, block, player));

@@ -8,12 +8,14 @@ import dev.auto.blockengine.entity.VirtualItemDisplay;
 import dev.auto.blockengine.items.ItemManager;
 import dev.auto.blockengine.runtime.ChunkEngine;
 import dev.auto.blockengine.runtime.RuntimeBlockView;
+import dev.auto.blockengine.types.BlockLocationKey;
 import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.event.player.PlayerMoveEvent;
+import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -90,6 +92,75 @@ public final class VisibilityManager {
                 }
             }
         }
+    }
+
+    public void animateBlockMove(
+            @NotNull BlockLocationKey from,
+            @NotNull BlockLocationKey to,
+            @NotNull ItemStack itemStack,
+            int durationTicks
+    ) {
+        if (!from.worldId().equals(to.worldId())) {
+            return;
+        }
+
+        DesiredDisplay base = ManagedDisplayManager.getInstance().defaultBlockDisplay(to, itemStack);
+        double dx = from.x() - to.x();
+        double dy = from.y() - to.y();
+        double dz = from.z() - to.z();
+        DesiredDisplay start = new DesiredDisplay(
+                base.id(),
+                base.spec().toBuilder()
+                        .translation(
+                                base.spec().translationX() + (float) dx,
+                                base.spec().translationY() + (float) dy,
+                                base.spec().translationZ() + (float) dz
+                        )
+                        .transformationInterpolationDuration(0)
+                        .build()
+        );
+        DesiredDisplay end = new DesiredDisplay(
+                base.id(),
+                base.spec().toBuilder()
+                        .transformationInterpolationDelay(0)
+                        .transformationInterpolationDuration(Math.max(1, durationTicks))
+                        .build()
+        );
+        ChunkEngine.Key targetChunk = new ChunkEngine.Key(to.worldId(), to.x() >> 4, to.z() >> 4);
+
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            if (!isChunkInPlayerRadius(player, targetChunk)) {
+                continue;
+            }
+
+            PlayerVisibility state = state(player);
+            VirtualItemDisplay display = state.active().get(base.id());
+            if (display == null) {
+                display = takeDisplay(state);
+                configure(display, start);
+                display.spawn(player);
+                state.active().put(base.id(), display);
+            } else {
+                configure(display, start);
+                display.updateMetadata(player);
+            }
+        }
+
+        Bukkit.getScheduler().runTask(Main.getInstance(), () -> {
+            for (Player player : Bukkit.getOnlinePlayers()) {
+                PlayerVisibility state = players.get(player.getUniqueId());
+                if (state == null) {
+                    continue;
+                }
+
+                VirtualItemDisplay display = state.active().get(base.id());
+                if (display == null) {
+                    continue;
+                }
+                configure(display, end);
+                display.updateMetadata(player);
+            }
+        });
     }
 
     public void removeChunkDisplays(@NotNull ChunkEngine.Key chunkKey) {

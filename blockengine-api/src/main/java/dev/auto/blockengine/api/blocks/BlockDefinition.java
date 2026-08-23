@@ -219,6 +219,11 @@ public final class BlockDefinition {
         }
     }
 
+    /**
+     * Face-aware redstone contract for custom blocks. Weak power directly
+     * powers adjacent consumers; strong power can additionally conduct through
+     * an adjacent solid block.
+     */
     public record Redstone(
             @NotNull Set<BlockFace> inputFaces,
             @NotNull Set<BlockFace> outputFaces,
@@ -239,7 +244,9 @@ public final class BlockDefinition {
         }
 
         public boolean hasOutputs() {
-            return !outputFaces.isEmpty() && (weakPower > 0 || strongPower > 0);
+            // Adapters may calculate dynamic power without using the configured
+            // value, so faces alone determine whether propagation is required.
+            return !outputFaces.isEmpty();
         }
 
         public static @NotNull Redstone none() {
@@ -248,13 +255,12 @@ public final class BlockDefinition {
     }
 
     public record Movement(
-            boolean pistonPushable,
-            boolean pistonPullable,
             boolean gravity,
-            boolean dispenserPlaceable
+            boolean dispenserPlaceable,
+            boolean gravityBreaksOnPartialBlock
     ) {
         public static @NotNull Movement normal() {
-            return new Movement(true, true, false, true);
+            return new Movement(false, true, false);
         }
     }
 
@@ -467,23 +473,18 @@ public final class BlockDefinition {
             return this;
         }
 
-        public @NotNull StateBuilder pistonPushable(boolean pistonPushable) {
-            movement = new Movement(pistonPushable, movement.pistonPullable(), movement.gravity(), movement.dispenserPlaceable());
-            return this;
-        }
-
-        public @NotNull StateBuilder pistonPullable(boolean pistonPullable) {
-            movement = new Movement(movement.pistonPushable(), pistonPullable, movement.gravity(), movement.dispenserPlaceable());
-            return this;
-        }
-
         public @NotNull StateBuilder gravity(boolean gravity) {
-            movement = new Movement(movement.pistonPushable(), movement.pistonPullable(), gravity, movement.dispenserPlaceable());
+            movement = new Movement(gravity, movement.dispenserPlaceable(), movement.gravityBreaksOnPartialBlock());
             return this;
         }
 
         public @NotNull StateBuilder dispenserPlaceable(boolean dispenserPlaceable) {
-            movement = new Movement(movement.pistonPushable(), movement.pistonPullable(), movement.gravity(), dispenserPlaceable);
+            movement = new Movement(movement.gravity(), dispenserPlaceable, movement.gravityBreaksOnPartialBlock());
+            return this;
+        }
+
+        public @NotNull StateBuilder gravityBreaksOnPartialBlock(boolean gravityBreaksOnPartialBlock) {
+            movement = new Movement(movement.gravity(), movement.dispenserPlaceable(), gravityBreaksOnPartialBlock);
             return this;
         }
 
@@ -603,26 +604,9 @@ public final class BlockDefinition {
     }
 
     public static final class MovementBuilder {
-        private boolean pistonPushable = true;
-        private boolean pistonPullable = true;
         private boolean gravity = false;
         private boolean dispenserPlaceable = true;
-
-        public @NotNull MovementBuilder pistonPushable(boolean pistonPushable) {
-            this.pistonPushable = pistonPushable;
-            return this;
-        }
-
-        public @NotNull MovementBuilder pistonPullable(boolean pistonPullable) {
-            this.pistonPullable = pistonPullable;
-            return this;
-        }
-
-        public @NotNull MovementBuilder pistonMovable(boolean pistonMovable) {
-            this.pistonPushable = pistonMovable;
-            this.pistonPullable = pistonMovable;
-            return this;
-        }
+        private boolean gravityBreaksOnPartialBlock = false;
 
         public @NotNull MovementBuilder gravity(boolean gravity) {
             this.gravity = gravity;
@@ -634,8 +618,17 @@ public final class BlockDefinition {
             return this;
         }
 
+        /**
+         * When enabled, gravity blocks break and drop instead of landing on
+         * partial collision supports such as slabs, stairs, signs, or torches.
+         */
+        public @NotNull MovementBuilder breaksViaGravity(boolean gravityBreaksOnPartialBlock) {
+            this.gravityBreaksOnPartialBlock = gravityBreaksOnPartialBlock;
+            return this;
+        }
+
         private @NotNull Movement build() {
-            return new Movement(pistonPushable, pistonPullable, gravity, dispenserPlaceable);
+            return new Movement(gravity, dispenserPlaceable, gravityBreaksOnPartialBlock);
         }
     }
 

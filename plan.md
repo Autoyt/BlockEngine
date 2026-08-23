@@ -1,4 +1,2 @@
 - add dispenser support
 - add redstone in/out support
-- add piston support
-- 

@@ -7,6 +7,7 @@ import dev.auto.blockengine.api.display.DisplaySpec;
 import dev.auto.blockengine.api.event.BlockEngineModificationEvent;
 import dev.auto.blockengine.event.BlockEngineEvents;
 import dev.auto.blockengine.integrity.BlockIntegrityManager;
+import dev.auto.blockengine.listeners.GameListener;
 import dev.auto.blockengine.registry.BlockRegistry;
 import dev.auto.blockengine.types.BlockDefinition;
 import dev.auto.blockengine.types.BlockLocationKey;
@@ -16,6 +17,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 
@@ -29,7 +31,7 @@ public final class BlockMover {
             @NotNull Block to,
             @NotNull BlockAdapter.MoveCause cause
     ) {
-        if (!canOccupy(to)) {
+        if (!isCurrentSource(from, customBlock) || !canOccupy(to)) {
             return false;
         }
 
@@ -53,7 +55,7 @@ public final class BlockMover {
         Objects.requireNonNull(to, "to");
         Objects.requireNonNull(cause, "cause");
 
-        if (!canOccupy(to)) {
+        if (!isCurrentSource(from, customBlock) || !canOccupy(to)) {
             return false;
         }
 
@@ -80,6 +82,8 @@ public final class BlockMover {
         to.setType(Main.getBackingBlock(), false);
         ChunkEngine.changed(from);
         ChunkEngine.changed(to);
+        GameListener.queueRedstoneUpdate(from);
+        GameListener.queueRedstoneUpdate(to);
         BlockEngineEvents.modification(
                 BlockEngineModificationEvent.Action.REMOVE_CUSTOM_BLOCK,
                 from,
@@ -104,6 +108,19 @@ public final class BlockMover {
             return false;
         }
         return target.getType().isAir() || target.isReplaceable() || target.isLiquid();
+    }
+
+    private static boolean isCurrentSource(@NotNull Block from, @NotNull RuntimeBlockView expected) {
+        RuntimeBlockView current = ChunkEngine.getBlock(location(from));
+        if (current == null) {
+            return false;
+        }
+
+        ChunkEngine.StoredBlock actual = current.storedBlock();
+        ChunkEngine.StoredBlock snapshot = expected.storedBlock();
+        return actual.blockId().equals(snapshot.blockId())
+                && actual.stateId().equals(snapshot.stateId())
+                && Arrays.equals(actual.payload(), snapshot.payload());
     }
 
     public static @NotNull ChunkEngine.StoredBlock movedBlock(

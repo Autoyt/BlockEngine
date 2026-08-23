@@ -55,6 +55,7 @@ public interface BlockAdapter {
     default void onTick(@NotNull BlockContext context) {
     }
 
+    /** Called after a face-aware input calculation changes from 0-15. */
     default void onRedstonePowerChange(@NotNull BlockContext context, int oldPower, int newPower) {
     }
 
@@ -75,6 +76,11 @@ public interface BlockAdapter {
     ) {
     }
 
+    /**
+     * Returns weak power emitted through one configured output face.
+     * Weak power affects an adjacent consumer but does not conduct through a
+     * solid block.
+     */
     default int redstoneWeakPower(
             @NotNull BlockContext context,
             @NotNull BlockFace outputFace,
@@ -83,6 +89,10 @@ public interface BlockAdapter {
         return configuredPower;
     }
 
+    /**
+     * Returns strong power emitted through one configured output face. Strong
+     * power may conduct through an adjacent solid block.
+     */
     default int redstoneStrongPower(
             @NotNull BlockContext context,
             @NotNull BlockFace outputFace,
@@ -122,8 +132,6 @@ public interface BlockAdapter {
     }
 
     enum MoveCause {
-        PISTON_PUSH,
-        PISTON_PULL,
         GRAVITY,
         PLUGIN
     }

@@ -11,6 +11,7 @@ public final class DebugBlocks {
     public static final String DEMO_BREAK_ID = NAMESPACE + ":demo_break";
     public static final String DEMO_STATE_ID = NAMESPACE + ":demo_state";
     public static final String DEMO_REDSTONE_DIALOG_ID = NAMESPACE + ":demo_redstone_dialog";
+    public static final String DEMO_MOVEMENT_ID = NAMESPACE + ":demo_movement";
 
     private DebugBlocks() {
     }
@@ -23,5 +24,6 @@ public final class DebugBlocks {
         BlockRegistry.registerBlock(new DemoBreakBlockAdapter(), NAMESPACE);
         BlockRegistry.registerBlock(new DemoStateBlockAdapter(), NAMESPACE);
         BlockRegistry.registerBlock(new DemoRedstoneDialogBlockAdapter(), NAMESPACE);
+        BlockRegistry.registerBlock(new DemoMovementBlockAdapter(), NAMESPACE);
     }
 }
