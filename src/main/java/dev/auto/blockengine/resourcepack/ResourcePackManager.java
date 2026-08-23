@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import dev.auto.blockengine.Main;
 import dev.auto.blockengine.api.CustomBlockSystem;
 import dev.auto.blockengine.api.resourcepack.GeneratedItemModel;
+import dev.auto.blockengine.datapack.BlockPack;
+import dev.auto.blockengine.datapack.DataBlockPacks;
 import dev.auto.blockengine.registry.BlockRegistry;
 import dev.auto.blockengine.registry.NamespaceRegistry;
 import net.kyori.adventure.resource.ResourcePackInfo;
@@ -143,6 +145,7 @@ public final class ResourcePackManager {
             hostedPacks.clear();
             hostedPacks.add(pack);
             hostedPacks.addAll(generateSystemPacks(config));
+            hostedPacks.addAll(generateDataPacks(config));
             Main.getInstance().getLogger().info("Generated BlockEngine resource pack at " + zip.toAbsolutePath()
                     + " sha1=" + HexFormat.of().formatHex(sha1));
             return pack;
@@ -434,6 +437,59 @@ public final class ResourcePackManager {
                     description,
                     blank(details.prompt()) ? prompt(title, description) : details.prompt(),
                     details.required()
+            ));
+        }
+        return packs;
+    }
+
+    private static @NotNull Collection<GeneratedPack> generateDataPacks(@NotNull ResourcePackConfig config) throws IOException {
+        List<GeneratedPack> packs = new ArrayList<>();
+        for (BlockPack blockPack : DataBlockPacks.loadedPacks()) {
+            String ending = safeUrlEnding(blockPack.urlEnding().isBlank() ? blockPack.namespace() : blockPack.urlEnding());
+            Path root = Main.getInstance().getDataFolder().toPath()
+                    .resolve("generated-resource-pack")
+                    .resolve("data-packs")
+                    .resolve(ending);
+
+            delete(root);
+            Files.createDirectories(root);
+            Component title = blockPack.title().isBlank()
+                    ? Component.text(blockPack.namespace())
+                    : rich(blockPack.title());
+            Component description = blockPack.description().isBlank()
+                    ? Component.text(blockPack.namespace() + " BlockEngine resources")
+                    : rich(blockPack.description());
+            String fileName = safeFileName(blank(title) ? ending : legacy(title));
+            Path zip = Main.getInstance().getDataFolder().toPath()
+                    .resolve("generated-packs")
+                    .resolve(fileName);
+            packMeta(root, title, description);
+            copyIcon(root, blockPack.icon());
+            copyAssets(root, blockPack.assetRoots());
+
+            if (!NamespaceRegistry.loaded(blockPack.namespace())) {
+                throw new IllegalStateException("Data pack resource namespace is not loaded: " + blockPack.namespace());
+            }
+            for (dev.auto.blockengine.types.BlockDefinition registered : BlockRegistry.getBlocks()) {
+                if (blockPack.namespace().equals(registered.name().namespace())) {
+                    ItemModelGenerator.generateBlock(root, registered.apiDefinition());
+                }
+            }
+
+            zip(root, zip);
+            byte[] sha1 = sha1(zip);
+            String packUrl = packUrl(config, "/data-packs/" + ending);
+            packs.add(new GeneratedPack(
+                    packId(packUrl),
+                    root,
+                    zip,
+                    fileName,
+                    sha1,
+                    packUrl,
+                    title,
+                    description,
+                    blockPack.prompt().isBlank() ? prompt(title, description) : rich(blockPack.prompt()),
+                    blockPack.required()
             ));
         }
         return packs;

@@ -3,6 +3,7 @@ package dev.auto.blockengine.registry;
 import dev.auto.blockengine.Main;
 import dev.auto.blockengine.api.CustomBlockSystem;
 import dev.auto.blockengine.api.blocks.BlockAdapter;
+import dev.auto.blockengine.datapack.DataBlockPacks;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.Plugin;
 
@@ -61,6 +62,10 @@ public final class DiscoverySystem {
                 }
             }
         }
+
+        List<BlockAdapter> dataPackAdapters = DataBlockPacks.loadAndRegister();
+        discoveredAdapters.addAll(dataPackAdapters);
+        registeredBlocks += dataPackAdapters.size();
 
         Main.getInstance().getLogger()
                 .info("Discovered " + discoveredPlugins + " plugins, " + registeredPlugins + " registered, " + registeredBlocks + " blocks registered.");

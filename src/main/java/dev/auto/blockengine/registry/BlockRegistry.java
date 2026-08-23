@@ -76,6 +76,9 @@ public class BlockRegistry {
         apiDefinition.validate();
 
         BlockDefinition definition = new BlockDefinition(new BlockName(apiDefinition.name(), namespace), adapter, apiDefinition);
+        if (blocks.containsKey(definition.name())) {
+            throw new IllegalArgumentException("Duplicate BlockEngine block id: " + definition.id());
+        }
         blocks.put(definition.name(), definition);
         return definition;
     }
