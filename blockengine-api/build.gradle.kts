@@ -30,7 +30,7 @@ publishing {
             pom {
                 name = "BlockEngine API"
                 description = "Public API for integrating with BlockEngine."
-                url = "https://github.com/Autoyt/TurtleBlocks"
+                url = "https://github.com/Autoyt/BlockEngine"
 
                 licenses {
                     license {
@@ -46,9 +46,9 @@ publishing {
                 }
 
                 scm {
-                    connection = "scm:git:https://github.com/Autoyt/TurtleBlocks.git"
-                    developerConnection = "scm:git:https://github.com/Autoyt/TurtleBlocks.git"
-                    url = "https://github.com/Autoyt/TurtleBlocks"
+                    connection = "scm:git:https://github.com/Autoyt/BlockEngine.git"
+                    developerConnection = "scm:git:https://github.com/Autoyt/BlockEngine.git"
+                    url = "https://github.com/Autoyt/BlockEngine"
                 }
             }
         }
@@ -57,7 +57,7 @@ publishing {
     repositories {
         maven {
             name = "GitHubPackages"
-            url = uri("https://maven.pkg.github.com/Autoyt/TurtleBlocks")
+            url = uri("https://maven.pkg.github.com/Autoyt/BlockEngine")
             credentials {
                 username = providers.gradleProperty("gpr.user")
                     .orElse(providers.environmentVariable("GITHUB_ACTOR"))
