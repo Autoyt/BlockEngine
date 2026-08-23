@@ -65,6 +65,25 @@ class BlockPackLoaderTest {
     }
 
     @Test
+    void rejectsInvalidDependencyNamespaces() throws IOException {
+        Path pack = tempDir.resolve("bad_dependency");
+        Files.createDirectories(pack.resolve("blocks"));
+        Files.writeString(pack.resolve("pack.json"), """
+                {
+                  "format": 1,
+                  "namespace": "bad_dependency",
+                  "dependencies": ["Bad Namespace"]
+                }
+                """);
+
+        BlockPackLoader.Result result = BlockPackLoader.load(tempDir);
+
+        assertEquals(0, result.packs().size());
+        assertEquals(1, result.errors().size());
+        assertTrue(result.errors().getFirst().contains("Invalid dependency namespace"));
+    }
+
+    @Test
     void scansZipPackFiles() throws IOException {
         Path zip = tempDir.resolve("bad.zip");
         try (ZipOutputStream output = new ZipOutputStream(Files.newOutputStream(zip))) {

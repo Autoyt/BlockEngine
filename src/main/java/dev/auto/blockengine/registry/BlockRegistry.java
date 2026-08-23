@@ -6,6 +6,7 @@ import dev.auto.blockengine.types.BlockName;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
@@ -13,12 +14,15 @@ import java.util.regex.Pattern;
 
 public class BlockRegistry {
     private static final Pattern NAMESPACE_PATTERN = Pattern.compile("^[a-z0-9._-]+$");
-    private static final Pattern BLOCK_ID_PATTERN = Pattern.compile("^[a-z0-9._-]+:[a-z0-9._-]+(?:/[a-z0-9._-]+)*$");
 
     private static final Map<BlockName, BlockDefinition> blocks = new HashMap<>();
+    private static final Map<String, BlockDefinition> blocksById = new HashMap<>();
+    private static final Map<BlockAdapter, BlockDefinition> blocksByAdapter = new IdentityHashMap<>();
 
     public static void clear() {
         blocks.clear();
+        blocksById.clear();
+        blocksByAdapter.clear();
     }
 
     public static BlockDefinition getBlock(String namespace, String name) {
@@ -32,15 +36,7 @@ public class BlockRegistry {
     }
 
     public static BlockDefinition getBlock(String id) {
-        if (id == null || !BLOCK_ID_PATTERN.matcher(id).matches()) {
-            return null;
-        }
-
-        String[] parts = id.split(":", 2);
-        if (parts.length != 2) {
-            return null;
-        }
-        return getBlock(parts[0], parts[1]);
+        return id == null ? null : blocksById.get(id);
     }
 
     public static BlockDefinition getBlock(BlockName name) {
@@ -51,12 +47,7 @@ public class BlockRegistry {
     }
 
     public static BlockDefinition getBlock(@NotNull BlockAdapter adapter) {
-        for (BlockDefinition definition : blocks.values()) {
-            if (definition.adapter() == adapter) {
-                return definition;
-            }
-        }
-        return null;
+        return blocksByAdapter.get(adapter);
     }
 
     public static Collection<BlockDefinition> getBlocks() {
@@ -80,6 +71,8 @@ public class BlockRegistry {
             throw new IllegalArgumentException("Duplicate BlockEngine block id: " + definition.id());
         }
         blocks.put(definition.name(), definition);
+        blocksById.put(definition.id(), definition);
+        blocksByAdapter.put(adapter, definition);
         return definition;
     }
 

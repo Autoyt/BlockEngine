@@ -35,6 +35,7 @@ plugins/blockengine/expansion/packs/
   "description": "Decorative blocks for BlockEngine",
   "prompt": "",
   "url-ending": "example",
+  "dependencies": ["other_namespace"],
   "required": true,
   "catalog": true,
   "icon": "pack.png",
@@ -114,6 +115,7 @@ The loader validates before registration:
 
 - `format` must be `1`.
 - `namespace` must match `^[a-z0-9._-]+$`.
+- `dependencies` entries must be valid namespaces and must be provided by another loaded expansion pack or `CustomBlockSystem`.
 - Block names and state ids must use lowercase path segments.
 - Materials must resolve against Bukkit `Material`.
 - Block material fields must be blocks; item material fields must be items.

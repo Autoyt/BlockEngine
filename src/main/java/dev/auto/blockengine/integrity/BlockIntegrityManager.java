@@ -118,7 +118,7 @@ public final class BlockIntegrityManager {
         return true;
     }
 
-    public boolean clearRecord(@NotNull Block block, @NotNull RuntimeBlockView customBlock, @NotNull BlockEngineModificationEvent.Action action) {
+    public void clearRecord(@NotNull Block block, @NotNull RuntimeBlockView customBlock, @NotNull BlockEngineModificationEvent.Action action) {
         Objects.requireNonNull(block, "block");
         Objects.requireNonNull(customBlock, "customBlock");
         ChunkEngine.Data data = ChunkEngine.data(block.getChunk());
@@ -134,7 +134,6 @@ public final class BlockIntegrityManager {
                 false
         ));
         callEvent(action, block, customBlock.storedBlock().blockId(), customBlock.storedBlock().stateId(), null, null);
-        return true;
     }
 
     private @NotNull BlockEngineBlockRemovedEvent.Reason reason(@NotNull BlockEngineModificationEvent.Action action) {

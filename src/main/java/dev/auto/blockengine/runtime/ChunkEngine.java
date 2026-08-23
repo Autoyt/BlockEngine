@@ -72,6 +72,7 @@ public final class ChunkEngine {
         }
 
         chunks.put(key, loaded);
+        BlockTicker.getInstance().loadChunk(key, loaded);
         ManagedDisplayManager.getInstance().loadChunk(key, data);
         PerformanceMetrics.record(PerformanceMetrics.CHUNK_LOAD, System.nanoTime() - started, data.blocks().size(), 0);
     }
@@ -79,6 +80,7 @@ public final class ChunkEngine {
     public static void unload(@NotNull Chunk chunk) {
         Key key = Key.from(chunk);
         chunks.remove(key);
+        BlockTicker.getInstance().unloadChunk(key);
         ManagedDisplayManager.getInstance().unloadChunk(key);
     }
 
@@ -194,6 +196,7 @@ public final class ChunkEngine {
         changedBlocks.clear();
         afterFlush.clear();
         flushScheduled = false;
+        BlockTicker.getInstance().clear();
     }
 
     private static @NotNull ChunkEdit edit(@NotNull Chunk chunk) {

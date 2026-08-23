@@ -49,23 +49,33 @@ public final class BlockMover {
             @NotNull Block to,
             @NotNull BlockAdapter.MoveCause cause
     ) {
+        PendingMove pending = beginMove(from, customBlock, to, cause);
+        return pending != null && finishMove(pending);
+    }
+
+    public static @Nullable PendingMove beginMove(
+            @NotNull Block from,
+            @NotNull RuntimeBlockView customBlock,
+            @NotNull Block to,
+            @NotNull BlockAdapter.MoveCause cause
+    ) {
         Objects.requireNonNull(from, "from");
         Objects.requireNonNull(customBlock, "customBlock");
         Objects.requireNonNull(to, "to");
         Objects.requireNonNull(cause, "cause");
 
         if (!isCurrentSource(from, customBlock) || !canOccupy(to)) {
-            return false;
+            return null;
         }
 
         BlockDefinition definition = BlockRegistry.getBlock(customBlock.storedBlock().blockId());
         if (definition == null) {
-            return false;
+            return null;
         }
 
         BlockContext context = BlockDataManager.getInstance().context(from, customBlock, null);
         if (context == null || !context.adapter().canMove(context, from, to, cause)) {
-            return false;
+            return null;
         }
 
         context.adapter().onMove(context, from, to, cause);
@@ -74,13 +84,9 @@ public final class BlockMover {
 
         ChunkEngine.Data sourceData = ChunkEngine.data(from.getChunk());
         sourceData.removeBlock(from.getX() & 15, from.getY(), from.getZ() & 15);
-        ChunkEngine.Data targetData = ChunkEngine.data(to.getChunk());
-        targetData.setBlock(moved);
 
         from.setType(Material.AIR, false);
-        to.setType(Main.getBackingBlock(), false);
         ChunkEngine.changed(from);
-        ChunkEngine.changed(to);
         BlockEngineEvents.modification(
                 BlockEngineModificationEvent.Action.REMOVE_CUSTOM_BLOCK,
                 from,
@@ -89,13 +95,26 @@ public final class BlockMover {
                 null,
                 null
         );
+        return new PendingMove(from, to, moved);
+    }
+
+    public static boolean finishMove(@NotNull PendingMove pending) {
+        Objects.requireNonNull(pending, "pending");
+        if (!canOccupy(pending.to())) {
+            return false;
+        }
+
+        ChunkEngine.Data targetData = ChunkEngine.data(pending.to().getChunk());
+        targetData.setBlock(pending.moved());
+        pending.to().setType(Main.getBackingBlock(), false);
+        ChunkEngine.changed(pending.to());
         BlockIntegrityManager.getInstance().callEvent(
                 BlockEngineModificationEvent.Action.SET_CUSTOM_BLOCK,
-                to,
+                pending.to(),
                 null,
                 null,
-                moved.blockId(),
-                moved.stateId()
+                pending.moved().blockId(),
+                pending.moved().stateId()
         );
         return true;
     }
@@ -184,5 +203,12 @@ public final class BlockMover {
 
     private static @NotNull BlockLocationKey location(@NotNull Block block) {
         return new BlockLocationKey(block.getWorld().getUID(), block.getX(), block.getY(), block.getZ());
+    }
+
+    public record PendingMove(
+            @NotNull Block from,
+            @NotNull Block to,
+            @NotNull ChunkEngine.StoredBlock moved
+    ) {
     }
 }

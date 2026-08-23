@@ -14,6 +14,7 @@ public record BlockPack(
         @NotNull String description,
         @NotNull String prompt,
         @NotNull String urlEnding,
+        @NotNull List<String> dependencies,
         boolean required,
         boolean catalog,
         @Nullable Path icon,
@@ -27,6 +28,7 @@ public record BlockPack(
         Objects.requireNonNull(description, "description");
         Objects.requireNonNull(prompt, "prompt");
         Objects.requireNonNull(urlEnding, "urlEnding");
+        dependencies = List.copyOf(Objects.requireNonNull(dependencies, "dependencies"));
         assetRoots = List.copyOf(Objects.requireNonNull(assetRoots, "assetRoots"));
         blocks = List.copyOf(Objects.requireNonNull(blocks, "blocks"));
     }

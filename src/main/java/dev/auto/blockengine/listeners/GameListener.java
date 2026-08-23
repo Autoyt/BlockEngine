@@ -79,14 +79,6 @@ import java.util.Set;
 import java.util.UUID;
 
 public class GameListener implements Listener {
-    private static final List<BlockFace> ADJACENT_FACES = List.of(
-            BlockFace.NORTH,
-            BlockFace.SOUTH,
-            BlockFace.EAST,
-            BlockFace.WEST,
-            BlockFace.UP,
-            BlockFace.DOWN
-    );
     private final Map<UUID, Integer> lastPlacementTicks = new HashMap<>();
     private final Map<UUID, MiningSession> miningSessions = new HashMap<>();
 
@@ -400,14 +392,17 @@ public class GameListener implements Listener {
                 }
                 continue;
             }
-            if (customBlock.storedBlock().unbreakable()) {
-                continue;
-            }
             Block block = world.getBlockAt(
                     customBlock.location().x(),
                     customBlock.location().y(),
                     customBlock.location().z()
             );
+            if (moveable(customBlock)) {
+                queueGravityUpdateAround(block);
+            }
+            if (customBlock.storedBlock().unbreakable()) {
+                continue;
+            }
             BlockRemover.remove(
                     block,
                     customBlock,
@@ -416,6 +411,22 @@ public class GameListener implements Listener {
                     false,
                     BlockEngineBlockRemovedEvent.Reason.EXPLOSION
             );
+        }
+    }
+
+    private boolean moveable(@NotNull RuntimeBlockView customBlock) {
+        BlockDefinition definition = BlockRegistry.getBlock(customBlock.storedBlock().blockId());
+        if (definition == null) {
+            return false;
+        }
+
+        try {
+            return definition.apiDefinition()
+                    .state(customBlock.storedBlock().stateId())
+                    .movement()
+                    .gravity();
+        } catch (IllegalArgumentException ignored) {
+            return false;
         }
     }
 
@@ -701,14 +712,7 @@ public class GameListener implements Listener {
     }
 
     private void queueGravityUpdateAround(@NotNull Block origin) {
-        Bukkit.getScheduler().runTask(Main.getInstance(), () -> {
-            GravityManager.getInstance().check(origin);
-            GravityManager.getInstance().check(origin.getRelative(BlockFace.UP));
-            for (BlockFace face : ADJACENT_FACES) {
-                GravityManager.getInstance().check(origin.getRelative(face));
-                GravityManager.getInstance().check(origin.getRelative(face).getRelative(BlockFace.UP));
-            }
-        });
+        GravityManager.getInstance().queueCascadeAfterFlush(origin);
     }
 
     private @NotNull BlockFace dispenserFacing(@NotNull Block dispenser) {

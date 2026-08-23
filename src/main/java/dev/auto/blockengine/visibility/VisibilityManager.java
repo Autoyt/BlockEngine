@@ -19,15 +19,19 @@ import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.HashSet;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 public final class VisibilityManager {
     private static final VisibilityManager instance = new VisibilityManager();
     private final Map<UUID, PlayerVisibility> players = new HashMap<>();
+    private final Set<ChunkEngine.Key> pendingRefreshChunks = new HashSet<>();
     private VisibilityConfig config;
+    private boolean refreshScheduled;
 
     private VisibilityManager() {
     }
@@ -76,14 +80,33 @@ public final class VisibilityManager {
     }
 
     public void refreshPlayersNear(@NotNull ChunkEngine.Key chunkKey) {
-        for (Player player : Bukkit.getOnlinePlayers()) {
-            if (isChunkInPlayerRadius(player, chunkKey)) {
-                forceRecalculate(player);
-            }
-        }
+        pendingRefreshChunks.add(chunkKey);
+        scheduleRefresh();
     }
 
     public void refreshPlayersNear(@NotNull Iterable<ChunkEngine.Key> chunkKeys) {
+        for (ChunkEngine.Key chunkKey : chunkKeys) {
+            pendingRefreshChunks.add(chunkKey);
+        }
+        scheduleRefresh();
+    }
+
+    private void scheduleRefresh() {
+        if (refreshScheduled || pendingRefreshChunks.isEmpty()) {
+            return;
+        }
+        refreshScheduled = true;
+        ChunkEngine.afterFlush(this::processRefreshes);
+    }
+
+    private void processRefreshes() {
+        refreshScheduled = false;
+        if (pendingRefreshChunks.isEmpty()) {
+            return;
+        }
+
+        Set<ChunkEngine.Key> chunkKeys = new HashSet<>(pendingRefreshChunks);
+        pendingRefreshChunks.clear();
         for (Player player : Bukkit.getOnlinePlayers()) {
             for (ChunkEngine.Key chunkKey : chunkKeys) {
                 if (isChunkInPlayerRadius(player, chunkKey)) {

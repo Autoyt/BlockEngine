@@ -40,9 +40,12 @@ public final class DataBlockPacks {
             Main.getInstance().getLogger().warning("Failed to load BlockEngine data pack: " + error);
         }
 
+        Set<String> validNamespaces = validNamespaces(result.packs());
+
         List<BlockAdapter> adapters = new ArrayList<>();
         for (BlockPack pack : result.packs()) {
             try {
+                validateDependencies(pack, validNamespaces);
                 validateNoDuplicateIds(pack);
                 NamespaceRegistry.load(pack.namespace());
                 for (BlockPackBlock block : pack.blocks()) {
@@ -61,6 +64,37 @@ public final class DataBlockPacks {
         }
 
         return Collections.unmodifiableList(adapters);
+    }
+
+    private static @NotNull Set<String> validNamespaces(@NotNull List<BlockPack> packs) {
+        Set<String> valid = new HashSet<>(NamespaceRegistry.loaded());
+        for (BlockPack pack : packs) {
+            valid.add(pack.namespace());
+        }
+
+        boolean changed;
+        do {
+            changed = false;
+            for (BlockPack pack : packs) {
+                if (!valid.contains(pack.namespace())) {
+                    continue;
+                }
+                if (!valid.containsAll(pack.dependencies())) {
+                    valid.remove(pack.namespace());
+                    changed = true;
+                }
+            }
+        } while (changed);
+
+        return valid;
+    }
+
+    private static void validateDependencies(@NotNull BlockPack pack, @NotNull Set<String> validNamespaces) {
+        for (String namespace : pack.dependencies()) {
+            if (!validNamespaces.contains(namespace)) {
+                throw new IllegalArgumentException("Missing required namespace '" + namespace + "'.");
+            }
+        }
     }
 
     private static void validateNoDuplicateIds(@NotNull BlockPack pack) {

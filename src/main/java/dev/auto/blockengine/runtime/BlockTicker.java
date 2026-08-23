@@ -3,6 +3,7 @@ package dev.auto.blockengine.runtime;
 import dev.auto.blockengine.Main;
 import dev.auto.blockengine.registry.BlockRegistry;
 import dev.auto.blockengine.types.BlockDefinition;
+import dev.auto.blockengine.types.BlockLocationKey;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.block.Block;
@@ -11,11 +12,18 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 public final class BlockTicker {
     private static final BlockTicker instance = new BlockTicker();
 
+    private final Set<BlockLocationKey> tickingBlocks = new LinkedHashSet<>();
+    private final Map<ChunkEngine.Key, Set<BlockLocationKey>> tickingBlocksByChunk = new HashMap<>();
     private @Nullable BukkitTask task;
 
     private BlockTicker() {
@@ -38,15 +46,47 @@ public final class BlockTicker {
         task = null;
     }
 
-    private void tick() {
-        List<RuntimeBlockView> blocks = new ArrayList<>();
-        for (ChunkEngine.LoadedChunk chunk : ChunkEngine.chunks()) {
-            blocks.addAll(chunk.blocks());
-        }
+    public void clear() {
+        tickingBlocks.clear();
+        tickingBlocksByChunk.clear();
+    }
 
-        for (RuntimeBlockView view : blocks) {
+    public void loadChunk(@NotNull ChunkEngine.Key key, @NotNull ChunkEngine.LoadedChunk chunk) {
+        unloadChunk(key);
+
+        Set<BlockLocationKey> chunkTickingBlocks = new HashSet<>();
+        for (RuntimeBlockView view : chunk.blocks()) {
             BlockDefinition definition = BlockRegistry.getBlock(view.storedBlock().blockId());
             if (definition == null || !definition.adapter().ticking()) {
+                continue;
+            }
+            chunkTickingBlocks.add(view.location());
+            tickingBlocks.add(view.location());
+        }
+
+        if (!chunkTickingBlocks.isEmpty()) {
+            tickingBlocksByChunk.put(key, chunkTickingBlocks);
+        }
+    }
+
+    public void unloadChunk(@NotNull ChunkEngine.Key key) {
+        Set<BlockLocationKey> removed = tickingBlocksByChunk.remove(key);
+        if (removed != null) {
+            tickingBlocks.removeAll(removed);
+        }
+    }
+
+    private void tick() {
+        List<BlockLocationKey> blocks = new ArrayList<>(tickingBlocks);
+        for (BlockLocationKey location : blocks) {
+            RuntimeBlockView view = ChunkEngine.getBlock(location);
+            if (view == null) {
+                tickingBlocks.remove(location);
+                continue;
+            }
+            BlockDefinition definition = BlockRegistry.getBlock(view.storedBlock().blockId());
+            if (definition == null || !definition.adapter().ticking()) {
+                tickingBlocks.remove(location);
                 continue;
             }
             World world = Bukkit.getWorld(view.location().worldId());

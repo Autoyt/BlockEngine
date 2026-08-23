@@ -146,6 +146,7 @@ public final class BlockPackLoader {
         if (!NAMESPACE_PATTERN.matcher(namespace).matches()) {
             throw new IllegalArgumentException("Invalid namespace '" + namespace + "'.");
         }
+        List<String> dependencies = namespaces(root.path("dependencies"), packFile);
 
         Path normalizedFolder = folder.toAbsolutePath().normalize();
         Path icon = null;
@@ -186,12 +187,29 @@ public final class BlockPackLoader {
                 textValue(root, "description", ""),
                 textValue(root, "prompt", ""),
                 textValue(root, "url-ending", namespace),
+                dependencies,
                 boolValue(root, "required", true),
                 packCatalog,
                 icon,
                 assetRoots,
                 blocks
         );
+    }
+
+    private static @NotNull List<String> namespaces(@NotNull JsonNode node, @NotNull Path file) {
+        if (!node.isArray()) {
+            return List.of();
+        }
+
+        List<String> namespaces = new ArrayList<>();
+        for (JsonNode value : node) {
+            String namespace = value.asText();
+            if (!NAMESPACE_PATTERN.matcher(namespace).matches()) {
+                throw new IllegalArgumentException(file + ": Invalid dependency namespace '" + namespace + "'.");
+            }
+            namespaces.add(namespace);
+        }
+        return namespaces;
     }
 
     private static @NotNull List<BlockPackBlock> loadBlocks(@NotNull Path folder, boolean packCatalog) throws IOException {

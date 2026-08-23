@@ -18,6 +18,18 @@ public interface CustomBlockSystem {
 
     String getNamespace();
 
+    /**
+     * Namespaces that must be present before this system can register blocks.
+     *
+     * <p>BlockEngine validates these during plugin discovery. If any namespace
+     * is not provided by another enabled {@link CustomBlockSystem}, this system
+     * is skipped so partially registered dependencies do not fail later at
+     * runtime.</p>
+     */
+    default @NotNull List<String> requiredNamespaces() {
+        return List.of();
+    }
+
     List<BlockAdapter> registerAdapters();
 
     default void setPackDetails(@NotNull PackDetails details) {
