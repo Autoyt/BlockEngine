@@ -1,0 +1,35 @@
+{
+  "name": "ruby_block",
+  "vanilla-block": "red_concrete",
+  "catalog": true,
+  "placement": "none",
+  "item": {
+    "material": "knowledge_book",
+    "name": "<#ff3355>Sample Ruby Block",
+    "lore": [
+      "<gray>Loaded from a JSON expansion pack."
+    ],
+    "glint": true,
+    "placeable": true
+  },
+  "default-state": "default",
+  "states": {
+    "default": {
+      "hardness": 1.5,
+      "mining-speed": 1.0,
+      "mining-profile": "stone",
+      "preferred-tools": [
+        "pickaxe"
+      ],
+      "textures": {
+        "all": "minecraft:block/red_concrete"
+      },
+      "sounds": {
+        "place": "minecraft:block.stone.place",
+        "break": "minecraft:block.stone.break",
+        "mining": "minecraft:block.stone.hit",
+        "step": "minecraft:block.stone.step"
+      }
+    }
+  }
+}

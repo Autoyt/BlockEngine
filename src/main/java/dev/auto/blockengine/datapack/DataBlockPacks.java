@@ -6,6 +6,7 @@ import dev.auto.blockengine.registry.BlockRegistry;
 import dev.auto.blockengine.registry.NamespaceRegistry;
 import org.jetbrains.annotations.NotNull;
 
+import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -24,8 +25,16 @@ public final class DataBlockPacks {
         loadedPacks.clear();
         loadErrors.clear();
 
-        Path packsRoot = Main.getInstance().getDataFolder().toPath().resolve("packs");
-        BlockPackLoader.Result result = BlockPackLoader.load(packsRoot);
+        Path dataFolder = Main.getInstance().getDataFolder().toPath();
+        Path packsRoot = dataFolder.resolve("expansion").resolve("packs");
+        Path extractedRoot = dataFolder.resolve("generated-expansion-packs").resolve("extracted");
+        try {
+            java.nio.file.Files.createDirectories(packsRoot);
+        } catch (IOException exception) {
+            Main.getInstance().getLogger().warning("Failed to create BlockEngine expansion pack folder: "
+                    + exception.getMessage());
+        }
+        BlockPackLoader.Result result = BlockPackLoader.load(packsRoot, extractedRoot);
         loadErrors.addAll(result.errors());
         for (String error : result.errors()) {
             Main.getInstance().getLogger().warning("Failed to load BlockEngine data pack: " + error);

@@ -8,10 +8,10 @@ The runtime sees these blocks as normal BlockEngine blocks. They use the existin
 
 ## Pack Layout
 
-Packs live under the BlockEngine plugin data folder:
+Packs live under the BlockEngine plugin data folder as either folders or zip files:
 
 ```text
-plugins/blockengine/packs/
+plugins/blockengine/expansion/packs/
   example_pack/
     pack.json
     blocks/
@@ -22,6 +22,7 @@ plugins/blockengine/packs/
       assets/example/textures/block/chair_top.png
       assets/example/textures/block/chair_side.png
     pack.png
+  another_pack.zip
 ```
 
 `pack.json` describes pack-level metadata:

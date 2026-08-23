@@ -57,7 +57,7 @@ import java.util.UUID;
 public final class DebugCommands implements BasicCommand, Listener {
     private static final List<String> ROOT_SUBCOMMANDS = List.of(
             "perf", "blocks", "plugins", "give", "chunks", "validate", "events", "reload", "profile", "block", "plugin",
-            "chunk", "visibility", "displays"
+            "chunk", "visibility", "displays", "sample-pack"
     );
     private static final List<String> PROFILE_TARGETS = List.of(
             "overall", "placement", "validation", "chunk-save", "flush", "events", "visibility", "displays", "commands"
@@ -101,6 +101,7 @@ public final class DebugCommands implements BasicCommand, Listener {
             case "chunk", "chunks" -> chunk(sender, args);
             case "validate" -> validate(sender, args);
             case "events" -> events(sender, args);
+            case "sample-pack", "samplepack" -> samplePack(sender);
             case "reload" -> {
                 ResourcePackManager.getInstance().reload();
                 DebugStyle.success(sender, "Regenerated and reloaded BlockEngine resource packs.");
@@ -186,6 +187,7 @@ public final class DebugCommands implements BasicCommand, Listener {
         BlockEngineChat.send(sender, DebugStyle.row("usage", "/blockengine debug <subcommand>"));
         BlockEngineChat.send(sender, DebugStyle.row("short", "/be debug <subcommand>"));
         BlockEngineChat.send(sender, DebugStyle.row("main", "perf, blocks, plugins, give, chunks, validate, events, reload"));
+        BlockEngineChat.send(sender, DebugStyle.row("packs", "sample-pack"));
         BlockEngineChat.send(sender, DebugStyle.row("legacy", "profile, block, plugin, chunk"));
     }
 
@@ -278,6 +280,24 @@ public final class DebugCommands implements BasicCommand, Listener {
         BlockEngineChat.send(sender, DebugStyle.row("size", bytes(link.bytes())));
         BlockEngineChat.send(sender, DebugStyle.row("file", link.zip().getFileName()));
         BlockEngineChat.send(sender, DebugStyle.row("download", download));
+    }
+
+    private void samplePack(@NotNull CommandSender sender) {
+        ResourcePackManager.DownloadLink link = ResourcePackManager.getInstance().sampleExpansionPackDownload();
+        if (link == null) {
+            DebugStyle.error(sender, "The bundled sample expansion pack is unavailable.");
+            return;
+        }
+
+        Component download = Component.text(link.url(), BlockEngineChat.ORANGE_LIGHT)
+                .clickEvent(ClickEvent.openUrl(link.url()))
+                .hoverEvent(HoverEvent.showText(Component.text("Open sample expansion pack download", BlockEngineChat.ORANGE_LIGHT)));
+        BlockEngineChat.send(sender, DebugStyle.header("sample expansion pack"));
+        BlockEngineChat.send(sender, DebugStyle.row("size", bytes(link.bytes())));
+        BlockEngineChat.send(sender, DebugStyle.row("file", link.zip().getFileName()));
+        BlockEngineChat.send(sender, DebugStyle.row("download", download));
+        BlockEngineChat.send(sender, DebugStyle.row("install", "plugins/blockengine/expansion/packs/sample-expansion-pack.zip"));
+        BlockEngineChat.send(sender, DebugStyle.row("restart", "restart the server to discover newly installed blocks"));
     }
 
     private void profile(@NotNull CommandSender sender, String[] args) {

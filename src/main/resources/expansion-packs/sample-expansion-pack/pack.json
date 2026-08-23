@@ -1,0 +1,10 @@
+{
+  "format": 1,
+  "namespace": "sample_expansion",
+  "title": "<green>Sample Expansion Pack",
+  "description": "A bundled BlockEngine data-driven block pack.",
+  "prompt": "",
+  "url-ending": "sample-expansion",
+  "required": true,
+  "catalog": true
+}

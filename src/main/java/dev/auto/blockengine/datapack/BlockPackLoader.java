@@ -8,8 +8,10 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Comparator;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
@@ -20,6 +22,8 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
 public final class BlockPackLoader {
     private static final int FORMAT = 1;
@@ -30,30 +34,105 @@ public final class BlockPackLoader {
     }
 
     public static @NotNull Result load(@NotNull Path packsRoot) {
+        return load(packsRoot, packsRoot.resolve(".extracted"));
+    }
+
+    public static @NotNull Result load(@NotNull Path packsRoot, @NotNull Path extractedRoot) {
         Objects.requireNonNull(packsRoot, "packsRoot");
+        Objects.requireNonNull(extractedRoot, "extractedRoot");
         if (!Files.isDirectory(packsRoot)) {
             return new Result(List.of(), List.of());
         }
 
         List<BlockPack> packs = new ArrayList<>();
         List<String> errors = new ArrayList<>();
+        try {
+            delete(extractedRoot);
+            Files.createDirectories(extractedRoot);
+        } catch (IOException exception) {
+            errors.add(extractedRoot + ": " + exception.getMessage());
+        }
+
         try (Stream<Path> children = Files.list(packsRoot)) {
-            for (Path folder : children.filter(Files::isDirectory).sorted().toList()) {
-                Path packFile = folder.resolve("pack.json");
-                if (!Files.isRegularFile(packFile)) {
-                    continue;
-                }
-                try {
-                    packs.add(loadPack(folder, packFile));
-                } catch (RuntimeException | IOException exception) {
-                    errors.add(packFile + ": " + exception.getMessage());
-                }
+            for (Path source : children.sorted().toList()) {
+                loadSource(source, extractedRoot, packs, errors);
             }
         } catch (IOException exception) {
             errors.add(packsRoot + ": " + exception.getMessage());
         }
 
         return new Result(packs, errors);
+    }
+
+    private static void loadSource(
+            @NotNull Path source,
+            @NotNull Path extractedRoot,
+            @NotNull List<BlockPack> packs,
+            @NotNull List<String> errors
+    ) {
+        try {
+            if (Files.isDirectory(source)) {
+                loadFolder(source, packs, errors);
+                return;
+            }
+            if (Files.isRegularFile(source)
+                    && source.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".zip")) {
+                Path extracted = extractedRoot.resolve(safeName(source)).normalize();
+                extractZip(source, extracted);
+                loadFolder(locatePackFolder(extracted), packs, errors);
+            }
+        } catch (RuntimeException | IOException exception) {
+            errors.add(source + ": " + exception.getMessage());
+        }
+    }
+
+    private static void loadFolder(
+            @NotNull Path folder,
+            @NotNull List<BlockPack> packs,
+            @NotNull List<String> errors
+    ) {
+        Path packFile = folder.resolve("pack.json");
+        if (!Files.isRegularFile(packFile)) {
+            return;
+        }
+        try {
+            packs.add(loadPack(folder, packFile));
+        } catch (RuntimeException | IOException exception) {
+            errors.add(packFile + ": " + exception.getMessage());
+        }
+    }
+
+    private static @NotNull Path locatePackFolder(@NotNull Path extracted) throws IOException {
+        if (Files.isRegularFile(extracted.resolve("pack.json"))) {
+            return extracted;
+        }
+        try (Stream<Path> children = Files.list(extracted)) {
+            List<Path> folders = children.filter(Files::isDirectory).toList();
+            if (folders.size() == 1 && Files.isRegularFile(folders.getFirst().resolve("pack.json"))) {
+                return folders.getFirst();
+            }
+        }
+        throw new IllegalArgumentException("Zip does not contain pack.json at root or inside one top-level folder.");
+    }
+
+    private static void extractZip(@NotNull Path zip, @NotNull Path outputRoot) throws IOException {
+        Files.createDirectories(outputRoot);
+        try (InputStream input = Files.newInputStream(zip);
+             ZipInputStream zipInput = new ZipInputStream(input)) {
+            ZipEntry entry;
+            while ((entry = zipInput.getNextEntry()) != null) {
+                Path output = outputRoot.resolve(entry.getName()).normalize();
+                if (!output.startsWith(outputRoot)) {
+                    throw new IllegalArgumentException("Zip entry escapes pack folder: " + entry.getName());
+                }
+                if (entry.isDirectory()) {
+                    Files.createDirectories(output);
+                    continue;
+                }
+                Files.createDirectories(output.getParent());
+                Files.copy(zipInput, output);
+            }
+        }
     }
 
     private static @NotNull BlockPack loadPack(@NotNull Path folder, @NotNull Path packFile) throws IOException {
@@ -366,6 +445,27 @@ public final class BlockPackLoader {
     private static float floatValue(@NotNull JsonNode node, @NotNull String field, float fallback) {
         JsonNode value = node.path(field);
         return value.isMissingNode() || value.isNull() ? fallback : (float) value.asDouble(fallback);
+    }
+
+    private static @NotNull String safeName(@NotNull Path source) {
+        String name = source.getFileName().toString();
+        int dot = name.toLowerCase(Locale.ROOT).lastIndexOf(".zip");
+        if (dot >= 0) {
+            name = name.substring(0, dot);
+        }
+        name = name.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9._-]", "_");
+        return name.isBlank() ? "pack" : name;
+    }
+
+    private static void delete(@NotNull Path path) throws IOException {
+        if (!Files.exists(path)) {
+            return;
+        }
+        try (Stream<Path> files = Files.walk(path)) {
+            for (Path file : files.sorted(Comparator.reverseOrder()).toList()) {
+                Files.deleteIfExists(file);
+            }
+        }
     }
 
     public record Result(@NotNull List<BlockPack> packs, @NotNull List<String> errors) {

@@ -6,6 +6,8 @@ import org.junit.jupiter.api.io.TempDir;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -60,5 +62,26 @@ class BlockPackLoaderTest {
         assertEquals(0, result.packs().size());
         assertEquals(1, result.errors().size());
         assertTrue(result.errors().getFirst().contains("Path escapes pack folder"));
+    }
+
+    @Test
+    void scansZipPackFiles() throws IOException {
+        Path zip = tempDir.resolve("bad.zip");
+        try (ZipOutputStream output = new ZipOutputStream(Files.newOutputStream(zip))) {
+            output.putNextEntry(new ZipEntry("pack.json"));
+            output.write("""
+                    {
+                      "format": 1,
+                      "namespace": "Bad Namespace"
+                    }
+                    """.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            output.closeEntry();
+        }
+
+        BlockPackLoader.Result result = BlockPackLoader.load(tempDir, tempDir.resolve("extracted"));
+
+        assertEquals(0, result.packs().size());
+        assertEquals(1, result.errors().size());
+        assertTrue(result.errors().getFirst().contains("Invalid namespace"));
     }
 }

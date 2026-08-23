@@ -206,6 +206,27 @@ public final class ResourcePackManager {
         }
     }
 
+    public @Nullable DownloadLink sampleExpansionPackDownload() {
+        ResourcePackConfig loadedConfig = config == null ? ResourcePackConfig.load(Main.getInstance()) : config;
+        Path zip = Main.getInstance().getDataFolder().toPath()
+                .resolve("generated-packs")
+                .resolve("sample-expansion-pack.zip");
+        try (InputStream input = Main.getInstance().getResource("expansion-packs/sample-expansion-pack.zip")) {
+            if (input == null) {
+                return null;
+            }
+            Files.createDirectories(zip.getParent());
+            Files.copy(input, zip, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            String url = packUrl(loadedConfig, "/downloads/sample-expansion-pack.zip");
+            ResourcePackHost.publish(url, zip);
+            return new DownloadLink("sample-expansion-pack", url, zip, Files.size(zip));
+        } catch (IOException exception) {
+            Main.getInstance().getLogger().warning("Failed to prepare BlockEngine sample expansion pack: "
+                    + exception.getMessage());
+            return null;
+        }
+    }
+
     public boolean send(@NotNull Player player, @NotNull String packId) {
         GeneratedPack generated = packsById().get(packId.toLowerCase(Locale.ROOT));
         if (generated == null || generated.sha1().length == 0) {
