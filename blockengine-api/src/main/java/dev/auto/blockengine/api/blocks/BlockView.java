@@ -8,7 +8,7 @@ import org.jetbrains.annotations.Nullable;
  * Read-only view of a world block used by adapter queries.
  *
  * <p>This keeps neighbor inspection safe while still giving adapters enough
- * information to make placement, support, redstone, and environment decisions.</p>
+ * information to make placement, support, and environment decisions.</p>
  */
 public interface BlockView {
     int x();

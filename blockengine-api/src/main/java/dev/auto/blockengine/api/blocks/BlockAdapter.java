@@ -1,6 +1,5 @@
 package dev.auto.blockengine.api.blocks;
 
-import org.bukkit.block.BlockFace;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
@@ -55,10 +54,6 @@ public interface BlockAdapter {
     default void onTick(@NotNull BlockContext context) {
     }
 
-    /** Called after a face-aware input calculation changes from 0-15. */
-    default void onRedstonePowerChange(@NotNull BlockContext context, int oldPower, int newPower) {
-    }
-
     default boolean canMove(
             @NotNull BlockContext context,
             @NotNull Block from,
@@ -74,31 +69,6 @@ public interface BlockAdapter {
             @NotNull Block to,
             @NotNull MoveCause cause
     ) {
-    }
-
-    /**
-     * Returns weak power emitted through one configured output face.
-     * Weak power affects an adjacent consumer but does not conduct through a
-     * solid block.
-     */
-    default int redstoneWeakPower(
-            @NotNull BlockContext context,
-            @NotNull BlockFace outputFace,
-            int configuredPower
-    ) {
-        return configuredPower;
-    }
-
-    /**
-     * Returns strong power emitted through one configured output face. Strong
-     * power may conduct through an adjacent solid block.
-     */
-    default int redstoneStrongPower(
-            @NotNull BlockContext context,
-            @NotNull BlockFace outputFace,
-            int configuredPower
-    ) {
-        return configuredPower;
     }
 
     /**

@@ -77,7 +77,6 @@ public final class Main extends JavaPlugin {
             for (Chunk chunk : world.getLoadedChunks()) {
                 ChunkEngine.load(chunk, VisibilityManager.getInstance().config());
                 BlockIntegrityManager.getInstance().enqueue(chunk);
-                GameListener.queueChunkRedstoneUpdate(chunk);
             }
         }
 
@@ -96,7 +95,6 @@ public final class Main extends JavaPlugin {
         ResourcePackManager.getInstance().stop();
         BlockIntegrityManager.getInstance().stop();
         BlockTicker.getInstance().stop();
-        GameListener.shutdown();
         ManagedDisplayManager.getInstance().clear();
         BlockEngine.clearManagedDisplayService();
         BlockEngine.clearManagedWorldFactory();

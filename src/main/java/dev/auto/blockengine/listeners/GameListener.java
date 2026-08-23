@@ -7,8 +7,6 @@ import dev.auto.blockengine.Main;
 import dev.auto.blockengine.api.event.BlockEngineBlockBreakEvent;
 import dev.auto.blockengine.api.event.BlockEngineBlockBrokenEvent;
 import dev.auto.blockengine.api.event.BlockEngineBlockRemovedEvent;
-import dev.auto.blockengine.defaultadapters.DebugBlocks;
-import dev.auto.blockengine.defaultadapters.DemoRedstoneDialogBlockAdapter;
 import dev.auto.blockengine.entity.PacketEntityManager;
 import dev.auto.blockengine.entity.VirtualItemDisplay;
 import dev.auto.blockengine.event.BlockEngineEvents;
@@ -30,7 +28,6 @@ import dev.auto.blockengine.types.BlockLocationKey;
 import dev.auto.blockengine.visibility.VisibilityManager;
 import io.papermc.paper.event.player.PlayerPickBlockEvent;
 import org.bukkit.Bukkit;
-import org.bukkit.Chunk;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -40,10 +37,7 @@ import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.block.Dispenser;
-import org.bukkit.block.data.AnaloguePowerable;
 import org.bukkit.block.data.Directional;
-import org.bukkit.block.data.FaceAttachable;
-import org.bukkit.block.data.type.RedstoneWire;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Event;
@@ -60,7 +54,6 @@ import org.bukkit.event.block.BlockFadeEvent;
 import org.bukkit.event.block.BlockFromToEvent;
 import org.bukkit.event.block.BlockPhysicsEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
-import org.bukkit.event.block.BlockRedstoneEvent;
 import org.bukkit.event.entity.EntityChangeBlockEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
@@ -80,17 +73,13 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.HashMap;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
 public class GameListener implements Listener {
-    private static final String REDSTONE_POWER_KEY = "__blockengine_redstone_power";
-    private static final List<BlockFace> REDSTONE_FACES = List.of(
+    private static final List<BlockFace> ADJACENT_FACES = List.of(
             BlockFace.NORTH,
             BlockFace.SOUTH,
             BlockFace.EAST,
@@ -98,71 +87,24 @@ public class GameListener implements Listener {
             BlockFace.UP,
             BlockFace.DOWN
     );
-    private static @Nullable GameListener instance;
     private final Map<UUID, Integer> lastPlacementTicks = new HashMap<>();
     private final Map<UUID, MiningSession> miningSessions = new HashMap<>();
-    private final Set<BlockLocationKey> pendingRedstoneOrigins = new LinkedHashSet<>();
-    private @Nullable BukkitTask redstoneUpdateTask;
 
     public GameListener() {
-        instance = this;
         Main.getInstance().getServer().getPluginManager().registerEvents(this, Main.getInstance());
-    }
-
-    public static void queueRedstoneUpdate(@NotNull Block origin) {
-        if (instance != null) {
-            instance.queueRedstoneUpdateAround(origin);
-        }
-    }
-
-    public static void refreshRedstoneOutput(@NotNull Block origin) {
-        if (instance != null) {
-            instance.refreshVanillaRedstoneAround(origin);
-        }
-    }
-
-    public static void queueChunkRedstoneUpdate(@NotNull Chunk chunk) {
-        if (instance == null) {
-            return;
-        }
-        ChunkEngine.LoadedChunk loaded = ChunkEngine.get(ChunkEngine.Key.from(chunk));
-        if (loaded == null) {
-            return;
-        }
-        for (RuntimeBlockView block : loaded.blocks()) {
-            instance.queueRedstoneUpdateAround(chunk.getWorld().getBlockAt(
-                    block.location().x(), block.location().y(), block.location().z()));
-        }
-    }
-
-    public static void shutdown() {
-        if (instance == null) {
-            return;
-        }
-        if (instance.redstoneUpdateTask != null) {
-            instance.redstoneUpdateTask.cancel();
-            instance.redstoneUpdateTask = null;
-        }
-        instance.pendingRedstoneOrigins.clear();
-        instance = null;
     }
 
     @EventHandler
     public void onChunkLoad(ChunkLoadEvent event) {
-        Chunk chunk = event.getChunk();
-        ChunkEngine.load(chunk, VisibilityManager.getInstance().config());
-        BlockIntegrityManager.getInstance().enqueue(chunk);
-        VisibilityManager.getInstance().refreshPlayersNear(ChunkEngine.Key.from(chunk));
-        queueChunkRedstoneUpdate(chunk);
+        ChunkEngine.load(event.getChunk(), VisibilityManager.getInstance().config());
+        BlockIntegrityManager.getInstance().enqueue(event.getChunk());
+        VisibilityManager.getInstance().refreshPlayersNear(ChunkEngine.Key.from(event.getChunk()));
     }
 
     @EventHandler
     public void onChunkUnload(ChunkUnloadEvent event) {
         ChunkEngine.flushNow();
         ChunkEngine.Key key = ChunkEngine.Key.from(event.getChunk());
-        pendingRedstoneOrigins.removeIf(origin -> origin.worldId().equals(key.worldId())
-                && origin.x() >> 4 == key.x()
-                && origin.z() >> 4 == key.z());
         ChunkEngine.unload(event.getChunk());
         VisibilityManager.getInstance().removeChunkDisplays(key);
     }
@@ -200,17 +142,8 @@ public class GameListener implements Listener {
     public void onQuit(PlayerQuitEvent event) {
         ChunkEngine.flushNow();
         lastPlacementTicks.remove(event.getPlayer().getUniqueId());
-        DemoRedstoneDialogBlockAdapter.cleanup(event.getPlayer().getUniqueId());
         stopMining(event.getPlayer());
         VisibilityManager.getInstance().cleanup(event.getPlayer());
-    }
-
-    @EventHandler
-    public void onCustomBlockRemoved(BlockEngineBlockRemovedEvent event) {
-        if (event.blockId().equals(DebugBlocks.DEMO_REDSTONE_DIALOG_ID)) {
-            DemoRedstoneDialogBlockAdapter.cleanup(event.block());
-        }
-        queueRedstoneUpdateAround(event.block());
     }
 
     @EventHandler
@@ -311,7 +244,6 @@ public class GameListener implements Listener {
             return;
         }
         queueGravityUpdateAround(target);
-        queueRedstoneUpdateAround(target);
 
         if (dispenserBlock.getState() instanceof Dispenser dispenser) {
             consumeDispenserItem(dispenser, event.getItem());
@@ -321,30 +253,18 @@ public class GameListener implements Listener {
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)
     public void onBreakPostVerify(BlockBreakEvent event) {
         postVerify(event.getBlock());
-        queueRedstoneUpdateAround(event.getBlock());
-    }
-
-    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
-    public void onRedstone(BlockRedstoneEvent event) {
-        event.setNewCurrent(Math.max(event.getNewCurrent(), customPowerInto(event.getBlock())));
-        queueRedstoneUpdateAround(event.getBlock());
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)
     public void onPlacePostVerify(BlockPlaceEvent event) {
         postVerify(event.getBlockPlaced());
         postVerify(event.getBlockReplacedState().getBlock());
-        queueRedstoneUpdateAround(event.getBlockPlaced());
-        queueRedstoneUpdateAround(event.getBlockReplacedState().getBlock());
-        refreshAttachedRedstoneOnPlace(event.getBlockPlaced());
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)
     public void onPhysicsPostVerify(BlockPhysicsEvent event) {
         postVerify(event.getBlock());
         postVerify(event.getSourceBlock());
-        queueRedstoneUpdateAround(event.getBlock());
-        queueRedstoneUpdateAround(event.getSourceBlock());
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)
@@ -438,17 +358,6 @@ public class GameListener implements Listener {
         }
 
         handleCustomRightClick(event, block);
-    }
-
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)
-    public void onInteractRedstonePost(PlayerInteractEvent event) {
-        if (event.getAction() != Action.RIGHT_CLICK_BLOCK || event.getClickedBlock() == null) {
-            return;
-        }
-
-        Block clicked = event.getClickedBlock();
-        queueRedstoneUpdateAround(clicked);
-        queueRedstoneUpdateAround(clicked.getRelative(event.getBlockFace()));
     }
 
     private void handleCustomRightClick(PlayerInteractEvent event, RuntimeBlockView block) {
@@ -650,8 +559,6 @@ public class GameListener implements Listener {
             return false;
         }
         queueGravityUpdateAround(block);
-        queueRedstoneUpdateAround(block);
-
         BlockEngineEvents.call(new BlockEngineBlockBrokenEvent(
                 block,
                 player,
@@ -797,7 +704,7 @@ public class GameListener implements Listener {
         Bukkit.getScheduler().runTask(Main.getInstance(), () -> {
             GravityManager.getInstance().check(origin);
             GravityManager.getInstance().check(origin.getRelative(BlockFace.UP));
-            for (BlockFace face : REDSTONE_FACES) {
+            for (BlockFace face : ADJACENT_FACES) {
                 GravityManager.getInstance().check(origin.getRelative(face));
                 GravityManager.getInstance().check(origin.getRelative(face).getRelative(BlockFace.UP));
             }
@@ -819,300 +726,6 @@ public class GameListener implements Listener {
                 return;
             }
         }
-    }
-
-    private void updateRedstoneAround(@NotNull Block origin) {
-        Set<BlockLocationKey> visited = new HashSet<>();
-        Set<BlockLocationKey> candidates = new LinkedHashSet<>();
-        collectRedstoneCandidate(origin, candidates);
-        for (BlockFace face : REDSTONE_FACES) {
-            Block neighbor = origin.getRelative(face);
-            collectRedstoneCandidate(neighbor, candidates);
-            for (BlockFace secondFace : REDSTONE_FACES) {
-                collectRedstoneCandidate(neighbor.getRelative(secondFace), candidates);
-            }
-        }
-        for (BlockLocationKey candidate : candidates) {
-            World world = Bukkit.getWorld(candidate.worldId());
-            if (world == null || !world.isChunkLoaded(candidate.x() >> 4, candidate.z() >> 4)) {
-                continue;
-            }
-            updateCustomRedstone(world.getBlockAt(candidate.x(), candidate.y(), candidate.z()), visited);
-        }
-    }
-
-    private void collectRedstoneCandidate(
-            @NotNull Block block,
-            @NotNull Set<BlockLocationKey> candidates
-    ) {
-        candidates.add(location(block));
-    }
-
-    private void queueRedstoneUpdateAround(@NotNull Block origin) {
-        pendingRedstoneOrigins.add(location(origin));
-        if (redstoneUpdateTask != null) {
-            return;
-        }
-        redstoneUpdateTask = Bukkit.getScheduler().runTask(Main.getInstance(), this::flushRedstoneUpdates);
-    }
-
-    private void flushRedstoneUpdates() {
-        redstoneUpdateTask = null;
-        int budget = Math.max(1, Main.getInstance().getConfig().getInt("redstone.max-origins-per-tick", 2048));
-        List<BlockLocationKey> origins = new ArrayList<>(Math.min(budget, pendingRedstoneOrigins.size()));
-        var iterator = pendingRedstoneOrigins.iterator();
-        while (iterator.hasNext() && origins.size() < budget) {
-            origins.add(iterator.next());
-            iterator.remove();
-        }
-        for (BlockLocationKey origin : origins) {
-            World world = Bukkit.getWorld(origin.worldId());
-            if (world == null || !world.isChunkLoaded(origin.x() >> 4, origin.z() >> 4)) {
-                continue;
-            }
-            updateRedstoneAround(world.getBlockAt(origin.x(), origin.y(), origin.z()));
-        }
-        if (!pendingRedstoneOrigins.isEmpty() && redstoneUpdateTask == null) {
-            redstoneUpdateTask = Bukkit.getScheduler().runTask(Main.getInstance(), this::flushRedstoneUpdates);
-        }
-    }
-
-    private void updateCustomRedstone(
-            @NotNull Block block,
-            @NotNull Set<BlockLocationKey> visited
-    ) {
-        BlockLocationKey key = new BlockLocationKey(
-                block.getWorld().getUID(),
-                block.getX(),
-                block.getY(),
-                block.getZ()
-        );
-        if (!visited.add(key)) {
-            return;
-        }
-
-        RuntimeBlockView customBlock = ChunkEngine.getBlock(key);
-        if (customBlock == null) {
-            return;
-        }
-
-        BlockDefinition definition = BlockRegistry.getBlock(customBlock.storedBlock().blockId());
-        if (definition == null) {
-            return;
-        }
-
-        dev.auto.blockengine.api.blocks.BlockDefinition.Redstone redstone;
-        try {
-            redstone = definition.apiDefinition()
-                    .state(customBlock.storedBlock().stateId())
-                    .redstone();
-        } catch (IllegalArgumentException ignored) {
-            return;
-        }
-        if (!redstone.hasInputs()) {
-            return;
-        }
-
-        BlockContext context = BlockDataManager.getInstance().context(block, customBlock, null);
-        if (context == null) {
-            return;
-        }
-
-        int oldPower = context.data().integer(REDSTONE_POWER_KEY) == null
-                ? 0
-                : Math.clamp(context.data().integer(REDSTONE_POWER_KEY), 0, 15);
-        int newPower = receivedRedstonePower(block, redstone.inputFaces());
-        if (oldPower == newPower) {
-            return;
-        }
-
-        context.data().integer(REDSTONE_POWER_KEY, newPower);
-        try {
-            context.adapter().onRedstonePowerChange(context, oldPower, newPower);
-        } catch (RuntimeException exception) {
-            Main.getInstance().getLogger().warning("BlockEngine redstone callback failed for "
-                    + customBlock.storedBlock().blockId() + " at " + key + ": " + exception.getMessage());
-            return;
-        }
-        boolean saved = BlockDataManager.getInstance().save(block, context);
-
-        if (saved && redstone.hasOutputs()) {
-            // Continue the circuit on the next scheduler pass. This gives each
-            // hop deterministic one-tick propagation and avoids recursive
-            // feedback loops whose result depended on hash iteration order.
-            refreshVanillaRedstoneAround(block);
-            queueRedstoneUpdateAround(block);
-        }
-    }
-
-    private void refreshVanillaRedstoneAround(@NotNull Block origin) {
-        for (BlockFace face : REDSTONE_FACES) {
-            refreshVanillaRedstoneAt(origin.getRelative(face));
-        }
-    }
-
-    private void refreshVanillaRedstoneAt(@NotNull Block target) {
-        if (!target.getWorld().isChunkLoaded(target.getX() >> 4, target.getZ() >> 4)
-                || block(target) != null) {
-            return;
-        }
-        target.getState().update(true, true);
-    }
-
-    private void refreshAttachedRedstoneOnPlace(@NotNull Block placed) {
-        BlockFace attachedFace = attachedFace(placed);
-        if (attachedFace == null) {
-            return;
-        }
-
-        Block support = placed.getRelative(attachedFace);
-        BlockFace outputFace = attachedFace.getOppositeFace();
-        int supportPower = Math.max(
-                Math.max(customWeakPower(support, outputFace), customStrongPower(support, outputFace)),
-                conductedCustomStrongPower(support, placed)
-        );
-        if (supportPower <= 0) {
-            return;
-        }
-
-        refreshVanillaRedstoneAt(placed);
-        queueRedstoneUpdateAround(support);
-        queueRedstoneUpdateAround(placed);
-        Bukkit.getScheduler().runTask(Main.getInstance(), () -> refreshVanillaRedstoneAt(placed));
-    }
-
-    private @Nullable BlockFace attachedFace(@NotNull Block block) {
-        org.bukkit.block.data.BlockData data = block.getBlockData();
-        if (block.getType() == Material.REDSTONE_TORCH) {
-            return BlockFace.DOWN;
-        }
-        if (block.getType() == Material.REDSTONE_WALL_TORCH && data instanceof Directional directional) {
-            return directional.getFacing().getOppositeFace();
-        }
-        if (data instanceof FaceAttachable attachable) {
-            return switch (attachable.getAttachedFace()) {
-                case FLOOR -> BlockFace.DOWN;
-                case CEILING -> BlockFace.UP;
-                case WALL -> data instanceof Directional directional
-                        ? directional.getFacing().getOppositeFace()
-                        : null;
-            };
-        }
-        return null;
-    }
-
-    private int receivedRedstonePower(@NotNull Block block, @NotNull Set<BlockFace> inputFaces) {
-        int max = 0;
-        for (BlockFace inputFace : inputFaces) {
-            Block neighbor = block.getRelative(inputFace);
-            BlockFace outputFace = inputFace.getOppositeFace();
-            max = Math.max(max, vanillaInputPower(block, neighbor, inputFace, outputFace));
-            max = Math.max(max, customWeakPower(neighbor, outputFace));
-            max = Math.max(max, customStrongPower(neighbor, outputFace));
-            max = Math.max(max, conductedCustomStrongPower(neighbor, block));
-            if (max >= 15) {
-                return 15;
-            }
-        }
-        return Math.clamp(max, 0, 15);
-    }
-
-    private int vanillaInputPower(
-            @NotNull Block receiver,
-            @NotNull Block source,
-            @NotNull BlockFace inputFace,
-            @NotNull BlockFace outputFace
-    ) {
-        int max = Math.max(receiver.getBlockPower(inputFace), source.getBlockPower(outputFace));
-
-        org.bukkit.block.data.BlockData sourceData = source.getBlockData();
-        if (sourceData instanceof RedstoneWire wire && wire.getFace(outputFace) != RedstoneWire.Connection.NONE) {
-            max = Math.max(max, wire.getPower());
-        } else if (sourceData instanceof AnaloguePowerable analoguePowerable
-                && directlyFaces(sourceData, outputFace)) {
-            max = Math.max(max, analoguePowerable.getPower());
-        }
-        return Math.clamp(max, 0, 15);
-    }
-
-    private boolean directlyFaces(@NotNull org.bukkit.block.data.BlockData data, @NotNull BlockFace outputFace) {
-        return !(data instanceof Directional directional) || directional.getFacing() == outputFace;
-    }
-
-    private int customWeakPower(@NotNull Block block, @NotNull BlockFace outputFace) {
-        return customRedstonePower(block, outputFace, false);
-    }
-
-    private int customStrongPower(@NotNull Block block, @NotNull BlockFace outputFace) {
-        return customRedstonePower(block, outputFace, true);
-    }
-
-    private int customRedstonePower(@NotNull Block block, @NotNull BlockFace outputFace, boolean strong) {
-        RuntimeBlockView customBlock = this.block(block);
-        if (customBlock == null) {
-            return 0;
-        }
-
-        BlockDefinition definition = BlockRegistry.getBlock(customBlock.storedBlock().blockId());
-        if (definition == null) {
-            return 0;
-        }
-
-        dev.auto.blockengine.api.blocks.BlockDefinition.Redstone redstone;
-        try {
-            redstone = definition.apiDefinition()
-                    .state(customBlock.storedBlock().stateId())
-                    .redstone();
-        } catch (IllegalArgumentException ignored) {
-            return 0;
-        }
-        if (!redstone.outputFaces().contains(outputFace)) {
-            return 0;
-        }
-
-        BlockContext context = BlockDataManager.getInstance().context(block, customBlock, null);
-        if (context == null) {
-            return 0;
-        }
-
-        try {
-            int power = strong
-                    ? context.adapter().redstoneStrongPower(context, outputFace, redstone.strongPower())
-                    : context.adapter().redstoneWeakPower(context, outputFace, redstone.weakPower());
-            return Math.clamp(power, 0, 15);
-        } catch (RuntimeException exception) {
-            Main.getInstance().getLogger().warning("BlockEngine redstone output failed for "
-                    + customBlock.storedBlock().blockId() + " at " + customBlock.location()
-                    + ": " + exception.getMessage());
-            return 0;
-        }
-    }
-
-    private int conductedCustomStrongPower(@NotNull Block conductor, @NotNull Block receiver) {
-        if (!conductor.isSolid()) {
-            return 0;
-        }
-        int max = 0;
-        for (BlockFace face : REDSTONE_FACES) {
-            Block source = conductor.getRelative(face);
-            if (source.equals(receiver)) {
-                continue;
-            }
-            max = Math.max(max, customStrongPower(source, face.getOppositeFace()));
-        }
-        return max;
-    }
-
-    private int customPowerInto(@NotNull Block target) {
-        int max = 0;
-        for (BlockFace inputFace : REDSTONE_FACES) {
-            Block source = target.getRelative(inputFace);
-            BlockFace outputFace = inputFace.getOppositeFace();
-            max = Math.max(max, customWeakPower(source, outputFace));
-            max = Math.max(max, customStrongPower(source, outputFace));
-            max = Math.max(max, conductedCustomStrongPower(source, target));
-        }
-        return Math.clamp(max, 0, 15);
     }
 
     private boolean placeHeld(PlayerInteractEvent event) {
@@ -1167,7 +780,6 @@ public class GameListener implements Listener {
             return true;
         }
         queueGravityUpdateAround(target);
-        queueRedstoneUpdateAround(target);
 
         player.swingHand(event.getHand());
 

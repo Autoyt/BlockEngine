@@ -7,7 +7,6 @@ import dev.auto.blockengine.api.display.DisplaySpec;
 import dev.auto.blockengine.api.event.BlockEngineModificationEvent;
 import dev.auto.blockengine.event.BlockEngineEvents;
 import dev.auto.blockengine.integrity.BlockIntegrityManager;
-import dev.auto.blockengine.listeners.GameListener;
 import dev.auto.blockengine.registry.BlockRegistry;
 import dev.auto.blockengine.types.BlockDefinition;
 import dev.auto.blockengine.types.BlockLocationKey;
@@ -82,8 +81,6 @@ public final class BlockMover {
         to.setType(Main.getBackingBlock(), false);
         ChunkEngine.changed(from);
         ChunkEngine.changed(to);
-        GameListener.queueRedstoneUpdate(from);
-        GameListener.queueRedstoneUpdate(to);
         BlockEngineEvents.modification(
                 BlockEngineModificationEvent.Action.REMOVE_CUSTOM_BLOCK,
                 from,

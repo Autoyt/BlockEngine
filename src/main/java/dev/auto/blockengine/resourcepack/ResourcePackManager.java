@@ -365,7 +365,6 @@ public final class ResourcePackManager {
         texture(root, "transparent", 0x00000000);
         texture(root, "demo_inventory", 0xFF2F6BFF);
         texture(root, "demo_break", 0xFFFF8C1A);
-        texture(root, "demo_redstone_dialog", 0xFFFFD84D);
         texture(root, "demo_state_red", 0xFFFF3355);
         texture(root, "demo_state_green", 0xFF33CC66);
         texture(root, "demo_state_purple", 0xFFB84DFF);

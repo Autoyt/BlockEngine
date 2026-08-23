@@ -1,7 +1,6 @@
 package dev.auto.blockengine.api.blocks;
 
 import org.bukkit.Material;
-import org.bukkit.block.BlockFace;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -168,7 +167,6 @@ public final class BlockDefinition {
             @NotNull Set<ToolType> preferredTools,
             boolean requirePreferredToolForDrops,
             boolean requireSilkTouchForDrops,
-            @NotNull Redstone redstone,
             @NotNull Movement movement,
             boolean unbreakable,
             boolean dropsItem,
@@ -182,7 +180,6 @@ public final class BlockDefinition {
             preferredTools = preferredTools.isEmpty()
                     ? Set.of()
                     : Collections.unmodifiableSet(EnumSet.copyOf(preferredTools));
-            Objects.requireNonNull(redstone, "redstone");
             Objects.requireNonNull(movement, "movement");
             Objects.requireNonNull(textures, "textures");
             Objects.requireNonNull(sounds, "sounds");
@@ -216,41 +213,6 @@ public final class BlockDefinition {
                     && south == null
                     && east == null
                     && west == null;
-        }
-    }
-
-    /**
-     * Face-aware redstone contract for custom blocks. Weak power directly
-     * powers adjacent consumers; strong power can additionally conduct through
-     * an adjacent solid block.
-     */
-    public record Redstone(
-            @NotNull Set<BlockFace> inputFaces,
-            @NotNull Set<BlockFace> outputFaces,
-            int weakPower,
-            int strongPower
-    ) {
-        public Redstone {
-            Objects.requireNonNull(inputFaces, "inputFaces");
-            Objects.requireNonNull(outputFaces, "outputFaces");
-            inputFaces = immutableFaces(inputFaces);
-            outputFaces = immutableFaces(outputFaces);
-            weakPower = Math.clamp(weakPower, 0, 15);
-            strongPower = Math.clamp(strongPower, 0, 15);
-        }
-
-        public boolean hasInputs() {
-            return !inputFaces.isEmpty();
-        }
-
-        public boolean hasOutputs() {
-            // Adapters may calculate dynamic power without using the configured
-            // value, so faces alone determine whether propagation is required.
-            return !outputFaces.isEmpty();
-        }
-
-        public static @NotNull Redstone none() {
-            return new Redstone(Set.of(), Set.of(), 0, 0);
         }
     }
 
@@ -402,7 +364,6 @@ public final class BlockDefinition {
         private final @NotNull Set<ToolType> preferredTools = EnumSet.noneOf(ToolType.class);
         private boolean requirePreferredToolForDrops = false;
         private boolean requireSilkTouchForDrops = false;
-        private @NotNull Redstone redstone = Redstone.none();
         private @NotNull Movement movement = Movement.normal();
         private boolean unbreakable = false;
         private boolean dropsItem = true;
@@ -454,14 +415,6 @@ public final class BlockDefinition {
 
         public @NotNull StateBuilder requireSilkTouchForDrops(boolean requireSilkTouchForDrops) {
             this.requireSilkTouchForDrops = requireSilkTouchForDrops;
-            return this;
-        }
-
-        public @NotNull StateBuilder redstone(@NotNull Consumer<RedstoneBuilder> configure) {
-            Objects.requireNonNull(configure, "configure");
-            RedstoneBuilder builder = new RedstoneBuilder();
-            configure.accept(builder);
-            this.redstone = builder.build();
             return this;
         }
 
@@ -527,7 +480,6 @@ public final class BlockDefinition {
                     preferredTools,
                     requirePreferredToolForDrops,
                     requireSilkTouchForDrops,
-                    redstone,
                     movement,
                     unbreakable,
                     dropsItem,
@@ -535,71 +487,6 @@ public final class BlockDefinition {
                     textures,
                     sounds
             );
-        }
-    }
-
-    public static final class RedstoneBuilder {
-        private final @NotNull Set<BlockFace> inputFaces = EnumSet.noneOf(BlockFace.class);
-        private final @NotNull Set<BlockFace> outputFaces = EnumSet.noneOf(BlockFace.class);
-        private int weakPower = 0;
-        private int strongPower = 0;
-
-        public @NotNull RedstoneBuilder inputFaces(BlockFace @NotNull ... faces) {
-            inputFaces.clear();
-            addFaces(inputFaces, faces);
-            return this;
-        }
-
-        public @NotNull RedstoneBuilder outputFaces(BlockFace @NotNull ... faces) {
-            outputFaces.clear();
-            addFaces(outputFaces, faces);
-            return this;
-        }
-
-        public @NotNull RedstoneBuilder inputAllFaces() {
-            inputFaces.clear();
-            inputFaces.addAll(allFaces());
-            return this;
-        }
-
-        public @NotNull RedstoneBuilder outputAllFaces() {
-            outputFaces.clear();
-            outputFaces.addAll(allFaces());
-            return this;
-        }
-
-        public @NotNull RedstoneBuilder noInput() {
-            inputFaces.clear();
-            return this;
-        }
-
-        public @NotNull RedstoneBuilder noOutput() {
-            outputFaces.clear();
-            weakPower = 0;
-            strongPower = 0;
-            return this;
-        }
-
-        public @NotNull RedstoneBuilder weakPower(int weakPower) {
-            this.weakPower = Math.clamp(weakPower, 0, 15);
-            return this;
-        }
-
-        public @NotNull RedstoneBuilder strongPower(int strongPower) {
-            this.strongPower = Math.clamp(strongPower, 0, 15);
-            return this;
-        }
-
-        private @NotNull Redstone build() {
-            return new Redstone(inputFaces, outputFaces, weakPower, strongPower);
-        }
-
-        private static void addFaces(@NotNull Set<BlockFace> target, BlockFace @NotNull [] faces) {
-            Objects.requireNonNull(faces, "faces");
-            for (BlockFace face : faces) {
-                validateRedstoneFace(face);
-                target.add(face);
-            }
         }
     }
 
@@ -629,29 +516,6 @@ public final class BlockDefinition {
 
         private @NotNull Movement build() {
             return new Movement(gravity, dispenserPlaceable, gravityBreaksOnPartialBlock);
-        }
-    }
-
-    private static @NotNull Set<BlockFace> allFaces() {
-        return EnumSet.of(BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST, BlockFace.UP, BlockFace.DOWN);
-    }
-
-    private static @NotNull Set<BlockFace> immutableFaces(@NotNull Set<BlockFace> faces) {
-        if (faces.isEmpty()) {
-            return Set.of();
-        }
-        EnumSet<BlockFace> copy = EnumSet.noneOf(BlockFace.class);
-        for (BlockFace face : faces) {
-            validateRedstoneFace(face);
-            copy.add(face);
-        }
-        return Collections.unmodifiableSet(copy);
-    }
-
-    private static void validateRedstoneFace(@NotNull BlockFace face) {
-        Objects.requireNonNull(face, "face");
-        if (!allFaces().contains(face)) {
-            throw new IllegalArgumentException("Redstone face must be one of the six block faces: " + face);
         }
     }
 

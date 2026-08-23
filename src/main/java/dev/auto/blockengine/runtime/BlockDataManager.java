@@ -4,7 +4,6 @@ import dev.auto.blockengine.api.blocks.BlockData;
 import dev.auto.blockengine.api.event.BlockEngineBlockDataSaveEvent;
 import dev.auto.blockengine.api.event.BlockEngineBlockDataSavedEvent;
 import dev.auto.blockengine.event.BlockEngineEvents;
-import dev.auto.blockengine.listeners.GameListener;
 import dev.auto.blockengine.registry.BlockRegistry;
 import dev.auto.blockengine.types.BlockDefinition;
 import dev.auto.blockengine.types.BlockLocationKey;
@@ -78,8 +77,6 @@ public final class BlockDataManager {
                 payload
         );
         ChunkEngine.changed(block);
-        GameListener.queueRedstoneUpdate(block);
-        GameListener.refreshRedstoneOutput(block);
         BlockEngineEvents.call(new BlockEngineBlockDataSavedEvent(
                 block,
                 context.data(),

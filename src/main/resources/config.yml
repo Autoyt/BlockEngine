@@ -8,9 +8,6 @@ resource-pack:
   public-url: ""
   required: false
 
-redstone:
-  max-origins-per-tick: 2048
-
 integrity:
   reconcile-on-chunk-load: true
   reconcile-on-interaction: true
