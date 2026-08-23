@@ -48,6 +48,7 @@ import java.util.zip.ZipOutputStream;
 
 public final class ResourcePackManager {
     private static final int PACK_FORMAT = 55;
+    private static final String DEFAULT_ICON_RESOURCE = "resource/default_icon.png";
     private static final MiniMessage MINI = MiniMessage.miniMessage();
     private static final GsonComponentSerializer GSON = GsonComponentSerializer.gson();
     private static final LegacyComponentSerializer LEGACY = LegacyComponentSerializer.legacySection();
@@ -118,6 +119,7 @@ public final class ResourcePackManager {
             Component title = Component.text("BlockEngine");
             Component description = Component.text("Generated BlockEngine custom block assets");
             packMeta(root, title, description);
+            copyIcon(root, null);
             ItemModelGenerator.generateBackingBlock(root);
             demoTextures(root);
 
@@ -185,7 +187,7 @@ public final class ResourcePackManager {
         return packsById().keySet();
     }
 
-    public @Nullable DownloadLink download(@NotNull String packId) {
+    public @Nullable ResourcePackDownload download(@NotNull String packId) {
         ResourcePackConfig loadedConfig = config == null ? ResourcePackConfig.load(Main.getInstance()) : config;
         String normalized = packId.toLowerCase(Locale.ROOT);
         try {
@@ -198,7 +200,7 @@ public final class ResourcePackManager {
                 return null;
             }
             ResourcePackHost.publish(generated.url(), generated.zip());
-            return new DownloadLink(normalized, generated.url(), generated.zip(), Files.size(generated.zip()));
+            return new ResourcePackDownload(normalized, generated.url(), generated.zip(), Files.size(generated.zip()));
         } catch (IOException exception) {
             Main.getInstance().getLogger().warning("Failed to prepare BlockEngine pack download '" + packId + "': "
                     + exception.getMessage());
@@ -206,7 +208,7 @@ public final class ResourcePackManager {
         }
     }
 
-    public @Nullable DownloadLink sampleExpansionPackDownload() {
+    public @Nullable ResourcePackDownload sampleExpansionPackDownload() {
         ResourcePackConfig loadedConfig = config == null ? ResourcePackConfig.load(Main.getInstance()) : config;
         Path zip = Main.getInstance().getDataFolder().toPath()
                 .resolve("generated-packs")
@@ -219,7 +221,7 @@ public final class ResourcePackManager {
             Files.copy(input, zip, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
             String url = packUrl(loadedConfig, "/downloads/sample-expansion-pack.zip");
             ResourcePackHost.publish(url, zip);
-            return new DownloadLink("sample-expansion-pack", url, zip, Files.size(zip));
+            return new ResourcePackDownload("sample-expansion-pack", url, zip, Files.size(zip));
         } catch (IOException exception) {
             Main.getInstance().getLogger().warning("Failed to prepare BlockEngine sample expansion pack: "
                     + exception.getMessage());
@@ -259,7 +261,7 @@ public final class ResourcePackManager {
         return packs;
     }
 
-    private @Nullable DownloadLink combinedDownload(@NotNull ResourcePackConfig config) throws IOException {
+    private @Nullable ResourcePackDownload combinedDownload(@NotNull ResourcePackConfig config) throws IOException {
         if (hostedPacks.isEmpty()) {
             return null;
         }
@@ -276,10 +278,13 @@ public final class ResourcePackManager {
         for (GeneratedPack generated : hostedPacks) {
             copyPackFolder(generated.folder(), root);
         }
+        if (!Files.isRegularFile(root.resolve("pack.png"))) {
+            copyIcon(root, null);
+        }
         zip(root, zip);
         String url = packUrl(config, "/downloads/blockengine-all.zip");
         ResourcePackHost.publish(url, zip);
-        return new DownloadLink("*", url, zip, Files.size(zip));
+        return new ResourcePackDownload("*", url, zip, Files.size(zip));
     }
 
     private void sendSingle(@NotNull Player player, @NotNull GeneratedPack generated) {
@@ -715,10 +720,17 @@ public final class ResourcePackManager {
     }
 
     private static void copyIcon(@NotNull Path root, @Nullable Path icon) throws IOException {
-        if (icon == null || !Files.isRegularFile(icon)) {
+        Path target = root.resolve("pack.png");
+        if (icon != null && Files.isRegularFile(icon)) {
+            Files.copy(icon, target);
             return;
         }
-        Files.copy(icon, root.resolve("pack.png"));
+
+        try (InputStream input = Main.getInstance().getResource(DEFAULT_ICON_RESOURCE)) {
+            if (input != null) {
+                Files.copy(input, target);
+            }
+        }
     }
 
     private static void copyAssets(@NotNull Path packRoot, @NotNull Collection<Path> roots) throws IOException {
@@ -805,11 +817,4 @@ public final class ResourcePackManager {
         }
     }
 
-    public record DownloadLink(
-            @NotNull String packId,
-            @NotNull String url,
-            @NotNull Path zip,
-            long bytes
-    ) {
-    }
 }

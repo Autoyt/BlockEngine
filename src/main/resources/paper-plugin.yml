@@ -1,5 +1,5 @@
 name: blockengine
-prefix: BLOCKENGINE by AutoYT
+prefix: BLOCKENGINE
 version: '${version}'
 
 main: dev.auto.blockengine.Main

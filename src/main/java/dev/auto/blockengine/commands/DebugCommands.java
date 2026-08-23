@@ -15,6 +15,7 @@ import dev.auto.blockengine.items.ItemManager;
 import dev.auto.blockengine.registry.BlockRegistry;
 import dev.auto.blockengine.registry.NamespaceRegistry;
 import dev.auto.blockengine.resourcepack.ResourcePackManager;
+import dev.auto.blockengine.resourcepack.ResourcePackDownload;
 import dev.auto.blockengine.runtime.ChunkEngine;
 import dev.auto.blockengine.runtime.PerformanceMetrics;
 import dev.auto.blockengine.runtime.RuntimeBlockView;
@@ -265,7 +266,7 @@ public final class DebugCommands implements BasicCommand, Listener {
 
     private void packDownload(@NotNull CommandSender sender, String[] args) {
         String packId = args.length >= 3 ? args[2].toLowerCase(Locale.ROOT) : "blockengine";
-        ResourcePackManager.DownloadLink link = ResourcePackManager.getInstance().download(packId);
+        ResourcePackDownload link = ResourcePackManager.getInstance().download(packId);
         if (link == null) {
             DebugStyle.error(sender, "Unknown or unavailable pack '" + packId + "'. Try: "
                     + String.join(", ", downloadPackIds()));
@@ -283,7 +284,7 @@ public final class DebugCommands implements BasicCommand, Listener {
     }
 
     private void samplePack(@NotNull CommandSender sender) {
-        ResourcePackManager.DownloadLink link = ResourcePackManager.getInstance().sampleExpansionPackDownload();
+        ResourcePackDownload link = ResourcePackManager.getInstance().sampleExpansionPackDownload();
         if (link == null) {
             DebugStyle.error(sender, "The bundled sample expansion pack is unavailable.");
             return;

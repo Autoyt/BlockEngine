@@ -307,6 +307,14 @@ public class GameListener implements Listener {
     @EventHandler(priority = EventPriority.LOWEST)
     public void onPlaceHeldBeforeVanillaUse(PlayerInteractEvent event) {
         if (event.getClickedBlock() == null
+                && event.getAction() == Action.RIGHT_CLICK_AIR
+                && event.getHand() == EquipmentSlot.HAND
+                && ItemManager.placeable(event.getItem())) {
+            denyVanillaPlacement(event);
+            return;
+        }
+
+        if (event.getClickedBlock() == null
                 || event.getAction() != Action.RIGHT_CLICK_BLOCK
                 || event.getHand() != EquipmentSlot.HAND
                 || !ItemManager.placeable(event.getItem())

@@ -19,6 +19,11 @@ final class ExplosionImpactCalculator {
     }
 
     static @NotNull Set<BlockLocationKey> affectedByExplosion(@NotNull Location origin, @NotNull List<Block> blocks) {
+        World world = origin.getWorld();
+        if (world == null || protectedByWater(world.getBlockAt(origin))) {
+            return Set.of();
+        }
+
         double radius = radius(origin, blocks);
         Set<BlockLocationKey> affected = affectedByExplosion(origin, radius);
         affected.addAll(storedCustomBlocksInRange(origin, radius));
@@ -75,7 +80,9 @@ final class ExplosionImpactCalculator {
                 double dy = location.y() + 0.5 - origin.getY();
                 double dz = location.z() + 0.5 - origin.getZ();
                 if (dx * dx + dy * dy + dz * dz <= radiusSquared) {
-                    affected.add(location);
+                    if (!blockedByWater(origin, world, location)) {
+                        affected.add(location);
+                    }
                 }
             }
         }
@@ -133,6 +140,39 @@ final class ExplosionImpactCalculator {
     private static boolean protectedByWater(@NotNull Block block) {
         return block.getType() == Material.WATER
                 || block.getBlockData() instanceof Waterlogged waterlogged && waterlogged.isWaterlogged();
+    }
+
+    private static boolean blockedByWater(
+            @NotNull Location origin,
+            @NotNull World world,
+            @NotNull BlockLocationKey target
+    ) {
+        double targetX = target.x() + 0.5;
+        double targetY = target.y() + 0.5;
+        double targetZ = target.z() + 0.5;
+        double dx = targetX - origin.getX();
+        double dy = targetY - origin.getY();
+        double dz = targetZ - origin.getZ();
+        double distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        if (distance <= 0.0) {
+            return false;
+        }
+
+        dx /= distance;
+        dy /= distance;
+        dz /= distance;
+        for (double traveled = 0.0; traveled < distance; traveled += 0.2) {
+            int blockX = floor(origin.getX() + dx * traveled);
+            int blockY = floor(origin.getY() + dy * traveled);
+            int blockZ = floor(origin.getZ() + dz * traveled);
+            if (blockX == target.x() && blockY == target.y() && blockZ == target.z()) {
+                return false;
+            }
+            if (protectedByWater(world.getBlockAt(blockX, blockY, blockZ))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static double dir(int value, int samples) {
