@@ -10,6 +10,7 @@ public final class DebugBlocks {
     public static final String DEMO_INVENTORY_ID = NAMESPACE + ":demo_inventory";
     public static final String DEMO_BREAK_ID = NAMESPACE + ":demo_break";
     public static final String DEMO_STATE_ID = NAMESPACE + ":demo_state";
+    public static final String DEMO_REDSTONE_DIALOG_ID = NAMESPACE + ":demo_redstone_dialog";
 
     private DebugBlocks() {
     }
@@ -21,5 +22,6 @@ public final class DebugBlocks {
         BlockRegistry.registerBlock(new DemoInventoryBlockAdapter(), NAMESPACE);
         BlockRegistry.registerBlock(new DemoBreakBlockAdapter(), NAMESPACE);
         BlockRegistry.registerBlock(new DemoStateBlockAdapter(), NAMESPACE);
+        BlockRegistry.registerBlock(new DemoRedstoneDialogBlockAdapter(), NAMESPACE);
     }
 }

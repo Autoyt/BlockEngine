@@ -1,15 +1,18 @@
 package dev.auto.blockengine.api.blocks;
 
 import org.bukkit.Material;
+import org.bukkit.block.BlockFace;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Collections;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Consumer;
 import java.util.regex.Pattern;
 
@@ -135,6 +138,15 @@ public final class BlockDefinition {
         DIRECTIONAL
     }
 
+    public enum ToolType {
+        PICKAXE,
+        AXE,
+        SHOVEL,
+        HOE,
+        SHEARS,
+        SWORD
+    }
+
     public record Item(
             @NotNull Material material,
             @Nullable String name,
@@ -152,6 +164,11 @@ public final class BlockDefinition {
     public record State(
             float hardness,
             float miningSpeed,
+            @NotNull Material miningProfile,
+            @NotNull Set<ToolType> preferredTools,
+            boolean requirePreferredToolForDrops,
+            boolean requireSilkTouchForDrops,
+            @NotNull Redstone redstone,
             boolean unbreakable,
             boolean dropsItem,
             boolean dropInCreative,
@@ -159,6 +176,12 @@ public final class BlockDefinition {
             @NotNull Sounds sounds
     ) {
         public State {
+            Objects.requireNonNull(miningProfile, "miningProfile");
+            Objects.requireNonNull(preferredTools, "preferredTools");
+            preferredTools = preferredTools.isEmpty()
+                    ? Set.of()
+                    : Collections.unmodifiableSet(EnumSet.copyOf(preferredTools));
+            Objects.requireNonNull(redstone, "redstone");
             Objects.requireNonNull(textures, "textures");
             Objects.requireNonNull(sounds, "sounds");
         }
@@ -191,6 +214,34 @@ public final class BlockDefinition {
                     && south == null
                     && east == null
                     && west == null;
+        }
+    }
+
+    public record Redstone(
+            @NotNull Set<BlockFace> inputFaces,
+            @NotNull Set<BlockFace> outputFaces,
+            int weakPower,
+            int strongPower
+    ) {
+        public Redstone {
+            Objects.requireNonNull(inputFaces, "inputFaces");
+            Objects.requireNonNull(outputFaces, "outputFaces");
+            inputFaces = immutableFaces(inputFaces);
+            outputFaces = immutableFaces(outputFaces);
+            weakPower = Math.clamp(weakPower, 0, 15);
+            strongPower = Math.clamp(strongPower, 0, 15);
+        }
+
+        public boolean hasInputs() {
+            return !inputFaces.isEmpty();
+        }
+
+        public boolean hasOutputs() {
+            return !outputFaces.isEmpty() && (weakPower > 0 || strongPower > 0);
+        }
+
+        public static @NotNull Redstone none() {
+            return new Redstone(Set.of(), Set.of(), 0, 0);
         }
     }
 
@@ -266,7 +317,7 @@ public final class BlockDefinition {
 
             StateBuilder builder = new StateBuilder();
             configure.accept(builder);
-            states.put(id, builder.build());
+            states.put(id, builder.build(defaultBlock));
             return this;
         }
 
@@ -328,6 +379,11 @@ public final class BlockDefinition {
     public static final class StateBuilder {
         private float hardness = 0.5f;
         private float miningSpeed = 1.0f;
+        private @Nullable Material miningProfile;
+        private final @NotNull Set<ToolType> preferredTools = EnumSet.noneOf(ToolType.class);
+        private boolean requirePreferredToolForDrops = false;
+        private boolean requireSilkTouchForDrops = false;
+        private @NotNull Redstone redstone = Redstone.none();
         private boolean unbreakable = false;
         private boolean dropsItem = true;
         private boolean dropInCreative = false;
@@ -341,6 +397,51 @@ public final class BlockDefinition {
 
         public @NotNull StateBuilder miningSpeed(float miningSpeed) {
             this.miningSpeed = miningSpeed;
+            return this;
+        }
+
+        public @NotNull StateBuilder miningProfile(@NotNull Material miningProfile) {
+            Objects.requireNonNull(miningProfile, "miningProfile");
+            if (!miningProfile.isBlock()) {
+                throw new IllegalArgumentException("Mining profile must be a block material: " + miningProfile);
+            }
+            this.miningProfile = miningProfile;
+            return this;
+        }
+
+        public @NotNull StateBuilder preferredTool(@NotNull ToolType tool) {
+            this.preferredTools.add(Objects.requireNonNull(tool, "tool"));
+            return this;
+        }
+
+        public @NotNull StateBuilder preferredTools(@NotNull ToolType first, ToolType @NotNull ... additional) {
+            this.preferredTools.add(Objects.requireNonNull(first, "first"));
+            Objects.requireNonNull(additional, "additional");
+            Collections.addAll(this.preferredTools, additional);
+            return this;
+        }
+
+        public @NotNull StateBuilder preferredTools(@NotNull Set<ToolType> tools) {
+            this.preferredTools.clear();
+            this.preferredTools.addAll(Objects.requireNonNull(tools, "tools"));
+            return this;
+        }
+
+        public @NotNull StateBuilder requirePreferredToolForDrops(boolean requirePreferredToolForDrops) {
+            this.requirePreferredToolForDrops = requirePreferredToolForDrops;
+            return this;
+        }
+
+        public @NotNull StateBuilder requireSilkTouchForDrops(boolean requireSilkTouchForDrops) {
+            this.requireSilkTouchForDrops = requireSilkTouchForDrops;
+            return this;
+        }
+
+        public @NotNull StateBuilder redstone(@NotNull Consumer<RedstoneBuilder> configure) {
+            Objects.requireNonNull(configure, "configure");
+            RedstoneBuilder builder = new RedstoneBuilder();
+            configure.accept(builder);
+            this.redstone = builder.build();
             return this;
         }
 
@@ -375,8 +476,109 @@ public final class BlockDefinition {
             return this;
         }
 
-        private @NotNull State build() {
-            return new State(hardness, miningSpeed, unbreakable, dropsItem, dropInCreative, textures, sounds);
+        private @NotNull State build(@NotNull Material defaultBlock) {
+            return new State(
+                    hardness,
+                    miningSpeed,
+                    miningProfile == null ? defaultBlock : miningProfile,
+                    preferredTools,
+                    requirePreferredToolForDrops,
+                    requireSilkTouchForDrops,
+                    redstone,
+                    unbreakable,
+                    dropsItem,
+                    dropInCreative,
+                    textures,
+                    sounds
+            );
+        }
+    }
+
+    public static final class RedstoneBuilder {
+        private final @NotNull Set<BlockFace> inputFaces = EnumSet.noneOf(BlockFace.class);
+        private final @NotNull Set<BlockFace> outputFaces = EnumSet.noneOf(BlockFace.class);
+        private int weakPower = 0;
+        private int strongPower = 0;
+
+        public @NotNull RedstoneBuilder inputFaces(BlockFace @NotNull ... faces) {
+            inputFaces.clear();
+            addFaces(inputFaces, faces);
+            return this;
+        }
+
+        public @NotNull RedstoneBuilder outputFaces(BlockFace @NotNull ... faces) {
+            outputFaces.clear();
+            addFaces(outputFaces, faces);
+            return this;
+        }
+
+        public @NotNull RedstoneBuilder inputAllFaces() {
+            inputFaces.clear();
+            inputFaces.addAll(allFaces());
+            return this;
+        }
+
+        public @NotNull RedstoneBuilder outputAllFaces() {
+            outputFaces.clear();
+            outputFaces.addAll(allFaces());
+            return this;
+        }
+
+        public @NotNull RedstoneBuilder noInput() {
+            inputFaces.clear();
+            return this;
+        }
+
+        public @NotNull RedstoneBuilder noOutput() {
+            outputFaces.clear();
+            weakPower = 0;
+            strongPower = 0;
+            return this;
+        }
+
+        public @NotNull RedstoneBuilder weakPower(int weakPower) {
+            this.weakPower = Math.clamp(weakPower, 0, 15);
+            return this;
+        }
+
+        public @NotNull RedstoneBuilder strongPower(int strongPower) {
+            this.strongPower = Math.clamp(strongPower, 0, 15);
+            return this;
+        }
+
+        private @NotNull Redstone build() {
+            return new Redstone(inputFaces, outputFaces, weakPower, strongPower);
+        }
+
+        private static void addFaces(@NotNull Set<BlockFace> target, BlockFace @NotNull [] faces) {
+            Objects.requireNonNull(faces, "faces");
+            for (BlockFace face : faces) {
+                validateRedstoneFace(face);
+                target.add(face);
+            }
+        }
+    }
+
+    private static @NotNull Set<BlockFace> allFaces() {
+        return EnumSet.of(BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST, BlockFace.UP, BlockFace.DOWN);
+    }
+
+    private static @NotNull Set<BlockFace> immutableFaces(@NotNull Set<BlockFace> faces) {
+        if (faces.isEmpty()) {
+            return Set.of();
+        }
+        EnumSet<BlockFace> copy = EnumSet.noneOf(BlockFace.class);
+        for (BlockFace face : faces) {
+            validateRedstoneFace(face);
+            copy.add(face);
+        }
+        return Collections.unmodifiableSet(copy);
+    }
+
+    private static void validateRedstoneFace(@NotNull BlockFace face) {
+        Objects.requireNonNull(face, "face");
+        if (!allFaces().contains(face)) {
+            throw new IllegalArgumentException("Redstone face must be one of the six block faces: " + face);
         }
     }
 

@@ -143,6 +143,7 @@ public final class ItemModelGenerator {
             @NotNull String stateId,
             @NotNull BlockDefinition.State state
     ) throws IOException {
+        assert definition.namespace() != null;
         Path output = root.resolve("assets")
                 .resolve(definition.namespace())
                 .resolve("models")
@@ -168,6 +169,7 @@ public final class ItemModelGenerator {
     }
 
     private static void blockItemModel(@NotNull Path root, @NotNull BlockDefinition definition) throws IOException {
+        assert definition.namespace() != null;
         Path output = root.resolve("assets")
                 .resolve(definition.namespace())
                 .resolve("models")

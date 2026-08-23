@@ -84,7 +84,7 @@ public final class PlacementManager {
             @Nullable BlockFace placedAgainst,
             @Nullable String stateId
     ) {
-        if (waterlogged(block)) {
+        if (waterloggedSolid(block)) {
             return false;
         }
 
@@ -183,9 +183,10 @@ public final class PlacementManager {
         }
     }
 
-    private boolean waterlogged(@NotNull Block block) {
-        return block.isLiquid()
-                || block.getBlockData() instanceof Waterlogged waterlogged && waterlogged.isWaterlogged();
+    private boolean waterloggedSolid(@NotNull Block block) {
+        return !block.isLiquid()
+                && block.getBlockData() instanceof Waterlogged waterlogged
+                && waterlogged.isWaterlogged();
     }
 }
 

@@ -1,5 +1,6 @@
 package dev.auto.blockengine.api.blocks;
 
+import org.bukkit.block.BlockFace;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -51,6 +52,25 @@ public interface BlockAdapter {
     }
 
     default void onTick(@NotNull BlockContext context) {
+    }
+
+    default void onRedstonePowerChange(@NotNull BlockContext context, int oldPower, int newPower) {
+    }
+
+    default int redstoneWeakPower(
+            @NotNull BlockContext context,
+            @NotNull BlockFace outputFace,
+            int configuredPower
+    ) {
+        return configuredPower;
+    }
+
+    default int redstoneStrongPower(
+            @NotNull BlockContext context,
+            @NotNull BlockFace outputFace,
+            int configuredPower
+    ) {
+        return configuredPower;
     }
 
     /**

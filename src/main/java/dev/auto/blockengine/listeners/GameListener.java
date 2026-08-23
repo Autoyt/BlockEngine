@@ -53,6 +53,7 @@ import org.bukkit.event.block.BlockPhysicsEvent;
 import org.bukkit.event.block.BlockPistonExtendEvent;
 import org.bukkit.event.block.BlockPistonRetractEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
+import org.bukkit.event.block.BlockRedstoneEvent;
 import org.bukkit.event.entity.EntityChangeBlockEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
@@ -72,12 +73,22 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
 public class GameListener implements Listener {
+    private static final String REDSTONE_POWER_KEY = "__blockengine_redstone_power";
+    private static final List<BlockFace> REDSTONE_FACES = List.of(
+            BlockFace.NORTH,
+            BlockFace.SOUTH,
+            BlockFace.EAST,
+            BlockFace.WEST,
+            BlockFace.UP,
+            BlockFace.DOWN
+    );
     private final Map<UUID, Integer> lastPlacementTicks = new HashMap<>();
     private final Map<UUID, MiningSession> miningSessions = new HashMap<>();
 
@@ -165,7 +176,13 @@ public class GameListener implements Listener {
         RuntimeBlockView block = block(event.getBlock());
         if (block != null) {
             event.setCancelled(true);
-            breakCustomBlock(event.getBlock(), block, event.getPlayer());
+            breakCustomBlock(
+                    event.getBlock(),
+                    block,
+                    event.getPlayer(),
+                    event.getPlayer().getGameMode() == GameMode.CREATIVE
+                            || VanillaMiningCalculator.canHarvest(event.getPlayer(), block)
+            );
         }
     }
 
@@ -195,6 +212,11 @@ public class GameListener implements Listener {
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)
     public void onBreakPostVerify(BlockBreakEvent event) {
         postVerify(event.getBlock());
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onRedstone(BlockRedstoneEvent event) {
+        updateRedstoneAround(event.getBlock());
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)
@@ -384,6 +406,14 @@ public class GameListener implements Listener {
 
     private void breakOrStartMining(@NotNull Player player, @NotNull Block block, @NotNull RuntimeBlockView customBlock) {
         if (player.getGameMode() != GameMode.CREATIVE) {
+            if (VanillaMiningCalculator.progressPerTick(player, customBlock) >= 1.0f) {
+                stopMining(player, block);
+                RuntimeBlockView current = block(block);
+                if (current != null && sameStoredBlock(current, customBlock)) {
+                    breakCustomBlock(block, current, player, VanillaMiningCalculator.canHarvest(player, current));
+                }
+                return;
+            }
             startMining(player, block, customBlock);
             return;
         }
@@ -411,7 +441,7 @@ public class GameListener implements Listener {
             return;
         }
 
-        session.advance(progressPerTick(session.customBlock()));
+        session.advance(VanillaMiningCalculator.progressPerTick(player, session.customBlock()));
         session.tick();
         if (session.ticks() % 4 == 0) {
             playCustomSound(session.customBlock(), "mining");
@@ -425,7 +455,7 @@ public class GameListener implements Listener {
         }
 
         stopMining(player);
-        breakCustomBlock(session.block(), current, player);
+        breakCustomBlock(session.block(), current, player, VanillaMiningCalculator.canHarvest(player, current));
     }
 
     private void stopMining(@NotNull Player player) {
@@ -445,6 +475,15 @@ public class GameListener implements Listener {
     }
 
     private boolean breakCustomBlock(@NotNull Block block, @NotNull RuntimeBlockView customBlock, @NotNull Player player) {
+        return breakCustomBlock(block, customBlock, player, true);
+    }
+
+    private boolean breakCustomBlock(
+            @NotNull Block block,
+            @NotNull RuntimeBlockView customBlock,
+            @NotNull Player player,
+            boolean harvestable
+    ) {
         BlockContext context = BlockDataManager.getInstance().context(block, customBlock, player);
         if (context != null && BlockEngineEvents.callCancellable(new BlockEngineBlockBreakEvent(
                 block,
@@ -459,7 +498,9 @@ public class GameListener implements Listener {
             return false;
         }
 
-        boolean drop = player.getGameMode() != GameMode.CREATIVE || customBlock.storedBlock().dropInCreative();
+        boolean drop = player.getGameMode() == GameMode.CREATIVE
+                ? customBlock.storedBlock().dropInCreative()
+                : harvestable;
         String blockId = customBlock.storedBlock().blockId();
         String stateId = customBlock.storedBlock().stateId();
         if (!BlockRemover.remove(
@@ -481,12 +522,6 @@ public class GameListener implements Listener {
                 drop && customBlock.storedBlock().dropsItem()
         ));
         return true;
-    }
-
-    private float progressPerTick(@NotNull RuntimeBlockView customBlock) {
-        float hardness = Math.max(0.05f, customBlock.storedBlock().hardness());
-        float speed = Math.max(0.05f, customBlock.storedBlock().miningSpeed());
-        return Math.min(1.0f, speed / (hardness * 20.0f));
     }
 
     private void playCustomSound(@Nullable RuntimeBlockView customBlock, @NotNull String type) {
@@ -619,6 +654,124 @@ public class GameListener implements Listener {
         }
     }
 
+    private void updateRedstoneAround(@NotNull Block origin) {
+        Set<BlockLocationKey> visited = new HashSet<>();
+        updateCustomRedstone(origin, visited, true);
+        for (BlockFace face : REDSTONE_FACES) {
+            updateCustomRedstone(origin.getRelative(face), visited, true);
+        }
+    }
+
+    private void updateCustomRedstone(
+            @NotNull Block block,
+            @NotNull Set<BlockLocationKey> visited,
+            boolean propagateOutputs
+    ) {
+        BlockLocationKey key = new BlockLocationKey(
+                block.getWorld().getUID(),
+                block.getX(),
+                block.getY(),
+                block.getZ()
+        );
+        if (!visited.add(key)) {
+            return;
+        }
+
+        RuntimeBlockView customBlock = ChunkEngine.getBlock(key);
+        if (customBlock == null) {
+            return;
+        }
+
+        BlockDefinition definition = BlockRegistry.getBlock(customBlock.storedBlock().blockId());
+        if (definition == null) {
+            return;
+        }
+
+        dev.auto.blockengine.api.blocks.BlockDefinition.Redstone redstone;
+        try {
+            redstone = definition.apiDefinition()
+                    .state(customBlock.storedBlock().stateId())
+                    .redstone();
+        } catch (IllegalArgumentException ignored) {
+            return;
+        }
+        if (!redstone.hasInputs()) {
+            return;
+        }
+
+        BlockContext context = BlockDataManager.getInstance().context(block, customBlock, null);
+        if (context == null) {
+            return;
+        }
+
+        int oldPower = context.data().integer(REDSTONE_POWER_KEY) == null
+                ? 0
+                : context.data().integer(REDSTONE_POWER_KEY);
+        int newPower = receivedRedstonePower(block, redstone.inputFaces());
+        if (oldPower == newPower) {
+            return;
+        }
+
+        context.data().integer(REDSTONE_POWER_KEY, newPower);
+        context.adapter().onRedstonePowerChange(context, oldPower, newPower);
+        BlockDataManager.getInstance().save(block, context);
+
+        if (!propagateOutputs || !redstone.hasOutputs()) {
+            return;
+        }
+
+        for (BlockFace face : REDSTONE_FACES) {
+            updateCustomRedstone(block.getRelative(face), visited, false);
+        }
+    }
+
+    private int receivedRedstonePower(@NotNull Block block, @NotNull Set<BlockFace> inputFaces) {
+        int max = 0;
+        for (BlockFace inputFace : inputFaces) {
+            Block neighbor = block.getRelative(inputFace);
+            BlockFace outputFace = inputFace.getOppositeFace();
+            max = Math.max(max, block.getBlockPower(inputFace));
+            max = Math.max(max, customRedstonePower(neighbor, outputFace));
+            if (max >= 15) {
+                return 15;
+            }
+        }
+        return Math.clamp(max, 0, 15);
+    }
+
+    private int customRedstonePower(@NotNull Block block, @NotNull BlockFace outputFace) {
+        RuntimeBlockView customBlock = this.block(block);
+        if (customBlock == null) {
+            return 0;
+        }
+
+        BlockDefinition definition = BlockRegistry.getBlock(customBlock.storedBlock().blockId());
+        if (definition == null) {
+            return 0;
+        }
+
+        dev.auto.blockengine.api.blocks.BlockDefinition.Redstone redstone;
+        try {
+            redstone = definition.apiDefinition()
+                    .state(customBlock.storedBlock().stateId())
+                    .redstone();
+        } catch (IllegalArgumentException ignored) {
+            return 0;
+        }
+        if (!redstone.outputFaces().contains(outputFace)) {
+            return 0;
+        }
+
+        BlockContext context = BlockDataManager.getInstance().context(block, customBlock, null);
+        if (context == null) {
+            return 0;
+        }
+
+        int weak = context.adapter().redstoneWeakPower(context, outputFace, redstone.weakPower());
+        int strong = context.adapter().redstoneStrongPower(context, outputFace, redstone.strongPower());
+        return Math.clamp(Math.max(weak, strong), 0, 15);
+    }
+
     private boolean placeHeld(PlayerInteractEvent event) {
         if (event.getAction() != Action.RIGHT_CLICK_BLOCK || event.getHand() != EquipmentSlot.HAND) {
             return false;
@@ -639,7 +792,7 @@ public class GameListener implements Listener {
         }
 
         Block clicked = event.getClickedBlock();
-        Block target = clicked.isReplaceable() && !clicked.isLiquid()
+        Block target = replaceableTarget(clicked)
                 ? clicked
                 : clicked.getRelative(event.getBlockFace());
         String stateId = ItemManager.stateId(item);
@@ -676,6 +829,10 @@ public class GameListener implements Listener {
             item.subtract();
         }
         return true;
+    }
+
+    private boolean replaceableTarget(@NotNull Block block) {
+        return block.isReplaceable() || block.isLiquid();
     }
 
     private void denyVanillaPlacement(PlayerInteractEvent event) {

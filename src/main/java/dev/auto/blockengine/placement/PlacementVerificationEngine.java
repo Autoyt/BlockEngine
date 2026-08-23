@@ -27,10 +27,10 @@ public final class PlacementVerificationEngine {
             switch (state) {
                 case START -> state = State.TARGET_REPLACEABLE;
                 case TARGET_REPLACEABLE -> {
-                    if (!request.target().isReplaceable()) {
+                    if (!replaceableTarget(request.target())) {
                         return Result.denied(State.TARGET_REPLACEABLE, DenialReason.TARGET_NOT_REPLACEABLE);
                     }
-                    if (waterlogged(request.target())) {
+                    if (waterloggedSolid(request.target())) {
                         return Result.denied(State.TARGET_REPLACEABLE, DenialReason.WATERLOGGED_TARGET);
                     }
                     state = State.VANILLA_RULES;
@@ -109,9 +109,14 @@ public final class PlacementVerificationEngine {
         return false;
     }
 
-    private static boolean waterlogged(@NotNull Block target) {
-        return target.isLiquid()
-                || target.getBlockData() instanceof Waterlogged waterlogged && waterlogged.isWaterlogged();
+    private static boolean replaceableTarget(@NotNull Block target) {
+        return target.isReplaceable() || target.isLiquid();
+    }
+
+    private static boolean waterloggedSolid(@NotNull Block target) {
+        return !target.isLiquid()
+                && target.getBlockData() instanceof Waterlogged waterlogged
+                && waterlogged.isWaterlogged();
     }
 
     public record Request(
