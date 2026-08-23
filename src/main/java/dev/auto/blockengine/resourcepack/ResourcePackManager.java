@@ -182,6 +182,27 @@ public final class ResourcePackManager {
         return packsById().keySet();
     }
 
+    public @Nullable DownloadLink download(@NotNull String packId) {
+        ResourcePackConfig loadedConfig = config == null ? ResourcePackConfig.load(Main.getInstance()) : config;
+        String normalized = packId.toLowerCase(Locale.ROOT);
+        try {
+            if (normalized.equals("*")) {
+                return combinedDownload(loadedConfig);
+            }
+
+            GeneratedPack generated = packsById().get(normalized);
+            if (generated == null || !Files.isRegularFile(generated.zip())) {
+                return null;
+            }
+            ResourcePackHost.publish(generated.url(), generated.zip());
+            return new DownloadLink(normalized, generated.url(), generated.zip(), Files.size(generated.zip()));
+        } catch (IOException exception) {
+            Main.getInstance().getLogger().warning("Failed to prepare BlockEngine pack download '" + packId + "': "
+                    + exception.getMessage());
+            return null;
+        }
+    }
+
     public boolean send(@NotNull Player player, @NotNull String packId) {
         GeneratedPack generated = packsById().get(packId.toLowerCase(Locale.ROOT));
         if (generated == null || generated.sha1().length == 0) {
@@ -212,6 +233,29 @@ public final class ResourcePackManager {
             packs.putIfAbsent(packName(generated), generated);
         }
         return packs;
+    }
+
+    private @Nullable DownloadLink combinedDownload(@NotNull ResourcePackConfig config) throws IOException {
+        if (hostedPacks.isEmpty()) {
+            return null;
+        }
+
+        Path root = Main.getInstance().getDataFolder().toPath()
+                .resolve("generated-resource-pack")
+                .resolve("downloads")
+                .resolve("all");
+        Path zip = Main.getInstance().getDataFolder().toPath()
+                .resolve("generated-packs")
+                .resolve("blockengine-all.zip");
+        delete(root);
+        Files.createDirectories(root);
+        for (GeneratedPack generated : hostedPacks) {
+            copyPackFolder(generated.folder(), root);
+        }
+        zip(root, zip);
+        String url = packUrl(config, "/downloads/blockengine-all.zip");
+        ResourcePackHost.publish(url, zip);
+        return new DownloadLink("*", url, zip, Files.size(zip));
     }
 
     private void sendSingle(@NotNull Player player, @NotNull GeneratedPack generated) {
@@ -621,6 +665,26 @@ public final class ResourcePackManager {
         }
     }
 
+    private static void copyPackFolder(@NotNull Path sourceRoot, @NotNull Path outputRoot) throws IOException {
+        if (!Files.exists(sourceRoot)) {
+            return;
+        }
+        try (Stream<Path> files = Files.walk(sourceRoot)) {
+            for (Path file : files
+                    .filter(Files::isRegularFile)
+                    .sorted()
+                    .toList()) {
+                Path relative = sourceRoot.relativize(file);
+                Path output = outputRoot.resolve(relative.toString()).normalize();
+                if (!output.startsWith(outputRoot.normalize())) {
+                    continue;
+                }
+                Files.createDirectories(output.getParent());
+                Files.copy(file, output, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            }
+        }
+    }
+
     private static void copyAssetFile(@NotNull Path sourceRoot, @NotNull Path file, @NotNull Path packRoot) throws IOException {
         Path relative = sourceRoot.relativize(file.toAbsolutePath().normalize());
         if (!allowedAsset(relative)) {
@@ -662,5 +726,13 @@ public final class ResourcePackManager {
                 Files.deleteIfExists(file);
             }
         }
+    }
+
+    public record DownloadLink(
+            @NotNull String packId,
+            @NotNull String url,
+            @NotNull Path zip,
+            long bytes
+    ) {
     }
 }

@@ -203,7 +203,7 @@ public final class DebugCommands implements BasicCommand, Listener {
 
     private void pack(@NotNull CommandSender sender, String[] args) {
         if (args.length < 2) {
-            DebugStyle.usage(sender, "/blockengine packs <reload|resend|list>");
+            DebugStyle.usage(sender, "/blockengine packs <reload|resend|download|list>");
             return;
         }
         String action = args[1].toLowerCase(Locale.ROOT);
@@ -217,12 +217,20 @@ public final class DebugCommands implements BasicCommand, Listener {
             for (String packId : ResourcePackManager.getInstance().packIds()) {
                 BlockEngineChat.send(sender, DebugStyle.bullet(DebugStyle.pluginName(packId)
                         .append(Component.space())
-                        .append(DebugStyle.action("resend", "/blockengine packs resend " + packId, "Resend this pack"))));
+                        .append(DebugStyle.action("resend", "/blockengine packs resend " + packId, "Resend this pack"))
+                        .append(Component.space())
+                        .append(DebugStyle.action("download", "/blockengine packs download " + packId, "Create a download link"))));
             }
+            BlockEngineChat.send(sender, DebugStyle.bullet(DebugStyle.action("download all", "/blockengine packs download *",
+                    "Create one combined download link")));
+            return;
+        }
+        if (action.equals("download")) {
+            packDownload(sender, args);
             return;
         }
         if (!action.equals("resend")) {
-            DebugStyle.usage(sender, "/blockengine packs <reload|resend|list>");
+            DebugStyle.usage(sender, "/blockengine packs <reload|resend|download|list>");
             return;
         }
 
@@ -251,6 +259,25 @@ public final class DebugCommands implements BasicCommand, Listener {
             }
         }
         DebugStyle.success(sender, "Resent " + packSends + " pack(s) to " + targets.size() + " player(s).");
+    }
+
+    private void packDownload(@NotNull CommandSender sender, String[] args) {
+        String packId = args.length >= 3 ? args[2].toLowerCase(Locale.ROOT) : "blockengine";
+        ResourcePackManager.DownloadLink link = ResourcePackManager.getInstance().download(packId);
+        if (link == null) {
+            DebugStyle.error(sender, "Unknown or unavailable pack '" + packId + "'. Try: "
+                    + String.join(", ", downloadPackIds()));
+            return;
+        }
+
+        Component download = Component.text(link.url(), BlockEngineChat.ORANGE_LIGHT)
+                .clickEvent(ClickEvent.openUrl(link.url()))
+                .hoverEvent(HoverEvent.showText(Component.text("Open pack download", BlockEngineChat.ORANGE_LIGHT)));
+        BlockEngineChat.send(sender, DebugStyle.header(packId.equals("*") ? "combined pack download" : "pack download"));
+        BlockEngineChat.send(sender, DebugStyle.row("pack", packId.equals("*") ? "all packs" : link.packId()));
+        BlockEngineChat.send(sender, DebugStyle.row("size", bytes(link.bytes())));
+        BlockEngineChat.send(sender, DebugStyle.row("file", link.zip().getFileName()));
+        BlockEngineChat.send(sender, DebugStyle.row("download", download));
     }
 
     private void profile(@NotNull CommandSender sender, String[] args) {
@@ -900,13 +927,10 @@ public final class DebugCommands implements BasicCommand, Listener {
 
     private @NotNull Collection<String> suggestPack(String[] args) {
         if (args.length == 2) {
-            return matching(List.of("reload", "resend", "list"), args[1]);
+            return matching(List.of("reload", "resend", "download", "list"), args[1]);
         }
-        if (args.length == 3 && args[1].equalsIgnoreCase("resend")) {
-            List<String> packs = new ArrayList<>();
-            packs.add("*");
-            packs.addAll(ResourcePackManager.getInstance().packIds());
-            return matching(packs, args[2]);
+        if (args.length == 3 && (args[1].equalsIgnoreCase("resend") || args[1].equalsIgnoreCase("download"))) {
+            return matching(downloadPackIds(), args[2]);
         }
         if (args.length == 4 && args[1].equalsIgnoreCase("resend")) {
             return matching(playerTargets(), args[3]);
@@ -983,6 +1007,13 @@ public final class DebugCommands implements BasicCommand, Listener {
         targets.add("*");
         targets.addAll(Bukkit.getOnlinePlayers().stream().map(Player::getName).sorted().toList());
         return targets;
+    }
+
+    private @NotNull List<String> downloadPackIds() {
+        List<String> packs = new ArrayList<>();
+        packs.add("*");
+        packs.addAll(ResourcePackManager.getInstance().packIds());
+        return packs;
     }
 
     private @NotNull List<Player> players(@NotNull String target) {

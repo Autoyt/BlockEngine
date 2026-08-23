@@ -11,9 +11,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.net.URI;
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
 
 public final class ResourcePackHost {
     private static HttpServer server;
+    private static final Map<String, Path> downloads = new HashMap<>();
 
     private ResourcePackHost() {
     }
@@ -27,21 +30,10 @@ public final class ResourcePackHost {
         try {
             server = HttpServer.create(new InetSocketAddress(config.host(), config.port()), 0);
             for (GeneratedPack pack : packs) {
-                server.createContext(path(pack), exchange -> {
-                    Path zip = pack.zip();
-                    if (!Files.isRegularFile(zip)) {
-                        exchange.sendResponseHeaders(404, -1);
-                        return;
-                    }
-
-                    byte[] bytes = Files.readAllBytes(zip);
-                    exchange.getResponseHeaders().add("Content-Type", "application/zip");
-                    exchange.getResponseHeaders().add("Cache-Control", "no-cache");
-                    exchange.sendResponseHeaders(200, bytes.length);
-                    try (OutputStream output = exchange.getResponseBody()) {
-                        output.write(bytes);
-                    }
-                });
+                createFileContext(path(pack), pack.zip());
+            }
+            for (Map.Entry<String, Path> download : downloads.entrySet()) {
+                createFileContext(download.getKey(), download.getValue());
             }
             server.start();
             Main.getInstance().getLogger().info("Serving " + packs.size() + " BlockEngine resource pack(s).");
@@ -51,9 +43,43 @@ public final class ResourcePackHost {
         }
     }
 
+    public static void publish(@NotNull String url, @NotNull Path zip) {
+        String path = path(url);
+        downloads.put(path, zip);
+        if (server != null) {
+            createFileContext(path, zip);
+        }
+    }
+
     private static @NotNull String path(@NotNull GeneratedPack pack) {
-        String path = URI.create(pack.url()).getPath();
+        return path(pack.url());
+    }
+
+    private static @NotNull String path(@NotNull String url) {
+        String path = URI.create(url).getPath();
         return path == null || path.isBlank() ? "/" : path;
+    }
+
+    private static void createFileContext(@NotNull String path, @NotNull Path zip) {
+        try {
+            server.createContext(path, exchange -> {
+                if (!Files.isRegularFile(zip)) {
+                    exchange.sendResponseHeaders(404, -1);
+                    return;
+                }
+
+                byte[] bytes = Files.readAllBytes(zip);
+                exchange.getResponseHeaders().add("Content-Type", "application/zip");
+                exchange.getResponseHeaders().add("Content-Disposition", "attachment; filename=\"" + zip.getFileName() + "\"");
+                exchange.getResponseHeaders().add("Cache-Control", "no-cache");
+                exchange.sendResponseHeaders(200, bytes.length);
+                try (OutputStream output = exchange.getResponseBody()) {
+                    output.write(bytes);
+                }
+            });
+        } catch (IllegalArgumentException ignored) {
+            // Context already exists for this path; keep serving the updated file path captured above if unchanged.
+        }
     }
 
     public static void stop() {
