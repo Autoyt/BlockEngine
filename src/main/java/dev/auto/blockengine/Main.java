@@ -56,9 +56,6 @@ public final class Main extends JavaPlugin {
         BlockEngine.setManagedDisplayService(ManagedDisplayManager.getInstance());
         BlockEngine.setManagedWorldFactory(ManagedWorld::new);
         configSave(false);
-        DiscoverySystem.discoverBlocks();
-        DebugBlocks.register();
-        ResourcePackManager.getInstance().reload();
         VisibilityManager.getInstance().register(this);
         BlockIntegrityManager.getInstance().register(this);
         BlockTicker.getInstance().register(this);
@@ -83,6 +80,14 @@ public final class Main extends JavaPlugin {
         for (Player player : Bukkit.getOnlinePlayers()) {
             VisibilityManager.getInstance().forceRecalculate(player);
         }
+
+        Bukkit.getScheduler().runTask(this, this::reloadDiscoveredSystems);
+    }
+
+    private void reloadDiscoveredSystems() {
+        DiscoverySystem.discoverBlocks();
+        DebugBlocks.register();
+        ResourcePackManager.getInstance().reload();
     }
 
     @Override

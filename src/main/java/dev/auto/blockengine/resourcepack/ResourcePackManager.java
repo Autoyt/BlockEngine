@@ -402,6 +402,9 @@ public final class ResourcePackManager {
     private static @NotNull Collection<GeneratedPack> generateSystemPacks(@NotNull ResourcePackConfig config) throws IOException {
         List<GeneratedPack> packs = new ArrayList<>();
         for (Plugin plugin : Main.getInstance().getServer().getPluginManager().getPlugins()) {
+            if (!plugin.isEnabled()) {
+                continue;
+            }
             if (!(plugin instanceof CustomBlockSystem system)) {
                 continue;
             }
