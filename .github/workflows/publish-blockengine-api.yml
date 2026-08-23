@@ -3,7 +3,7 @@ name: Publish BlockEngine API
 on:
   push:
     tags:
-      - "v*"
+      - "api-v*"
   workflow_dispatch:
 
 permissions:

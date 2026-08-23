@@ -1,0 +1,55 @@
+name: Build BlockEngine Plugin
+
+on:
+  push:
+    tags:
+      - "plugin-v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build plugin jar
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "25"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v5
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x gradlew
+
+      - name: Build plugin
+        run: ./gradlew shadowJar
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: BlockEngine-plugin
+          path: build/libs/*-all.jar
+          if-no-files-found: error
+
+      - name: Attach jar to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          jar_file="$(find build/libs -maxdepth 1 -name '*-all.jar' -print -quit)"
+          release_asset="BlockEngine-${TAG_NAME}.jar"
+          gh release view "$TAG_NAME" >/dev/null 2>&1 \
+            || gh release create "$TAG_NAME" --title "$TAG_NAME" --notes "BlockEngine plugin build for $TAG_NAME"
+          gh release upload "$TAG_NAME" "$jar_file#$release_asset" --clobber
