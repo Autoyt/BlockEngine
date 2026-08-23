@@ -12,6 +12,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.entity.Vehicle;
 import org.bukkit.event.block.BlockCanBuildEvent;
 import org.bukkit.inventory.EquipmentSlot;
+import org.bukkit.block.data.Waterlogged;
 import org.bukkit.util.BoundingBox;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -28,6 +29,9 @@ public final class PlacementVerificationEngine {
                 case TARGET_REPLACEABLE -> {
                     if (!request.target().isReplaceable()) {
                         return Result.denied(State.TARGET_REPLACEABLE, DenialReason.TARGET_NOT_REPLACEABLE);
+                    }
+                    if (waterlogged(request.target())) {
+                        return Result.denied(State.TARGET_REPLACEABLE, DenialReason.WATERLOGGED_TARGET);
                     }
                     state = State.VANILLA_RULES;
                 }
@@ -105,6 +109,11 @@ public final class PlacementVerificationEngine {
         return false;
     }
 
+    private static boolean waterlogged(@NotNull Block target) {
+        return target.isLiquid()
+                || target.getBlockData() instanceof Waterlogged waterlogged && waterlogged.isWaterlogged();
+    }
+
     public record Request(
             @NotNull Block target,
             @NotNull BlockDefinition definition,
@@ -137,6 +146,7 @@ public final class PlacementVerificationEngine {
 
     public enum DenialReason {
         TARGET_NOT_REPLACEABLE,
+        WATERLOGGED_TARGET,
         VANILLA_RULES_REJECTED,
         BUILD_EVENT_REJECTED,
         OCCUPIED

@@ -17,6 +17,7 @@ import dev.auto.blockengine.runtime.RuntimeBlockView;
 import dev.auto.blockengine.types.BlockDefinition;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
+import org.bukkit.block.data.Waterlogged;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.entity.Player;
 import org.bukkit.NamespacedKey;
@@ -83,6 +84,10 @@ public final class PlacementManager {
             @Nullable BlockFace placedAgainst,
             @Nullable String stateId
     ) {
+        if (waterlogged(block)) {
+            return false;
+        }
+
         String defaultState = stateId == null || stateId.isBlank()
                 ? definition.apiDefinition().defaultState()
                 : stateId;
@@ -176,6 +181,11 @@ public final class PlacementManager {
         } catch (IllegalArgumentException ignored) {
             return null;
         }
+    }
+
+    private boolean waterlogged(@NotNull Block block) {
+        return block.isLiquid()
+                || block.getBlockData() instanceof Waterlogged waterlogged && waterlogged.isWaterlogged();
     }
 }
 

@@ -639,9 +639,11 @@ public class GameListener implements Listener {
         }
 
         Block clicked = event.getClickedBlock();
-        Block target = clicked.isReplaceable() ? clicked : clicked.getRelative(event.getBlockFace());
+        Block target = clicked.isReplaceable() && !clicked.isLiquid()
+                ? clicked
+                : clicked.getRelative(event.getBlockFace());
         String stateId = ItemManager.stateId(item);
-        BlockFace placedAgainst = event.getBlockFace().getOppositeFace();
+        BlockFace placedAgainst = event.getBlockFace();
         PlacementVerificationEngine.Result verification = PlacementVerificationEngine.verify(
                 new PlacementVerificationEngine.Request(
                         target,
