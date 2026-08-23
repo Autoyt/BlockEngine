@@ -321,9 +321,6 @@ public class GameListener implements Listener {
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)
     public void onEntityChangeBlockPostVerify(EntityChangeBlockEvent event) {
-        if (GravityManager.getInstance().land(event)) {
-            return;
-        }
         postVerify(event.getBlock());
     }
 

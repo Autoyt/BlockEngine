@@ -14,12 +14,12 @@ import dev.auto.blockengine.commands.PerfCommand;
 import dev.auto.blockengine.defaultadapters.DebugBlocks;
 import dev.auto.blockengine.entity.ManagedDisplayManager;
 import dev.auto.blockengine.integrity.BlockIntegrityManager;
+import dev.auto.blockengine.listeners.GravityListener;
 import dev.auto.blockengine.listeners.GameListener;
 import dev.auto.blockengine.registry.DiscoverySystem;
 import dev.auto.blockengine.resourcepack.ResourcePackManager;
 import dev.auto.blockengine.runtime.BlockTicker;
 import dev.auto.blockengine.runtime.ChunkEngine;
-import dev.auto.blockengine.runtime.GravityManager;
 import dev.auto.blockengine.visibility.VisibilityManager;
 import dev.auto.blockengine.world.ManagedWorld;
 import io.github.retrooper.packetevents.factory.spigot.SpigotPacketEventsBuilder;
@@ -38,6 +38,7 @@ public final class Main extends JavaPlugin {
             .enable(SerializationFeature.INDENT_OUTPUT);
     @Getter
     private static final Material backingBlock = Material.BARRIER;
+    private GravityListener gravityListener;
 
     @Override
     public void onLoad() {
@@ -72,6 +73,7 @@ public final class Main extends JavaPlugin {
 
         new CatalogListeners();
         new OverideFillCommand();
+        gravityListener = new GravityListener();
         new GameListener();
 
         for (org.bukkit.World world : Bukkit.getWorlds()) {
@@ -96,7 +98,10 @@ public final class Main extends JavaPlugin {
         ResourcePackManager.getInstance().stop();
         BlockIntegrityManager.getInstance().stop();
         BlockTicker.getInstance().stop();
-        GravityManager.getInstance().clear();
+        if (gravityListener != null) {
+            gravityListener.clear();
+            gravityListener = null;
+        }
         ManagedDisplayManager.getInstance().clear();
         BlockEngine.clearManagedDisplayService();
         BlockEngine.clearManagedWorldFactory();
