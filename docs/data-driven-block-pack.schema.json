@@ -1,0 +1,326 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://blockengine.local/schemas/data-driven-block-pack.schema.json",
+  "title": "BlockEngine Data-Driven Block Pack",
+  "description": "Schema definitions for BlockEngine data-driven pack.json and blocks/**/*.json files.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/pack"
+    },
+    {
+      "$ref": "#/$defs/block"
+    }
+  ],
+  "$defs": {
+    "pack": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "namespace"
+      ],
+      "properties": {
+        "format": {
+          "type": "integer",
+          "const": 1,
+          "default": 1
+        },
+        "namespace": {
+          "$ref": "#/$defs/namespace"
+        },
+        "title": {
+          "type": "string",
+          "default": ""
+        },
+        "description": {
+          "type": "string",
+          "default": ""
+        },
+        "prompt": {
+          "type": "string",
+          "default": ""
+        },
+        "url-ending": {
+          "type": "string",
+          "default": ""
+        },
+        "required": {
+          "type": "boolean",
+          "default": true
+        },
+        "catalog": {
+          "type": "boolean",
+          "default": true
+        },
+        "icon": {
+          "$ref": "#/$defs/relativePath"
+        },
+        "assets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/relativePath"
+          },
+          "default": [
+            "assets"
+          ]
+        }
+      }
+    },
+    "block": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "states"
+      ],
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/blockName"
+        },
+        "vanilla-block": {
+          "$ref": "#/$defs/materialName",
+          "default": "barrier"
+        },
+        "catalog": {
+          "type": "boolean"
+        },
+        "placement": {
+          "$ref": "#/$defs/placement"
+        },
+        "item": {
+          "$ref": "#/$defs/item"
+        },
+        "default-state": {
+          "$ref": "#/$defs/blockName",
+          "default": "default"
+        },
+        "states": {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": {
+            "$ref": "#/$defs/blockName"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/state"
+          }
+        }
+      }
+    },
+    "item": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "material": {
+          "$ref": "#/$defs/materialName",
+          "default": "knowledge_book"
+        },
+        "name": {
+          "type": "string"
+        },
+        "lore": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "glint": {
+          "type": "boolean",
+          "default": false
+        },
+        "placeable": {
+          "type": "boolean",
+          "default": true
+        }
+      }
+    },
+    "state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "textures"
+      ],
+      "properties": {
+        "hardness": {
+          "type": "number",
+          "default": 0.5
+        },
+        "mining-speed": {
+          "type": "number",
+          "default": 1.0
+        },
+        "mining-profile": {
+          "$ref": "#/$defs/materialName"
+        },
+        "preferred-tools": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/toolType"
+          },
+          "uniqueItems": true,
+          "default": []
+        },
+        "require-preferred-tool-for-drops": {
+          "type": "boolean",
+          "default": false
+        },
+        "require-silk-touch-for-drops": {
+          "type": "boolean",
+          "default": false
+        },
+        "movement": {
+          "$ref": "#/$defs/movement"
+        },
+        "unbreakable": {
+          "type": "boolean",
+          "default": false
+        },
+        "drops-item": {
+          "type": "boolean",
+          "default": true
+        },
+        "drop-in-creative": {
+          "type": "boolean",
+          "default": false
+        },
+        "textures": {
+          "$ref": "#/$defs/textures"
+        },
+        "sounds": {
+          "$ref": "#/$defs/sounds"
+        }
+      }
+    },
+    "movement": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "gravity": {
+          "type": "boolean",
+          "default": false
+        },
+        "dispenser-placeable": {
+          "type": "boolean",
+          "default": true
+        },
+        "breaks-via-gravity": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "textures": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "all": {
+          "$ref": "#/$defs/textureRef"
+        },
+        "side": {
+          "$ref": "#/$defs/textureRef"
+        },
+        "front": {
+          "$ref": "#/$defs/textureRef"
+        },
+        "top": {
+          "$ref": "#/$defs/textureRef"
+        },
+        "bottom": {
+          "$ref": "#/$defs/textureRef"
+        },
+        "north": {
+          "$ref": "#/$defs/textureRef"
+        },
+        "south": {
+          "$ref": "#/$defs/textureRef"
+        },
+        "east": {
+          "$ref": "#/$defs/textureRef"
+        },
+        "west": {
+          "$ref": "#/$defs/textureRef"
+        }
+      }
+    },
+    "sounds": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "place": {
+          "$ref": "#/$defs/soundRef"
+        },
+        "break": {
+          "$ref": "#/$defs/soundRef"
+        },
+        "mining": {
+          "$ref": "#/$defs/soundRef",
+          "default": "minecraft:block.stone.hit"
+        },
+        "step": {
+          "$ref": "#/$defs/soundRef"
+        },
+        "hit": {
+          "$ref": "#/$defs/soundRef"
+        },
+        "fall": {
+          "$ref": "#/$defs/soundRef"
+        }
+      }
+    },
+    "namespace": {
+      "type": "string",
+      "pattern": "^[a-z0-9._-]+$"
+    },
+    "blockName": {
+      "type": "string",
+      "pattern": "^[a-z0-9._-]+(?:/[a-z0-9._-]+)*$"
+    },
+    "relativePath": {
+      "type": "string",
+      "minLength": 1,
+      "not": {
+        "anyOf": [
+          {
+            "pattern": "^(?:[A-Za-z]:)?[\\\\/]"
+          },
+          {
+            "pattern": "(^|[\\\\/])\\.\\.([\\\\/]|$)"
+          }
+        ]
+      }
+    },
+    "materialName": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9_]+$"
+    },
+    "textureRef": {
+      "type": "string",
+      "minLength": 1
+    },
+    "soundRef": {
+      "type": "string",
+      "minLength": 1
+    },
+    "placement": {
+      "type": "string",
+      "enum": [
+        "none",
+        "horizontal_facing",
+        "horizontal-facing",
+        "axis",
+        "directional"
+      ],
+      "default": "none"
+    },
+    "toolType": {
+      "type": "string",
+      "enum": [
+        "pickaxe",
+        "axe",
+        "shovel",
+        "hoe",
+        "shears",
+        "sword"
+      ]
+    }
+  }
+}

@@ -122,6 +122,8 @@ The loader validates before registration:
 - Enum values are case-insensitive and may use hyphens.
 - Pack asset and icon paths must stay inside the pack folder.
 
+A JSON Schema for editor and tooling support lives at `docs/data-driven-block-pack.schema.json`.
+
 ## Non-Goals
 
 - No custom Java callbacks from data packs.
