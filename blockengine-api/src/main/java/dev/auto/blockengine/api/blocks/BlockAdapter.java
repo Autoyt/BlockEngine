@@ -1,6 +1,7 @@
 package dev.auto.blockengine.api.blocks;
 
 import org.bukkit.block.BlockFace;
+import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -57,6 +58,23 @@ public interface BlockAdapter {
     default void onRedstonePowerChange(@NotNull BlockContext context, int oldPower, int newPower) {
     }
 
+    default boolean canMove(
+            @NotNull BlockContext context,
+            @NotNull Block from,
+            @NotNull Block to,
+            @NotNull MoveCause cause
+    ) {
+        return true;
+    }
+
+    default void onMove(
+            @NotNull BlockContext context,
+            @NotNull Block from,
+            @NotNull Block to,
+            @NotNull MoveCause cause
+    ) {
+    }
+
     default int redstoneWeakPower(
             @NotNull BlockContext context,
             @NotNull BlockFace outputFace,
@@ -101,5 +119,12 @@ public interface BlockAdapter {
             @Nullable Throwable error
     ) {
         return true;
+    }
+
+    enum MoveCause {
+        PISTON_PUSH,
+        PISTON_PULL,
+        GRAVITY,
+        PLUGIN
     }
 }

@@ -60,7 +60,8 @@ public final class PlacementManager {
                         ItemManager.stateId(event.getItemInHand()),
                         event.getPlayer(),
                         placedAgainst,
-                        event.getHand()
+                        event.getHand(),
+                        PlacementVerificationEngine.Source.PLAYER
                 )
         );
         if (!verification.allowed()) {

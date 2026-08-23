@@ -169,6 +169,7 @@ public final class BlockDefinition {
             boolean requirePreferredToolForDrops,
             boolean requireSilkTouchForDrops,
             @NotNull Redstone redstone,
+            @NotNull Movement movement,
             boolean unbreakable,
             boolean dropsItem,
             boolean dropInCreative,
@@ -182,6 +183,7 @@ public final class BlockDefinition {
                     ? Set.of()
                     : Collections.unmodifiableSet(EnumSet.copyOf(preferredTools));
             Objects.requireNonNull(redstone, "redstone");
+            Objects.requireNonNull(movement, "movement");
             Objects.requireNonNull(textures, "textures");
             Objects.requireNonNull(sounds, "sounds");
         }
@@ -242,6 +244,17 @@ public final class BlockDefinition {
 
         public static @NotNull Redstone none() {
             return new Redstone(Set.of(), Set.of(), 0, 0);
+        }
+    }
+
+    public record Movement(
+            boolean pistonPushable,
+            boolean pistonPullable,
+            boolean gravity,
+            boolean dispenserPlaceable
+    ) {
+        public static @NotNull Movement normal() {
+            return new Movement(true, true, false, true);
         }
     }
 
@@ -384,6 +397,7 @@ public final class BlockDefinition {
         private boolean requirePreferredToolForDrops = false;
         private boolean requireSilkTouchForDrops = false;
         private @NotNull Redstone redstone = Redstone.none();
+        private @NotNull Movement movement = Movement.normal();
         private boolean unbreakable = false;
         private boolean dropsItem = true;
         private boolean dropInCreative = false;
@@ -445,6 +459,34 @@ public final class BlockDefinition {
             return this;
         }
 
+        public @NotNull StateBuilder movement(@NotNull Consumer<MovementBuilder> configure) {
+            Objects.requireNonNull(configure, "configure");
+            MovementBuilder builder = new MovementBuilder();
+            configure.accept(builder);
+            this.movement = builder.build();
+            return this;
+        }
+
+        public @NotNull StateBuilder pistonPushable(boolean pistonPushable) {
+            movement = new Movement(pistonPushable, movement.pistonPullable(), movement.gravity(), movement.dispenserPlaceable());
+            return this;
+        }
+
+        public @NotNull StateBuilder pistonPullable(boolean pistonPullable) {
+            movement = new Movement(movement.pistonPushable(), pistonPullable, movement.gravity(), movement.dispenserPlaceable());
+            return this;
+        }
+
+        public @NotNull StateBuilder gravity(boolean gravity) {
+            movement = new Movement(movement.pistonPushable(), movement.pistonPullable(), gravity, movement.dispenserPlaceable());
+            return this;
+        }
+
+        public @NotNull StateBuilder dispenserPlaceable(boolean dispenserPlaceable) {
+            movement = new Movement(movement.pistonPushable(), movement.pistonPullable(), movement.gravity(), dispenserPlaceable);
+            return this;
+        }
+
         public @NotNull StateBuilder unbreakable(boolean unbreakable) {
             this.unbreakable = unbreakable;
             return this;
@@ -485,6 +527,7 @@ public final class BlockDefinition {
                     requirePreferredToolForDrops,
                     requireSilkTouchForDrops,
                     redstone,
+                    movement,
                     unbreakable,
                     dropsItem,
                     dropInCreative,
@@ -556,6 +599,43 @@ public final class BlockDefinition {
                 validateRedstoneFace(face);
                 target.add(face);
             }
+        }
+    }
+
+    public static final class MovementBuilder {
+        private boolean pistonPushable = true;
+        private boolean pistonPullable = true;
+        private boolean gravity = false;
+        private boolean dispenserPlaceable = true;
+
+        public @NotNull MovementBuilder pistonPushable(boolean pistonPushable) {
+            this.pistonPushable = pistonPushable;
+            return this;
+        }
+
+        public @NotNull MovementBuilder pistonPullable(boolean pistonPullable) {
+            this.pistonPullable = pistonPullable;
+            return this;
+        }
+
+        public @NotNull MovementBuilder pistonMovable(boolean pistonMovable) {
+            this.pistonPushable = pistonMovable;
+            this.pistonPullable = pistonMovable;
+            return this;
+        }
+
+        public @NotNull MovementBuilder gravity(boolean gravity) {
+            this.gravity = gravity;
+            return this;
+        }
+
+        public @NotNull MovementBuilder dispenserPlaceable(boolean dispenserPlaceable) {
+            this.dispenserPlaceable = dispenserPlaceable;
+            return this;
+        }
+
+        private @NotNull Movement build() {
+            return new Movement(pistonPushable, pistonPullable, gravity, dispenserPlaceable);
         }
     }
 

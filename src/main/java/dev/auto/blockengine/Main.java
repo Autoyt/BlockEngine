@@ -19,6 +19,7 @@ import dev.auto.blockengine.registry.DiscoverySystem;
 import dev.auto.blockengine.resourcepack.ResourcePackManager;
 import dev.auto.blockengine.runtime.BlockTicker;
 import dev.auto.blockengine.runtime.ChunkEngine;
+import dev.auto.blockengine.runtime.GravityManager;
 import dev.auto.blockengine.visibility.VisibilityManager;
 import dev.auto.blockengine.world.ManagedWorld;
 import io.github.retrooper.packetevents.factory.spigot.SpigotPacketEventsBuilder;
@@ -95,6 +96,7 @@ public final class Main extends JavaPlugin {
         ResourcePackManager.getInstance().stop();
         BlockIntegrityManager.getInstance().stop();
         BlockTicker.getInstance().stop();
+        GravityManager.getInstance().clear();
         ManagedDisplayManager.getInstance().clear();
         BlockEngine.clearManagedDisplayService();
         BlockEngine.clearManagedWorldFactory();

@@ -48,6 +48,10 @@ public final class PlacementVerificationEngine {
                     state = State.BLOCK_CAN_BUILD_EVENT;
                 }
                 case BLOCK_CAN_BUILD_EVENT -> {
+                    if (request.player() == null || request.hand() == null) {
+                        state = State.COLLISION_CHECK;
+                        continue;
+                    }
                     org.bukkit.block.data.BlockData placementData = VanillaRules.placementData(
                             request.definition(),
                             request.stateId(),
@@ -81,7 +85,7 @@ public final class PlacementVerificationEngine {
         }
     }
 
-    private static boolean occupied(@NotNull Block target, @NotNull Player player) {
+    private static boolean occupied(@NotNull Block target, @Nullable Player player) {
         BoundingBox blockBox = new BoundingBox(
                 target.getX(),
                 target.getY(),
@@ -91,7 +95,7 @@ public final class PlacementVerificationEngine {
                 target.getZ() + 1.0
         );
 
-        if (player.getBoundingBox().overlaps(blockBox)) {
+        if (player != null && player.getBoundingBox().overlaps(blockBox)) {
             return true;
         }
 
@@ -123,10 +127,19 @@ public final class PlacementVerificationEngine {
             @NotNull Block target,
             @NotNull BlockDefinition definition,
             @Nullable String stateId,
-            @NotNull Player player,
+            @Nullable Player player,
             @Nullable BlockFace placedAgainst,
-            @NotNull EquipmentSlot hand
+            @Nullable EquipmentSlot hand,
+            @NotNull Source source
     ) {
+    }
+
+    public enum Source {
+        PLAYER,
+        DISPENSER,
+        GRAVITY,
+        PISTON,
+        PLUGIN
     }
 
     public record Result(boolean allowed, @NotNull State state, @Nullable DenialReason reason) {
