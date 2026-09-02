@@ -4,6 +4,11 @@
   --sl-color-accent-high: #643000;
   --sl-color-orange-light: #ffc46b;
   --sl-color-orange-hot: #ff6a2e;
+  --be-code-string: #1d8a4a;
+  --be-code-method: #0369a1;
+  --be-code-type: #7c3aed;
+  --be-code-keyword: #c44e00;
+  --be-code-muted: #64748b;
 }
 
 :root[data-theme='dark'] {
@@ -14,6 +19,11 @@
   --sl-color-bg-sidebar: #100d09;
   --sl-color-bg-nav: #100d09;
   --sl-color-hairline-light: #3a2a18;
+  --be-code-string: #7ee787;
+  --be-code-method: #7dd3fc;
+  --be-code-type: #c4b5fd;
+  --be-code-keyword: #ffb454;
+  --be-code-muted: #b48a5a;
 }
 
 .expressive-code {
@@ -68,18 +78,18 @@
 
 :root[data-theme='dark'] .expressive-code .ec-line span[style*='--0:#82AAFF'],
 :root[data-theme='dark'] .expressive-code .ec-line span[style*='--0:#C792EA'] {
-  --0: #ffc46b !important;
+  --0: var(--be-code-method) !important;
 }
 
 :root[data-theme='dark'] .expressive-code .ec-line span[style*='--0:#ECC48D'],
 :root[data-theme='dark'] .expressive-code .ec-line span[style*='--0:#C3E88D'],
 :root[data-theme='dark'] .expressive-code .ec-line span[style*='--0:#C5E478'] {
-  --0: #ffd38d !important;
+  --0: var(--be-code-string) !important;
 }
 
 :root[data-theme='dark'] .expressive-code .ec-line span[style*='--0:#F78C6C'],
 :root[data-theme='dark'] .expressive-code .ec-line span[style*='--0:#FFCB6B'] {
-  --0: #ff9f2e !important;
+  --0: var(--be-code-keyword) !important;
 }
 
 :root[data-theme='dark'] .expressive-code .ec-line span[style*='--0:#FF5370'],
@@ -89,13 +99,34 @@
 
 :root:not([data-theme='dark']) .expressive-code .ec-line span[style*='--1:#3B61B0'],
 :root:not([data-theme='dark']) .expressive-code .ec-line span[style*='--1:#0C969B'] {
-  --1: #a84f00 !important;
+  --1: var(--be-code-method) !important;
 }
 
 :root:not([data-theme='dark']) .expressive-code .ec-line span[style*='--1:#984E4D'],
 :root:not([data-theme='dark']) .expressive-code .ec-line span[style*='--1:#8F2165'],
 :root:not([data-theme='dark']) .expressive-code .ec-line span[style*='--1:#AA0982'] {
-  --1: #c44e00 !important;
+  --1: var(--be-code-keyword) !important;
+}
+
+:root:not([data-theme='dark']) .expressive-code .ec-line span[style*='--1:#487A1E'],
+:root:not([data-theme='dark']) .expressive-code .ec-line span[style*='--1:#54790D'],
+:root:not([data-theme='dark']) .expressive-code .ec-line span[style*='--1:#4A7D1C'] {
+  --1: var(--be-code-string) !important;
+}
+
+:root[data-theme='dark'] .expressive-code .ec-line span[style*='--0:#89DDFF'],
+:root[data-theme='dark'] .expressive-code .ec-line span[style*='--0:#ADD7FF'] {
+  --0: var(--be-code-type) !important;
+}
+
+:root:not([data-theme='dark']) .expressive-code .ec-line span[style*='--1:#005CC5'],
+:root:not([data-theme='dark']) .expressive-code .ec-line span[style*='--1:#0550AE'] {
+  --1: var(--be-code-type) !important;
+}
+
+:root[data-theme='dark'] .expressive-code .ec-line span[style*='--0:#676E95'],
+:root:not([data-theme='dark']) .expressive-code .ec-line span[style*='--1:#6A737D'] {
+  color: var(--be-code-muted) !important;
 }
 
 .site-title img {
@@ -109,6 +140,8 @@
 
 .sl-markdown-content code:not(:where(.expressive-code code)) {
   border: 1px solid color-mix(in srgb, var(--sl-color-accent) 24%, transparent);
+  color: var(--be-code-string);
+  background: color-mix(in srgb, var(--be-code-string) 10%, transparent);
 }
 
 .sl-markdown-content a:not(:where(.not-content *)) {
