@@ -14,6 +14,11 @@ export default defineConfig({
       },
       social: [
         {
+          icon: 'document',
+          label: 'Java API Docs',
+          href: '/BlockEngine/reference/java-api/',
+        },
+        {
           icon: 'github',
           label: 'GitHub',
           href: 'https://github.com/Autoyt/BlockEngine',
