@@ -1,0 +1,67 @@
+---
+title: Resource Packs
+description: How BlockEngine generates, hosts, sends, and troubleshoots resource packs.
+---
+
+BlockEngine generates resource packs because the Minecraft client still renders only vanilla client-side concepts: textures, models, language files, item definitions, and pack metadata.
+
+## Configuration
+
+The default config shape is:
+
+```yaml
+resource-pack:
+  enabled: true
+  port: 8123
+  public-url: ""
+  required: false
+```
+
+`public-url` can be left blank for local testing. Set it when players need to download packs through a public domain, reverse proxy, or hosted file endpoint.
+
+## Generated plugin pack
+
+The main generated pack is written under the plugin data folder:
+
+```text
+plugins/blockengine/generated-resource-pack/
+plugins/blockengine/blockengine-resource-pack.zip
+```
+
+It contains BlockEngine's generated backing block, break-stage models, block models, item models, and creative inventory model routing.
+
+## Generated system packs
+
+Each Java `CustomBlockSystem` can provide its own pack metadata and assets with `PackDetails`. BlockEngine validates declared namespaces, copies safe asset files, generates models for blocks in that namespace, and hosts the result as a separate pack.
+
+## Generated data packs
+
+Each loaded data-driven pack gets a hosted resource pack. The pack's `title`, `description`, `prompt`, `required`, `url-ending`, `icon`, and `assets` values come from `pack.json`.
+
+## Sending packs
+
+Use:
+
+```text
+/blockengine packs list
+/blockengine packs resend <pack>
+/blockengine packs resend *
+/blockengine packs download <pack>
+/blockengine packs download *
+```
+
+`*` merges generated packs into one combined download for testing or manual distribution.
+
+## Creative inventory model routing
+
+Creative menu placeholders are enchanted books. The generated pack writes:
+
+```text
+assets/minecraft/items/enchanted_book.json
+```
+
+That file checks `minecraft:stored_enchantments` and routes BlockEngine creative enchantments to the matching custom block item model.
+
+## Troubleshooting
+
+If a block places correctly but looks wrong, resend the pack and confirm the client accepted it. If a generated pack is missing assets, check that the source files live under a declared asset root and use allowed extensions such as `png`, `json`, `mcmeta`, and `ogg`.

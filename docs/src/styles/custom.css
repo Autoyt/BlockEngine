@@ -32,3 +32,29 @@
 .sl-markdown-content a:not(:where(.not-content *)) {
   text-decoration-color: var(--sl-color-orange-light);
 }
+
+.version-pill {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  align-items: center;
+  width: fit-content;
+  margin: 0.5rem 0 1rem;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid color-mix(in srgb, var(--sl-color-accent) 42%, transparent);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--sl-color-accent) 12%, transparent);
+  color: var(--sl-color-white);
+}
+
+.version-pill span {
+  color: var(--sl-color-gray-2);
+}
+
+.version-pill strong {
+  color: var(--sl-color-accent-high);
+}
+
+:root[data-theme='dark'] .version-pill strong {
+  color: var(--sl-color-accent-high);
+}

@@ -1,0 +1,153 @@
+---
+title: Code-Driven Blocks
+description: Setup, APIs, adapters, block data, callbacks, assets, and testing for Java block systems.
+---
+
+import { Aside, Card, CardGrid, Steps, TabItem, Tabs } from '@astrojs/starlight/components';
+import DependencySnippet from '../../../components/DependencySnippet.astro';
+
+Code-driven blocks use the Java API. Use this path when your blocks need behavior: interaction callbacks, state changes, ticking, plugin integration, custom data, movement control, or private payload persistence.
+
+<Aside type="tip" title="When to use this path">
+  Pick code-driven blocks when the block is part of a plugin system, not just a textured cube. If a right-click should open a UI, change state, consume data, trigger effects, or call another API, write an adapter.
+</Aside>
+
+## Setup
+
+<Tabs syncKey="code-setup">
+  <TabItem label="Gradle Kotlin">
+
+<DependencySnippet />
+
+  </TabItem>
+  <TabItem label="plugin.yml">
+
+Declare that BlockEngine must load before your plugin:
+
+```yaml
+dependencies:
+  server:
+    blockengine:
+      load: BEFORE
+      required: true
+```
+
+  </TabItem>
+  <TabItem label="Assets">
+
+Put assets in your plugin data folder and expose them through `PackDetails`:
+
+```text
+plugins/MyPlugin/assets/
+  assets/
+    example/
+      textures/
+        block/
+          my_block.png
+```
+
+```java
+details.addAssets(getDataFolder().toPath().resolve("assets"));
+```
+
+  </TabItem>
+</Tabs>
+
+## Authoring flow
+
+<Steps>
+  1. Implement `CustomBlockSystem` on your plugin main class.
+  2. Return a stable namespace from `getNamespace()`.
+  3. Return adapters from `registerAdapters()`.
+  4. Define each block with `BlockDefinition.Builder`.
+  5. Create initial data in `createDefaultData()`.
+  6. Add callbacks such as `onInteract()`, `onBreak()`, `onTick()`, `save()`, and `load()` as needed.
+  7. Provide textures with `PackDetails#addAssets(...)`.
+  8. Start the server once to discover the block, then restart once more for new creative entries.
+</Steps>
+
+## Feature areas
+
+<Tabs syncKey="code-features">
+  <TabItem label="CustomBlockSystem" icon="code">
+
+`CustomBlockSystem` is the plugin-level integration point:
+
+<ul>
+  <li><code>pluginVersion()</code> exposes your plugin version.</li>
+  <li><code>getNamespace()</code> owns ids such as <code>example:toggle_lamp</code>.</li>
+  <li><code>requiredNamespaces()</code> declares BlockEngine namespace dependencies.</li>
+  <li><code>registerAdapters()</code> returns block behavior objects.</li>
+  <li><code>setPackDetails()</code> configures generated resource-pack metadata and assets.</li>
+  <li><code>onItemModelGeneration()</code> can register additional generated item models.</li>
+</ul>
+
+  </TabItem>
+  <TabItem label="BlockAdapter" icon="setting">
+
+`BlockAdapter` owns one block:
+
+<ul>
+  <li><code>name()</code> returns the local block path.</li>
+  <li><code>define()</code> fills a <code>BlockDefinition.Builder</code>.</li>
+  <li><code>createDefaultData()</code> creates placed-block data.</li>
+  <li>callbacks handle placement, breaking, interactions, ticking, movement, save/load, and payload recovery.</li>
+</ul>
+
+  </TabItem>
+  <TabItem label="BlockDefinition" icon="puzzle">
+
+`BlockDefinition` is the static server contract. It controls fallback material, catalog visibility, creative-menu visibility, item metadata, placement mode, default state, and state definitions.
+
+```java
+builder.vanillaBlock(Material.BARRIER)
+        .creativeMenu(true)
+        .catalog(true)
+        .placement(BlockDefinition.Placement.DIRECTIONAL);
+```
+
+  </TabItem>
+  <TabItem label="BlockData" icon="document">
+
+`BlockData` stores mutable placed-block state:
+
+```java
+data.string("owner", player.getUniqueId().toString());
+data.integer("uses", 0);
+data.bool("lit", false);
+```
+
+Use public maps for data other plugins can reason about. Use adapter private payload bytes only for adapter-owned details that do not fit those maps.
+
+  </TabItem>
+  <TabItem label="Testing" icon="approve-check-circle">
+
+Useful in-game checks:
+
+```text
+/blockengine debug plugins <namespace>
+/blockengine debug blocks <namespace>
+/blockengine debug give <namespace>:<block>
+/blockengine packs resend <pack>
+/blockengine catalog <namespace>
+```
+
+Check server logs for namespace validation, duplicate ids, asset validation, and generated resource-pack output.
+
+  </TabItem>
+</Tabs>
+
+## Complete example
+
+<CardGrid>
+  <Card title="Java Lamp Block Plugin" icon="code">
+    Build a two-state lamp block with a `BlockAdapter`, custom data, resource-pack assets, and an interaction callback.
+    <br />
+    <a href="/BlockEngine/examples/java-lamp-block-plugin/">Open the example</a>
+  </Card>
+  <Card title="API docs" icon="document">
+    Browse the generated Javadocs for `CustomBlockSystem`, `BlockAdapter`, `BlockDefinition`, `BlockData`, and related API types.
+    <br />
+    <a href="/BlockEngine/api/">Open Java API docs</a>
+  </Card>
+</CardGrid>

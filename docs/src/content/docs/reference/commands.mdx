@@ -1,0 +1,76 @@
+---
+title: Commands
+description: Common BlockEngine commands for development, testing, resource packs, catalog access, and debugging.
+---
+
+Most operational commands require `blockengine.debug`, which defaults to server operators.
+
+## Main command
+
+```text
+/blockengine <info|catalog|packs|debug>
+/be <info|catalog|packs|debug>
+```
+
+Use `/blockengine info` to see plugin state, registered block count, namespace count, and resource-pack count.
+
+## Catalog
+
+```text
+/blockengine catalog <namespace>
+/be catalog <namespace>
+```
+
+Opens the BlockEngine catalog for a namespace.
+
+## Resource packs
+
+```text
+/blockengine packs list
+/blockengine packs reload
+/blockengine packs resend <pack>
+/blockengine packs resend *
+/blockengine packs download <pack>
+/blockengine packs download *
+```
+
+Use `reload` after changing generated assets or pack configuration. Use `download *` when you want one combined pack URL for manual testing.
+
+## Blocks
+
+```text
+/blockengine debug blocks list
+/blockengine debug blocks <namespace>
+/blockengine debug blocks looking
+/blockengine debug blocks give <blockId> [stateId]
+/blockengine debug give <blockId> [stateId]
+```
+
+Use these when validating registration, item creation, state ids, and placement behavior.
+
+## Plugins and namespaces
+
+```text
+/blockengine debug plugins
+/blockengine debug plugins <namespace>
+/blockengine debug plugins catalog <namespace>
+/blockengine debug plugins blocks <namespace>
+```
+
+These commands show which systems are loaded, which resource packs are available, and which blocks belong to each namespace.
+
+## Runtime diagnostics
+
+```text
+/blockengine debug chunks here
+/blockengine debug chunks flush
+/blockengine debug chunks pending
+/blockengine debug validate looking
+/blockengine debug validate here
+/blockengine debug events on
+/blockengine debug events tail
+/blockengine debug perf overall
+/blockengine debug perf live overall
+```
+
+Use these when debugging placed-block persistence, chunk saves, event flow, validation, and runtime performance.

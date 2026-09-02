@@ -4,8 +4,11 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "predev": "node scripts/sync-version.mjs",
     "dev": "astro dev",
+    "prebuild": "node scripts/sync-version.mjs",
     "build": "astro build",
+    "prepreview": "node scripts/sync-version.mjs",
     "preview": "astro preview"
   },
   "dependencies": {

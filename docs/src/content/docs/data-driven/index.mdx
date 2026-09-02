@@ -1,0 +1,165 @@
+---
+title: Data-Driven Blocks
+description: Setup, features, folder layout, resource packs, creative inventory, validation, and testing for JSON block packs.
+---
+
+import { Aside, Card, CardGrid, Steps, TabItem, Tabs } from '@astrojs/starlight/components';
+
+Data-driven packs add BlockEngine blocks with JSON and resource-pack assets. Use this path when a block can be described by configuration: textures, hardness, drops, sounds, movement flags, catalog visibility, and creative-menu visibility.
+
+<Aside type="tip" title="When to use this path">
+  Pick data-driven blocks for decorative blocks, furniture-style cubes, simple breakable/placeable blocks, or pack-driven content where writing Java would add ceremony without adding behavior.
+</Aside>
+
+## Setup
+
+<Tabs syncKey="data-pack-setup">
+  <TabItem label="Folder">
+
+Create a folder under the BlockEngine plugin data directory:
+
+```text
+plugins/blockengine/expansion/packs/my_pack/
+  pack.json
+  blocks/
+  assets/
+  pack.png
+```
+
+Folders are easiest while iterating because you can edit JSON and texture files directly.
+
+  </TabItem>
+  <TabItem label="Zip">
+
+Zip packs use the same internal structure:
+
+```text
+plugins/blockengine/expansion/packs/my_pack.zip
+  pack.json
+  blocks/
+  assets/
+  pack.png
+```
+
+Use zip packs when distributing a finished block pack to another server.
+
+  </TabItem>
+</Tabs>
+
+## Authoring flow
+
+<Steps>
+  1. Choose a namespace such as `example`.
+  2. Create `pack.json` with pack metadata and asset roots.
+  3. Add one JSON file per block under `blocks/`.
+  4. Add textures under the declared asset root.
+  5. Start the server once so BlockEngine discovers blocks and writes creative metadata.
+  6. Restart once more if new creative-menu entries need to appear in the vanilla creative inventory.
+  7. Test with `/blockengine debug blocks list`, `/blockengine debug give <id>`, and `/blockengine catalog <namespace>`.
+</Steps>
+
+## Feature areas
+
+<Tabs syncKey="data-pack-features">
+  <TabItem label="Pack metadata" icon="document">
+
+`pack.json` owns namespace-level settings:
+
+<ul>
+  <li><code>namespace</code> decides the block id prefix.</li>
+  <li><code>title</code>, <code>description</code>, and <code>prompt</code> control generated resource-pack presentation.</li>
+  <li><code>assets</code> lists copied asset roots.</li>
+  <li><code>catalog</code> and <code>creative-menu</code> define default visibility.</li>
+  <li><code>dependencies</code> ensures required namespaces are loaded before registration.</li>
+</ul>
+
+  </TabItem>
+  <TabItem label="Block item" icon="puzzle">
+
+The `item` object controls the inventory representation:
+
+```json
+{
+  "material": "knowledge_book",
+  "name": "<gold>Example Block",
+  "lore": ["<gray>Placed by BlockEngine"],
+  "glint": false,
+  "placeable": true
+}
+```
+
+MiniMessage works for the final BlockEngine item title and lore. Creative-menu enchantment titles use generated translation strings.
+
+  </TabItem>
+  <TabItem label="States" icon="setting">
+
+States define how the block behaves and renders:
+
+<ul>
+  <li><code>hardness</code> and <code>mining-speed</code></li>
+  <li><code>mining-profile</code></li>
+  <li><code>preferred-tools</code></li>
+  <li>drop requirements</li>
+  <li>sounds</li>
+  <li>movement flags</li>
+  <li>texture references</li>
+</ul>
+
+Every block must have at least one state, and `default-state` must point at a defined state.
+
+  </TabItem>
+  <TabItem label="Placement" icon="add-document">
+
+`placement` controls orientation behavior:
+
+```json
+{
+  "placement": "directional"
+}
+```
+
+Supported values are `none`, `horizontal-facing`, `axis`, and `directional`.
+
+  </TabItem>
+  <TabItem label="Creative and catalog" icon="star">
+
+`creative-menu` and `catalog` default to `true`. Disable them per pack or per block:
+
+```json
+{
+  "creative-menu": false,
+  "catalog": false
+}
+```
+
+Creative inventory entries are discovered at runtime, written to the manifest, and realized on the next full restart.
+
+  </TabItem>
+</Tabs>
+
+## Generated output
+
+BlockEngine generates the model files data-pack authors normally do by hand:
+
+```text
+generated-resource-pack/data-packs/<pack>/
+  assets/<namespace>/models/block/<block>/<state>.json
+  assets/<namespace>/models/item/<block>.json
+  assets/<namespace>/items/<block>.json
+  assets/<namespace>/lang/en_us.json
+```
+
+## Complete example
+
+<CardGrid>
+  <Card title="JSON Ruby Block Pack" icon="document">
+    Walk through a complete pack from folder structure to in-game testing.
+    <br />
+    <a href="/BlockEngine/examples/json-ruby-block-pack/">Open the example</a>
+  </Card>
+  <Card title="Reference" icon="document">
+    Browse every supported `pack.json` and block JSON field.
+    <br />
+    <a href="/BlockEngine/reference/data-driven-packs/">Open the reference</a>
+  </Card>
+</CardGrid>

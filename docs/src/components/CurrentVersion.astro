@@ -1,0 +1,14 @@
+---
+import versionInfo from '../data/version.json';
+
+interface Props {
+  label?: string;
+}
+
+const { label = 'Current version' } = Astro.props;
+---
+
+<span class="version-pill" aria-label={`${label}: ${versionInfo.version}`}>
+  <span>{label}</span>
+  <strong>{versionInfo.version}</strong>
+</span>

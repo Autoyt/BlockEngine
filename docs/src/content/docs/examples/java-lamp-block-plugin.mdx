@@ -3,24 +3,15 @@ title: Java Lamp Block Plugin
 description: A complete Java integration example with a custom adapter, state changes, assets, and testing.
 ---
 
+import DependencySnippet from '../../../components/DependencySnippet.astro';
+
 This example creates a Java plugin that registers one BlockEngine block: `example:toggle_lamp`. Right-clicking the placed block toggles its state between `off` and `on`.
 
 ## 1. Add BlockEngine as a dependency
 
 In your plugin's Gradle build, depend on the BlockEngine API:
 
-```kotlin
-repositories {
-    mavenCentral()
-    maven("https://repo.papermc.io/repository/maven-public/")
-    maven("https://maven.pkg.github.com/Autoyt/BlockEngine")
-}
-
-dependencies {
-    compileOnly("dev.auto:blockengine-api:1.0.4-RELEASE")
-    compileOnly("io.papermc.paper:paper-api:1.21.11-R0.1-SNAPSHOT")
-}
-```
+<DependencySnippet />
 
 GitHub Packages may require credentials depending on repository visibility and package settings.
 

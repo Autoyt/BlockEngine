@@ -35,24 +35,33 @@ export default defineConfig({
           ],
         },
         {
-          label: 'Guides',
+          label: 'Data-Driven Blocks',
           items: [
+            { label: 'Overview and Setup', slug: 'data-driven' },
             { label: 'Create a Data Pack', slug: 'guides/create-a-data-pack' },
-            { label: 'Register Blocks from Java', slug: 'guides/register-blocks-from-java' },
-            { label: 'Creative Inventory', slug: 'guides/creative-inventory' },
+            { label: 'JSON Ruby Block Pack', slug: 'examples/json-ruby-block-pack' },
           ],
         },
         {
-          label: 'End-to-End Examples',
+          label: 'Code-Driven Blocks',
           items: [
-            { label: 'JSON Ruby Block Pack', slug: 'examples/json-ruby-block-pack' },
+            { label: 'Overview and Setup', slug: 'code-driven' },
+            { label: 'Register Blocks from Java', slug: 'guides/register-blocks-from-java' },
             { label: 'Java Lamp Block Plugin', slug: 'examples/java-lamp-block-plugin' },
+          ],
+        },
+        {
+          label: 'Shared Systems',
+          items: [
+            { label: 'Creative Inventory', slug: 'guides/creative-inventory' },
           ],
         },
         {
           label: 'Reference',
           items: [
             { label: 'Data-Driven Packs', slug: 'reference/data-driven-packs' },
+            { label: 'Resource Packs', slug: 'reference/resource-packs' },
+            { label: 'Commands', slug: 'reference/commands' },
             { label: 'Java API Docs', link: '/api/' },
           ],
         },

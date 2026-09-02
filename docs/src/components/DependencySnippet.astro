@@ -1,0 +1,16 @@
+---
+import versionInfo from '../data/version.json';
+
+const dependency = `repositories {
+    mavenCentral()
+    maven("https://repo.papermc.io/repository/maven-public/")
+    maven("https://maven.pkg.github.com/Autoyt/BlockEngine")
+}
+
+dependencies {
+    compileOnly("dev.auto:blockengine-api:${versionInfo.version}")
+    compileOnly("io.papermc.paper:paper-api:1.21.11-R0.1-SNAPSHOT")
+}`;
+---
+
+<pre class="astro-code"><code>{dependency}</code></pre>
