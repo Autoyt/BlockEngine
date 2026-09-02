@@ -16,6 +16,88 @@
   --sl-color-hairline-light: #3a2a18;
 }
 
+.expressive-code {
+  --ec-codeBg: #1d140b;
+  --ec-codeFg: #ffe6c2;
+  --ec-codeSelBg: #4c2500;
+  --ec-gtrFg: #b48a5a;
+  --ec-gtrBrdCol: #7a4218;
+  --ec-gtrHlFg: #ffc46b;
+  --ec-uiSelBg: #5a2f0a;
+  --ec-uiSelFg: #fff7ed;
+  --ec-focusBrd: #ff9f2e;
+  --ec-sbThumbCol: #ff9f2e55;
+  --ec-sbThumbHoverCol: #ff9f2e88;
+  --ec-frm-edActTabBg: #2a190b;
+  --ec-frm-edActTabFg: #ffe1b1;
+  --ec-frm-edActTabIndTopCol: #ff9f2e;
+  --ec-frm-edTabBarBg: #100d09;
+  --ec-frm-edBg: #1d140b;
+  --ec-frm-trmTtbBg: #100d09;
+  --ec-frm-trmBg: #1d140b;
+  --ec-frm-inlBtnFg: #3f2410;
+  --ec-frm-inlBtnBg: #ff9f2e;
+  --ec-frm-inlBtnBrd: #ffc46b;
+  --ec-frm-tooltipSuccessBg: #ff9f2e;
+}
+
+:root:not([data-theme='dark']) .expressive-code {
+  --ec-codeBg: #fff7ed;
+  --ec-codeFg: #3f2410;
+  --ec-codeSelBg: #ffe1b1;
+  --ec-gtrFg: #9a6a35;
+  --ec-gtrBrdCol: #ffc46b;
+  --ec-gtrHlFg: #a84f00;
+  --ec-uiSelBg: #ffd38d;
+  --ec-uiSelFg: #3f2410;
+  --ec-focusBrd: #ff9f2e;
+  --ec-sbThumbCol: #ff9f2e55;
+  --ec-sbThumbHoverCol: #ff9f2e88;
+  --ec-frm-edActTabBg: #fff1d8;
+  --ec-frm-edActTabFg: #3f2410;
+  --ec-frm-edActTabIndTopCol: #ff9f2e;
+  --ec-frm-edTabBarBg: #ffe9bd;
+  --ec-frm-edBg: #fff7ed;
+  --ec-frm-trmTtbBg: #ffe9bd;
+  --ec-frm-trmBg: #fff7ed;
+  --ec-frm-inlBtnFg: #3f2410;
+  --ec-frm-inlBtnBg: #ff9f2e;
+  --ec-frm-inlBtnBrd: #c76500;
+  --ec-frm-tooltipSuccessBg: #ff9f2e;
+}
+
+:root[data-theme='dark'] .expressive-code .ec-line span[style*='--0:#82AAFF'],
+:root[data-theme='dark'] .expressive-code .ec-line span[style*='--0:#C792EA'] {
+  --0: #ffc46b !important;
+}
+
+:root[data-theme='dark'] .expressive-code .ec-line span[style*='--0:#ECC48D'],
+:root[data-theme='dark'] .expressive-code .ec-line span[style*='--0:#C3E88D'],
+:root[data-theme='dark'] .expressive-code .ec-line span[style*='--0:#C5E478'] {
+  --0: #ffd38d !important;
+}
+
+:root[data-theme='dark'] .expressive-code .ec-line span[style*='--0:#F78C6C'],
+:root[data-theme='dark'] .expressive-code .ec-line span[style*='--0:#FFCB6B'] {
+  --0: #ff9f2e !important;
+}
+
+:root[data-theme='dark'] .expressive-code .ec-line span[style*='--0:#FF5370'],
+:root[data-theme='dark'] .expressive-code .ec-line span[style*='--0:#FF6A83'] {
+  --0: #ff6a2e !important;
+}
+
+:root:not([data-theme='dark']) .expressive-code .ec-line span[style*='--1:#3B61B0'],
+:root:not([data-theme='dark']) .expressive-code .ec-line span[style*='--1:#0C969B'] {
+  --1: #a84f00 !important;
+}
+
+:root:not([data-theme='dark']) .expressive-code .ec-line span[style*='--1:#984E4D'],
+:root:not([data-theme='dark']) .expressive-code .ec-line span[style*='--1:#8F2165'],
+:root:not([data-theme='dark']) .expressive-code .ec-line span[style*='--1:#AA0982'] {
+  --1: #c44e00 !important;
+}
+
 .site-title img {
   image-rendering: pixelated;
 }

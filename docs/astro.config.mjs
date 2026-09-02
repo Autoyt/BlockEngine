@@ -62,7 +62,7 @@ export default defineConfig({
             { label: 'Data-Driven Packs', slug: 'reference/data-driven-packs' },
             { label: 'Resource Packs', slug: 'reference/resource-packs' },
             { label: 'Commands', slug: 'reference/commands' },
-            { label: 'Java API Docs', link: '/api/' },
+            { label: 'Java API Docs', slug: 'reference/java-api' },
           ],
         },
       ],

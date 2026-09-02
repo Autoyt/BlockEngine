@@ -1,0 +1,42 @@
+---
+title: Java API Docs
+description: Generated Javadocs, dependency snippets, and public API entry points for code-driven BlockEngine integrations.
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+import CurrentVersion from '../../../components/CurrentVersion.astro';
+import DependencySnippet from '../../../components/DependencySnippet.astro';
+
+<CurrentVersion />
+
+The Java API is the code-driven entry point for plugins that register custom blocks, provide callbacks, attach placed-block data, and contribute resource-pack assets.
+
+<LinkCard title="Open generated Javadocs" href="/BlockEngine/api/" description="Browse the generated Javadoc output for the current published API." />
+
+## Dependency
+
+<DependencySnippet />
+
+The docs site keeps this snippet in sync with the version published from the repository, so examples and overview pages show the same release number.
+
+## Main entry points
+
+- `CustomBlockSystem` is implemented by your plugin or integration class. It registers adapters, declares the namespace, sets pack details, and exposes version metadata.
+- `BlockAdapter` defines one custom block and owns its runtime behavior.
+- `BlockDefinition.Builder` describes the static block contract: fallback material, item model, catalog visibility, creative-menu visibility, placement behavior, and state definitions.
+- `BlockData` stores public placed-block data such as strings, numbers, booleans, locations, item stacks, and inventories.
+- `PackDetails` declares generated resource-pack metadata and any additional asset roots your integration contributes.
+
+## Local generation
+
+Run Javadocs from the repository root:
+
+```bash
+./gradlew :blockengine-api:javadoc
+```
+
+The generated output is published under the docs site's `/api/` path during the GitHub Pages release workflow.
+
+## Troubleshooting
+
+If the generated Javadocs link returns `404` immediately after a release, wait for the Pages workflow to finish and refresh the site. The Starlight page you are reading is built with the docs, while the generated Javadocs are copied into the final Pages artifact as a separate API directory.
