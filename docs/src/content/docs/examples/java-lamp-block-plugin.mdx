@@ -3,6 +3,7 @@ title: Java Lamp Block Plugin
 description: A complete Java integration example with a custom adapter, state changes, assets, and testing.
 ---
 
+import { CardGrid, LinkCard } from '@astrojs/starlight/components';
 import DependencySnippet from '../../../components/DependencySnippet.astro';
 
 This example creates a Java plugin that registers one BlockEngine block: `example:toggle_lamp`. Right-clicking the placed block toggles its state between `off` and `on`.
@@ -157,24 +158,26 @@ Start the server once so BlockEngine discovers the block and writes creative met
 
 Useful commands:
 
-```text
-/blockengine debug plugins example
-/blockengine debug blocks example
-/blockengine debug give example:toggle_lamp
-/blockengine packs resend example-blocks
-/blockengine catalog example
-```
+<CardGrid>
+  <LinkCard title="Debug plugin namespace" href="/BlockEngine/reference/commands/#plugins-and-namespaces" description="/blockengine debug plugins example confirms the Java system loaded." />
+  <LinkCard title="Debug registered blocks" href="/BlockEngine/reference/commands/#blocks" description="/blockengine debug blocks example confirms the adapter and states registered." />
+  <LinkCard title="Give the lamp item" href="/BlockEngine/reference/commands/#blocks" description="/blockengine debug give example:toggle_lamp creates the real block item." />
+  <LinkCard title="Resend the pack" href="/BlockEngine/reference/commands/#resource-packs" description="/blockengine packs resend example-blocks sends the generated plugin pack." />
+  <LinkCard title="Open the catalog" href="/BlockEngine/reference/commands/#catalog" description="/blockengine catalog example opens the namespace catalog UI." />
+</CardGrid>
 
 Place the lamp, right-click it, and confirm the state changes from `off` to `on`.
 
 ## 7. What this example covers
 
-- Java namespace registration
-- adapter-backed block definition
-- custom item name and lore
-- two generated block states
-- texture asset copying
-- resource-pack hosting
-- creative inventory visibility
-- placed-block state data
-- interaction callbacks
+<CardGrid>
+  <LinkCard title="Java namespace registration" href="/BlockEngine/code-driven/#setup" description="CustomBlockSystem owns the stable example namespace." />
+  <LinkCard title="Adapter-backed definition" href="/BlockEngine/code-driven/#setting-up-your-first-block" description="BlockAdapter defines one behavior-backed custom block." />
+  <LinkCard title="Item name and lore" href="/BlockEngine/code-driven/#item-and-block" description="The block item gets custom display metadata while remaining placeable." />
+  <LinkCard title="Two generated states" href="/BlockEngine/code-driven/#states" description="off and on states each get generated block models." />
+  <LinkCard title="Texture asset copying" href="/BlockEngine/code-driven/#textures-and-tools" description="PackDetails copies declared assets into the generated resource pack." />
+  <LinkCard title="Resource-pack hosting" href="/BlockEngine/reference/resource-packs/" description="The example pack can be hosted and resent independently." />
+  <LinkCard title="Creative inventory visibility" href="/BlockEngine/guides/creative-inventory/" description="creativeMenu(true) exposes the block through the creative manifest." />
+  <LinkCard title="Placed-block state data" href="/BlockEngine/code-driven/#state-data" description="BlockData persists the lit flag across saves and restarts." />
+  <LinkCard title="Interaction callbacks" href="/BlockEngine/code-driven/#adapter-callbacks" description="onInteract toggles state when a player right-clicks the block." />
+</CardGrid>

@@ -3,7 +3,18 @@ title: Commands
 description: Common BlockEngine commands for development, testing, resource packs, catalog access, and debugging.
 ---
 
+import { CardGrid, LinkCard } from '@astrojs/starlight/components';
+
 Most operational commands require `blockengine.debug`, which defaults to server operators.
+
+<CardGrid>
+  <LinkCard title="Main command" href="/BlockEngine/reference/commands/#main-command" description="Entry points for /blockengine and /be." />
+  <LinkCard title="Catalog" href="/BlockEngine/reference/commands/#catalog" description="Open namespace catalog views." />
+  <LinkCard title="Resource packs" href="/BlockEngine/reference/commands/#resource-packs" description="List, reload, resend, and download generated packs." />
+  <LinkCard title="Blocks" href="/BlockEngine/reference/commands/#blocks" description="Inspect registrations and give test block items." />
+  <LinkCard title="Plugins and namespaces" href="/BlockEngine/reference/commands/#plugins-and-namespaces" description="Debug loaded systems, packs, namespaces, and catalog output." />
+  <LinkCard title="Runtime diagnostics" href="/BlockEngine/reference/commands/#runtime-diagnostics" description="Inspect chunk persistence, validation, events, and performance." />
+</CardGrid>
 
 ## Main command
 

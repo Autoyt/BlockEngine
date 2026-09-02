@@ -3,7 +3,15 @@ title: Creative Inventory
 description: How BlockEngine exposes custom blocks through the vanilla creative menu.
 ---
 
+import { CardGrid, LinkCard } from '@astrojs/starlight/components';
+
 BlockEngine's creative-menu system is built around Paper bootstrap enchantment registration and resource-pack item model routing.
+
+<CardGrid>
+  <LinkCard title="Startup lifecycle" href="/BlockEngine/concepts/system-lifecycle/#1-bootstrap-registers-creative-placeholders" description="Follow the bootstrap manifest and restart sequence." />
+  <LinkCard title="Resource-pack routing" href="/BlockEngine/reference/resource-packs/#creative-inventory-model-routing" description="See how enchanted books route to custom block item models." />
+  <LinkCard title="Commands" href="/BlockEngine/reference/commands/#catalog" description="Use catalog and debug commands to test creative-visible blocks." />
+</CardGrid>
 
 ## Why enchantments?
 

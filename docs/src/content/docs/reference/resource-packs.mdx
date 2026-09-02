@@ -3,6 +3,8 @@ title: Resource Packs
 description: How BlockEngine generates, hosts, sends, and troubleshoots resource packs.
 ---
 
+import { CardGrid, LinkCard } from '@astrojs/starlight/components';
+
 BlockEngine generates resource packs because the Minecraft client still renders only vanilla client-side concepts: textures, models, language files, item definitions, and pack metadata.
 
 ## Configuration
@@ -67,11 +69,13 @@ assets/<namespace>/sounds.json
 
 For block textures:
 
-- use PNG files
-- use lowercase file names with underscores or hyphens
-- reference textures without `.png` from Java or JSON
-- prefer square vanilla-style sizes such as `16x16`, `32x32`, or `64x64`
-- keep large textures intentional because every connected client must download them
+<CardGrid>
+  <LinkCard title="PNG textures" href="/BlockEngine/reference/resource-packs/#asset-and-image-constraints" description="Use PNG files for block and item textures." />
+  <LinkCard title="Lowercase names" href="/BlockEngine/reference/resource-packs/#asset-and-image-constraints" description="Use lowercase file names with underscores or hyphens." />
+  <LinkCard title="Extensionless references" href="/BlockEngine/code-driven/#texture-faces" description="Reference textures without .png from Java or JSON." />
+  <LinkCard title="Square sizes" href="/BlockEngine/reference/resource-packs/#asset-and-image-constraints" description="Prefer vanilla-style 16x16, 32x32, or 64x64 textures." />
+  <LinkCard title="Download size" href="/BlockEngine/reference/resource-packs/#sending-packs" description="Keep large textures intentional because every connected client must download them." />
+</CardGrid>
 
 BlockEngine generates simple block and item model JSON for BlockEngine blocks. You normally provide textures, not hand-written models. Add manual model JSON only for extra custom assets that your plugin uses outside the standard generated block model path.
 

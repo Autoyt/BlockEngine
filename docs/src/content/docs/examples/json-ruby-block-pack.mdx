@@ -3,6 +3,8 @@ title: JSON Ruby Block Pack
 description: A complete data-driven pack example from folder layout to in-game testing.
 ---
 
+import { CardGrid, LinkCard } from '@astrojs/starlight/components';
+
 This example creates a single decorative custom block named `example:ruby_block` using JSON and one texture file.
 
 ## 1. Create the pack folder
@@ -125,12 +127,12 @@ If this is the first time the block exists, restart the server once more so Pape
 
 Use these commands as an operator:
 
-```text
-/blockengine debug blocks list
-/blockengine debug give example:ruby_block
-/blockengine packs resend *
-/blockengine catalog example
-```
+<CardGrid>
+  <LinkCard title="List blocks" href="/BlockEngine/reference/commands/#blocks" description="/blockengine debug blocks list confirms the pack registered." />
+  <LinkCard title="Give the block item" href="/BlockEngine/reference/commands/#blocks" description="/blockengine debug give example:ruby_block creates the real BlockEngine item." />
+  <LinkCard title="Resend the combined pack" href="/BlockEngine/reference/commands/#resource-packs" description="/blockengine packs resend * sends the generated resource pack again." />
+  <LinkCard title="Open the catalog" href="/BlockEngine/reference/commands/#catalog" description="/blockengine catalog example opens the namespace catalog." />
+</CardGrid>
 
 Then place the item. It should become a BlockEngine managed block using the ruby texture from the generated resource pack.
 

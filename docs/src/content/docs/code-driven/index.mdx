@@ -3,7 +3,7 @@ title: Code-Driven Blocks
 description: Setup, first block walkthrough, states, textures, mining, events, and testing for Java block systems.
 ---
 
-import { Aside, Card, CardGrid, TabItem, Tabs } from '@astrojs/starlight/components';
+import { Aside, CardGrid, LinkCard, TabItem, Tabs } from '@astrojs/starlight/components';
 import DependencySnippet from '../../../components/DependencySnippet.astro';
 
 Code-driven blocks use the Java API. Use this path when a block needs behavior: interaction callbacks, state changes, ticking, plugin integration, custom data, movement control, or private payload persistence.
@@ -253,11 +253,13 @@ Available slots are `all`, `side`, `front`, `top`, `bottom`, `north`, `south`, `
 
 BlockEngine expects resource-pack-safe files under declared asset roots:
 
-- use lowercase names with underscores, such as `toggle_lamp_on.png`
-- put block textures under `assets/<namespace>/textures/block/`
-- keep texture references extensionless in Java, such as `textures.all("toggle_lamp_on")`
-- use PNG textures; keep JSON, MCMeta, and OGG files in normal Minecraft resource-pack locations
-- keep assets inside the declared root so validation can prove the pack is safe to copy
+<CardGrid>
+  <LinkCard title="Lowercase file names" href="/BlockEngine/reference/resource-packs/#asset-and-image-constraints" description="Use names like toggle_lamp_on.png so generated JSON and client lookups stay predictable." />
+  <LinkCard title="Block texture folder" href="/BlockEngine/reference/resource-packs/#asset-and-image-constraints" description="Put block textures under assets/&lt;namespace&gt;/textures/block/." />
+  <LinkCard title="Extensionless references" href="/BlockEngine/reference/resource-packs/#asset-and-image-constraints" description="Use references such as textures.all(&quot;toggle_lamp_on&quot;) from Java." />
+  <LinkCard title="Resource-pack file types" href="/BlockEngine/reference/resource-packs/#asset-and-image-constraints" description="Use PNG textures and keep JSON, MCMeta, and OGG files in normal Minecraft locations." />
+  <LinkCard title="Validated asset roots" href="/BlockEngine/reference/resource-packs/#asset-and-image-constraints" description="Keep copied files inside declared roots so BlockEngine can validate them safely." />
+</CardGrid>
 
 Vanilla-style square textures such as `16x16`, `32x32`, or `64x64` are the easiest to reason about. Higher resolution works as a resource-pack concern, but every client must download it.
 
@@ -548,27 +550,19 @@ Read the full resource-pack reference for generated pack layout, individual pack
 
 Useful in-game checks:
 
-```text
-/blockengine debug plugins <namespace>
-/blockengine debug blocks <namespace>
-/blockengine debug give <namespace>:<block>
-/blockengine packs resend <pack>
-/blockengine catalog <namespace>
-```
+<CardGrid>
+  <LinkCard title="Debug plugins" href="/BlockEngine/reference/commands/#plugins-and-namespaces" description="/blockengine debug plugins &lt;namespace&gt; shows loaded systems, packs, and namespace ownership." />
+  <LinkCard title="Debug blocks" href="/BlockEngine/reference/commands/#blocks" description="/blockengine debug blocks &lt;namespace&gt; validates registration and state ids." />
+  <LinkCard title="Give a block" href="/BlockEngine/reference/commands/#blocks" description="/blockengine debug give &lt;namespace&gt;:&lt;block&gt; creates a real BlockEngine item." />
+  <LinkCard title="Resend a pack" href="/BlockEngine/reference/commands/#resource-packs" description="/blockengine packs resend &lt;pack&gt; pushes generated resource packs back to players." />
+  <LinkCard title="Open catalog" href="/BlockEngine/reference/commands/#catalog" description="/blockengine catalog &lt;namespace&gt; opens the namespace catalog UI." />
+</CardGrid>
 
 Check server logs for namespace validation, duplicate ids, asset validation, generated resource-pack output, and creative-menu manifest messages.
 
 ## Complete example
 
 <CardGrid>
-  <Card title="Java Lamp Block Plugin" icon="code">
-    Build a two-state lamp block with a `BlockAdapter`, custom data, resource-pack assets, and an interaction callback.
-    <br />
-    <a href="/BlockEngine/examples/java-lamp-block-plugin/">Open the example</a>
-  </Card>
-  <Card title="API docs" icon="document">
-    Browse the generated Javadocs for `CustomBlockSystem`, `BlockAdapter`, `BlockDefinition`, `BlockData`, and related API types.
-    <br />
-    <a href="/BlockEngine/reference/java-api/">Open Java API docs</a>
-  </Card>
+  <LinkCard title="Java Lamp Block Plugin" href="/BlockEngine/examples/java-lamp-block-plugin/" description="Build a two-state lamp block with a BlockAdapter, custom data, resource-pack assets, and an interaction callback." />
+  <LinkCard title="API docs" href="/BlockEngine/reference/java-api/" description="Browse the generated Javadocs for CustomBlockSystem, BlockAdapter, BlockDefinition, BlockData, and related API types." />
 </CardGrid>

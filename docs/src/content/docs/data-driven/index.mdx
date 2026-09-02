@@ -3,7 +3,7 @@ title: Data-Driven Blocks
 description: Setup, features, folder layout, resource packs, creative inventory, validation, and testing for JSON block packs.
 ---
 
-import { Aside, Card, CardGrid, Steps, TabItem, Tabs } from '@astrojs/starlight/components';
+import { Aside, CardGrid, LinkCard, TabItem, Tabs } from '@astrojs/starlight/components';
 
 Data-driven packs add BlockEngine blocks with JSON and resource-pack assets. Use this path when a block can be described by configuration: textures, hardness, drops, sounds, movement flags, catalog visibility, and creative-menu visibility.
 
@@ -48,15 +48,14 @@ Use zip packs when distributing a finished block pack to another server.
 
 ## Authoring flow
 
-<Steps>
-  1. Choose a namespace such as `example`.
-  2. Create `pack.json` with pack metadata and asset roots.
-  3. Add one JSON file per block under `blocks/`.
-  4. Add textures under the declared asset root.
-  5. Start the server once so BlockEngine discovers blocks and writes creative metadata.
-  6. Restart once more if new creative-menu entries need to appear in the vanilla creative inventory.
-  7. Test with `/blockengine debug blocks list`, `/blockengine debug give <id>`, and `/blockengine catalog <namespace>`.
-</Steps>
+<CardGrid>
+  <LinkCard title="1. Choose a namespace" href="/BlockEngine/reference/data-driven-packs/#pack-metadata" description="Pick the stable prefix for ids such as example:ruby_block." />
+  <LinkCard title="2. Create pack.json" href="/BlockEngine/reference/data-driven-packs/#pack-metadata" description="Declare metadata, asset roots, catalog visibility, creative-menu defaults, and dependencies." />
+  <LinkCard title="3. Add block JSON" href="/BlockEngine/reference/data-driven-packs/#block-file" description="Create one file per block under blocks/ with item, placement, and state definitions." />
+  <LinkCard title="4. Add textures" href="/BlockEngine/reference/resource-packs/#asset-and-image-constraints" description="Place PNG textures inside declared resource-pack asset roots." />
+  <LinkCard title="5. Restart for creative" href="/BlockEngine/guides/creative-inventory/" description="Let BlockEngine discover entries, write the manifest, and realize them on the next full restart." />
+  <LinkCard title="6. Test commands" href="/BlockEngine/reference/commands/#blocks" description="Use debug give, blocks list, and catalog commands to verify the pack in-game." />
+</CardGrid>
 
 ## Feature areas
 
@@ -65,13 +64,13 @@ Use zip packs when distributing a finished block pack to another server.
 
 `pack.json` owns namespace-level settings:
 
-<ul>
-  <li><code>namespace</code> decides the block id prefix.</li>
-  <li><code>title</code>, <code>description</code>, and <code>prompt</code> control generated resource-pack presentation.</li>
-  <li><code>assets</code> lists copied asset roots.</li>
-  <li><code>catalog</code> and <code>creative-menu</code> define default visibility.</li>
-  <li><code>dependencies</code> ensures required namespaces are loaded before registration.</li>
-</ul>
+<CardGrid>
+  <LinkCard title="namespace" href="/BlockEngine/reference/data-driven-packs/#pack-metadata" description="Controls the block id prefix for every block in the pack." />
+  <LinkCard title="title, description, prompt" href="/BlockEngine/reference/resource-packs/#sending-packs" description="Control generated resource-pack presentation and player-facing pack prompts." />
+  <LinkCard title="assets" href="/BlockEngine/reference/resource-packs/#asset-and-image-constraints" description="Lists copied asset roots containing textures, models, sounds, and pack files." />
+  <LinkCard title="catalog and creative-menu" href="/BlockEngine/guides/creative-inventory/" description="Define default visibility for catalog flows and vanilla creative inventory entries." />
+  <LinkCard title="dependencies" href="/BlockEngine/concepts/system-lifecycle/#3-namespaces-protect-ownership" description="Require other namespaces before this pack registers." />
+</CardGrid>
 
   </TabItem>
   <TabItem label="Block item" icon="puzzle">
@@ -95,15 +94,14 @@ MiniMessage works for the final BlockEngine item title and lore. Creative-menu e
 
 States define how the block behaves and renders:
 
-<ul>
-  <li><code>hardness</code> and <code>mining-speed</code></li>
-  <li><code>mining-profile</code></li>
-  <li><code>preferred-tools</code></li>
-  <li>drop requirements</li>
-  <li>sounds</li>
-  <li>movement flags</li>
-  <li>texture references</li>
-</ul>
+<CardGrid>
+  <LinkCard title="Hardness and mining speed" href="/BlockEngine/code-driven/#mining-and-hardness" description="Control break timing and custom mining calculations." />
+  <LinkCard title="Mining profile" href="/BlockEngine/reference/data-driven-packs/#block-file" description="Borrow vanilla mining behavior from a real Bukkit block material." />
+  <LinkCard title="Preferred tools" href="/BlockEngine/code-driven/#mining-and-hardness" description="Model pickaxe, axe, shovel, hoe, shears, and sword drop behavior." />
+  <LinkCard title="Drops and Silk Touch" href="/BlockEngine/reference/data-driven-packs/#block-file" description="Decide when states drop their custom item in survival or creative mode." />
+  <LinkCard title="Sounds and movement" href="/BlockEngine/code-driven/#movement" description="Configure placement, break, mining, gravity, dispenser, and partial-support behavior." />
+  <LinkCard title="Texture references" href="/BlockEngine/reference/resource-packs/#asset-and-image-constraints" description="Point generated block models at safe resource-pack texture paths." />
+</CardGrid>
 
 Every block must have at least one state, and `default-state` must point at a defined state.
 
@@ -152,14 +150,6 @@ generated-resource-pack/data-packs/<pack>/
 ## Complete example
 
 <CardGrid>
-  <Card title="JSON Ruby Block Pack" icon="document">
-    Walk through a complete pack from folder structure to in-game testing.
-    <br />
-    <a href="/BlockEngine/examples/json-ruby-block-pack/">Open the example</a>
-  </Card>
-  <Card title="Reference" icon="document">
-    Browse every supported `pack.json` and block JSON field.
-    <br />
-    <a href="/BlockEngine/reference/data-driven-packs/">Open the reference</a>
-  </Card>
+  <LinkCard title="JSON Ruby Block Pack" href="/BlockEngine/examples/json-ruby-block-pack/" description="Walk through a complete pack from folder structure to in-game testing." />
+  <LinkCard title="Reference" href="/BlockEngine/reference/data-driven-packs/" description="Browse every supported pack.json and block JSON field." />
 </CardGrid>

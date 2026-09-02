@@ -3,6 +3,8 @@ title: System Lifecycle
 description: A detailed startup-to-runtime explanation of how BlockEngine discovers, renders, places, persists, and exposes custom blocks.
 ---
 
+import { CardGrid, LinkCard } from '@astrojs/starlight/components';
+
 BlockEngine is built around a clear boundary: Minecraft and Paper own the server process, worlds, inventories, registries, and resource-pack protocol. BlockEngine adds a custom-block layer on top by registering block definitions, generating client assets, and storing placed-block state.
 
 This page follows a block from disk or Java code all the way to a player placing it in-world.
@@ -25,8 +27,10 @@ New blocks are not visible in the creative inventory until the next full restart
 
 During normal startup, BlockEngine discovers two block sources:
 
-- Java plugins implementing `CustomBlockSystem`
-- JSON expansion packs under `plugins/blockengine/expansion/packs/`
+<CardGrid>
+  <LinkCard title="Java systems" href="/BlockEngine/code-driven/" description="Plugins implementing CustomBlockSystem register adapters and behavior-backed blocks." />
+  <LinkCard title="JSON expansion packs" href="/BlockEngine/data-driven/" description="Folders or zip files under plugins/blockengine/expansion/packs/ register data-driven blocks." />
+</CardGrid>
 
 Both sources become the same internal block representation. This keeps later systems simple: placement, mining, persistence, catalog views, item generation, and resource-pack generation do not need to care whether the block started as Java or JSON.
 
@@ -46,11 +50,13 @@ BlockEngine validates dependencies and refuses duplicate block ids. A block id s
 
 A `BlockDefinition` tells BlockEngine what the block is allowed to do:
 
-- `vanillaBlock` is the fallback Bukkit block material used in-world
-- `item` controls the inventory representation
-- `creativeMenu` and `catalog` control visibility
-- `placement` controls orientation behavior
-- `states` define textures, hardness, drops, sounds, and movement
+<CardGrid>
+  <LinkCard title="vanillaBlock" href="/BlockEngine/code-driven/#item-and-block" description="The fallback Bukkit block material used in-world." />
+  <LinkCard title="item" href="/BlockEngine/code-driven/#item-and-block" description="The inventory representation, including title, lore, glint, and placeability." />
+  <LinkCard title="creativeMenu and catalog" href="/BlockEngine/guides/creative-inventory/" description="Visibility switches for vanilla creative inventory and BlockEngine catalog flows." />
+  <LinkCard title="placement" href="/BlockEngine/code-driven/#definition" description="Orientation behavior for none, horizontal-facing, axis, and directional placement." />
+  <LinkCard title="states" href="/BlockEngine/code-driven/#states" description="Textures, hardness, drops, sounds, movement, and variant ids." />
+</CardGrid>
 
 Data packs express this in JSON. Java adapters express it through `BlockDefinition.Builder`.
 

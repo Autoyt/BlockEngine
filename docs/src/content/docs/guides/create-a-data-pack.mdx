@@ -3,9 +3,14 @@ title: Create a Data Pack
 description: Add custom blocks with JSON and resource-pack assets.
 ---
 
+import { CardGrid, LinkCard } from '@astrojs/starlight/components';
+
 Data-driven packs are the fastest way to add simple custom blocks. They are meant for blocks that do not need Java callbacks.
 
-For a complete copyable project, see [JSON Ruby Block Pack](/BlockEngine/examples/json-ruby-block-pack/).
+<CardGrid>
+  <LinkCard title="Complete Ruby example" href="/BlockEngine/examples/json-ruby-block-pack/" description="Use the full copyable project after reading this shorter setup guide." />
+  <LinkCard title="Data-driven reference" href="/BlockEngine/reference/data-driven-packs/" description="Look up every supported pack.json and block JSON field." />
+</CardGrid>
 
 ## Folder layout
 
@@ -93,10 +98,10 @@ New creative-menu entries are discovered during startup and realized on the next
 
 If the block loads but does not look right, check the generated pack first:
 
-```text
-/blockengine packs list
-/blockengine packs resend *
-/blockengine packs download *
-```
+<CardGrid>
+  <LinkCard title="List packs" href="/BlockEngine/reference/commands/#resource-packs" description="/blockengine packs list shows generated and hosted packs." />
+  <LinkCard title="Resend packs" href="/BlockEngine/reference/commands/#resource-packs" description="/blockengine packs resend * asks players to re-accept the combined pack." />
+  <LinkCard title="Download packs" href="/BlockEngine/reference/commands/#resource-packs" description="/blockengine packs download * gives a manual testing URL." />
+</CardGrid>
 
 If the block does not register, check the server log for validation errors. The loader rejects invalid namespaces, missing states, missing textures, invalid materials, paths outside the pack folder, and duplicate block ids.

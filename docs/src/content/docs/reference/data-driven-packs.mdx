@@ -3,11 +3,16 @@ title: Data-Driven Packs
 description: Reference for BlockEngine JSON pack and block files.
 ---
 
+import { CardGrid, LinkCard } from '@astrojs/starlight/components';
+
 BlockEngine supports custom blocks that are added with JSON files and resource-pack assets only. A pack author can define decorative, breakable, placeable, textured blocks without writing a `BlockAdapter`, compiling a plugin, or implementing callbacks.
 
 The runtime sees these blocks as normal BlockEngine blocks. They use the existing registry, persistence, placement, mining, gravity, catalog, creative-menu, item, and resource-pack generation paths.
 
-For a complete folder-by-folder walkthrough, see [JSON Ruby Block Pack](/BlockEngine/examples/json-ruby-block-pack/).
+<CardGrid>
+  <LinkCard title="JSON Ruby Block Pack" href="/BlockEngine/examples/json-ruby-block-pack/" description="Follow a complete folder-by-folder walkthrough." />
+  <LinkCard title="Create a Data Pack" href="/BlockEngine/guides/create-a-data-pack/" description="Build the smallest useful data-driven block pack." />
+</CardGrid>
 
 ## Pack layout
 
@@ -100,28 +105,26 @@ Each file in `blocks/**/*.json` defines one block. If `name` is omitted, the pat
 
 Data packs get individual hosted resource packs, parallel to plugin-provided `CustomBlockSystem` packs:
 
-- BlockEngine generates normal block and item model JSON for every data block.
-- BlockEngine generates `en_us.json` entries for creative-menu enchantments and fallback item names.
-- BlockEngine writes `plugins/blockengine/generated-creative-enchantments.json` during startup; Paper realizes those enchantments on the next full server restart.
-- Declared asset roots are copied with the same allowlist used by plugin pack assets.
-- `pack.png`, `title`, `description`, `prompt`, `required`, and `url-ending` come from `pack.json`.
-- The combined `*` download still works by merging generated pack folders.
+<CardGrid>
+  <LinkCard title="Generated models" href="/BlockEngine/reference/resource-packs/#generated-data-packs" description="BlockEngine generates normal block and item model JSON for every data block." />
+  <LinkCard title="Generated language" href="/BlockEngine/reference/resource-packs/#generated-data-packs" description="en_us.json entries cover creative-menu enchantments and fallback item names." />
+  <LinkCard title="Creative manifest" href="/BlockEngine/guides/creative-inventory/#startup-manifest" description="generated-creative-enchantments.json is written during startup and realized on the next restart." />
+  <LinkCard title="Asset copying" href="/BlockEngine/reference/resource-packs/#asset-and-image-constraints" description="Declared asset roots are copied through the same allowlist used by plugin assets." />
+  <LinkCard title="Pack metadata" href="/BlockEngine/reference/resource-packs/#generated-data-packs" description="pack.png, title, description, prompt, required, and url-ending come from pack.json." />
+  <LinkCard title="Combined download" href="/BlockEngine/reference/resource-packs/#sending-packs" description="The combined * download merges generated pack folders for manual testing." />
+</CardGrid>
 
 ## Validation
 
 The loader validates before registration:
 
-- `format` must be `1`.
-- `namespace` must match `^[a-z0-9._-]+$`.
-- `dependencies` entries must be valid namespaces and must be provided by another loaded expansion pack or `CustomBlockSystem`.
-- Block names and state ids must use lowercase path segments.
-- Materials must resolve against Bukkit `Material`.
-- Block material fields must be blocks; item material fields must be items.
-- Every block must define at least one state.
-- `default-state` must exist.
-- Every state must define at least one texture.
-- `creative-menu` defaults to `true` at pack and block level.
-- Enum values are case-insensitive and may use hyphens.
-- Pack asset and icon paths must stay inside the pack folder.
-
-A JSON Schema for editor and tooling support lives at [`/schemas/data-driven-block-pack.schema.json`](/BlockEngine/schemas/data-driven-block-pack.schema.json).
+<CardGrid>
+  <LinkCard title="Format version" href="/BlockEngine/reference/data-driven-packs/#pack-metadata" description="format must be 1." />
+  <LinkCard title="Namespace shape" href="/BlockEngine/concepts/system-lifecycle/#3-namespaces-protect-ownership" description="namespace must match lowercase resource-key rules." />
+  <LinkCard title="Dependencies" href="/BlockEngine/concepts/system-lifecycle/#3-namespaces-protect-ownership" description="dependencies must be valid namespaces provided by another loaded pack or system." />
+  <LinkCard title="Block and state ids" href="/BlockEngine/reference/data-driven-packs/#block-file" description="Names and state ids must use lowercase path segments." />
+  <LinkCard title="Materials" href="/BlockEngine/reference/data-driven-packs/#block-file" description="Materials resolve against Bukkit Material, with block fields requiring blocks and item fields requiring items." />
+  <LinkCard title="Required states" href="/BlockEngine/code-driven/#states" description="Every block needs at least one state, a valid default-state, and at least one texture per state." />
+  <LinkCard title="Creative defaults" href="/BlockEngine/guides/creative-inventory/" description="creative-menu defaults to true at pack and block level." />
+  <LinkCard title="JSON Schema" href="/BlockEngine/schemas/data-driven-block-pack.schema.json" description="Use the schema for editor validation and tooling support." />
+</CardGrid>

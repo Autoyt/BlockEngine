@@ -3,6 +3,8 @@ title: Register Blocks from Java
 description: Use the BlockEngine API when blocks need plugin-owned behavior.
 ---
 
+import { CardGrid, LinkCard } from '@astrojs/starlight/components';
+
 Java integrations should implement `CustomBlockSystem`. This gives your plugin a namespace and registration callback.
 
 ```java
@@ -80,3 +82,9 @@ public void setPackDetails(PackDetails details) {
 `creativeMenu(true)` is the default. Set `creativeMenu(false)` for internal blocks, helper blocks, or blocks that should only be obtainable through commands or plugin logic.
 
 Creative-menu enchantments are registered during Paper bootstrap, so newly added Java blocks also need one full restart after discovery before they appear in the creative inventory.
+
+<CardGrid>
+  <LinkCard title="Code-driven guide" href="/BlockEngine/code-driven/" description="Read the full setup, state, texture, mining, event, and resource-pack walkthrough." />
+  <LinkCard title="Java Lamp example" href="/BlockEngine/examples/java-lamp-block-plugin/" description="See this pattern expanded into a complete two-state block plugin." />
+  <LinkCard title="Java API docs" href="/BlockEngine/reference/java-api/" description="Browse generated Javadocs and API entry points." />
+</CardGrid>

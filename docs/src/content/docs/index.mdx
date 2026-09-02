@@ -12,11 +12,13 @@ BlockEngine is a Paper plugin for building custom blocks that behave like first-
 
 It gives plugin authors and pack authors the same core path:
 
-- register a block id such as `example:ruby_block`
-- define how the item looks and places
-- generate the resource-pack models and translations
-- persist placed custom blocks in loaded worlds
-- expose blocks through catalog and creative-menu flows
+<CardGrid>
+  <LinkCard title="Register block ids" href="/BlockEngine/concepts/how-it-works/#registration" description="Create stable ids such as example:ruby_block from Java systems or JSON packs." />
+  <LinkCard title="Define items and placement" href="/BlockEngine/concepts/system-lifecycle/#4-definitions-describe-the-server-contract" description="Describe the inventory item, fallback block, placement behavior, states, hardness, sounds, and movement." />
+  <LinkCard title="Generate client assets" href="/BlockEngine/reference/resource-packs/" description="Build resource-pack models, item definitions, translations, and hosted pack files." />
+  <LinkCard title="Persist placed blocks" href="/BlockEngine/concepts/system-lifecycle/#8-placement-creates-persisted-block-data" description="Store placed custom block ids, state ids, public data maps, and adapter payloads." />
+  <LinkCard title="Expose creative entries" href="/BlockEngine/guides/creative-inventory/" description="Publish catalog and creative-menu entries with datapack-style model routing and inventory conversion." />
+</CardGrid>
 
 The two supported authoring paths meet in the same runtime. JSON packs are ideal for decorative or configuration-only blocks. Java integrations are for blocks that need behavior, callbacks, custom data, or plugin-owned systems.
 

@@ -3,7 +3,7 @@ title: Java API Docs
 description: Generated Javadocs, dependency snippets, and public API entry points for code-driven BlockEngine integrations.
 ---
 
-import { LinkCard } from '@astrojs/starlight/components';
+import { CardGrid, LinkCard } from '@astrojs/starlight/components';
 import CurrentVersion from '../../../components/CurrentVersion.astro';
 import DependencySnippet from '../../../components/DependencySnippet.astro';
 
@@ -21,11 +21,13 @@ The docs site keeps this snippet in sync with the version published from the rep
 
 ## Main entry points
 
-- `CustomBlockSystem` is implemented by your plugin or integration class. It registers adapters, declares the namespace, sets pack details, and exposes version metadata.
-- `BlockAdapter` defines one custom block and owns its runtime behavior.
-- `BlockDefinition.Builder` describes the static block contract: fallback material, item model, catalog visibility, creative-menu visibility, placement behavior, and state definitions.
-- `BlockData` stores public placed-block data such as strings, numbers, booleans, locations, item stacks, and inventories.
-- `PackDetails` declares generated resource-pack metadata and any additional asset roots your integration contributes.
+<CardGrid>
+  <LinkCard title="CustomBlockSystem" href="/BlockEngine/api/dev/auto/blockengine/api/CustomBlockSystem.html" description="Registers adapters, declares the namespace, sets pack details, and exposes version metadata." />
+  <LinkCard title="BlockAdapter" href="/BlockEngine/api/dev/auto/blockengine/api/blocks/BlockAdapter.html" description="Defines one custom block and owns its runtime behavior." />
+  <LinkCard title="BlockDefinition.Builder" href="/BlockEngine/api/dev/auto/blockengine/api/blocks/BlockDefinition.Builder.html" description="Describes fallback material, item model, catalog visibility, creative-menu visibility, placement behavior, and states." />
+  <LinkCard title="BlockData" href="/BlockEngine/api/dev/auto/blockengine/api/blocks/BlockData.html" description="Stores public placed-block data such as strings, numbers, and booleans." />
+  <LinkCard title="PackDetails" href="/BlockEngine/api/dev/auto/blockengine/api/CustomBlockSystem.PackDetails.html" description="Declares generated resource-pack metadata and additional asset roots." />
+</CardGrid>
 
 ## Local generation
 

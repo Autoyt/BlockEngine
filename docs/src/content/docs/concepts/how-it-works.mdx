@@ -3,6 +3,8 @@ title: How BlockEngine Works
 description: The moving parts behind custom block registration, rendering, items, and creative inventory entries.
 ---
 
+import { CardGrid, LinkCard } from '@astrojs/starlight/components';
+
 BlockEngine splits custom blocks into three responsibilities: registration, runtime behavior, and client presentation. That shape is similar to Paper's own documentation style: the server owns behavior, while resource packs describe what the client should display.
 
 The important design rule is that a custom block is not only an item model. A BlockEngine block has a server id, a runtime adapter, one or more states, item metadata, generated client assets, and persisted placed-block data.
@@ -19,23 +21,27 @@ Code-backed blocks are registered by plugins implementing `CustomBlockSystem`. J
 
 Each registered block produces a `BlockDefinition`. The definition contains:
 
-- the vanilla fallback block used in the world
-- item material, title, lore, glint, and placeability
-- catalog and creative-menu visibility
-- placement mode
-- state ids and textures
-- mining, drops, sound, and movement rules
+<CardGrid>
+  <LinkCard title="Fallback block" href="/BlockEngine/code-driven/#item-and-block" description="The vanilla Bukkit block material that exists in the world." />
+  <LinkCard title="Inventory item" href="/BlockEngine/code-driven/#item-and-block" description="The item material, title, lore, glint, and placeability settings." />
+  <LinkCard title="Catalog and creative menu" href="/BlockEngine/guides/creative-inventory/" description="Visibility controls for catalog flows and vanilla creative inventory entries." />
+  <LinkCard title="Placement mode" href="/BlockEngine/code-driven/#definition" description="Orientation rules for none, horizontal-facing, axis, and directional blocks." />
+  <LinkCard title="States and textures" href="/BlockEngine/code-driven/#states" description="State ids plus the texture references used by generated models." />
+  <LinkCard title="Mining and movement" href="/BlockEngine/code-driven/#mining-and-hardness" description="Hardness, tools, drops, sounds, gravity, and movement behavior." />
+</CardGrid>
 
 ## Runtime behavior
 
 Once registered, blocks flow through the same systems:
 
-- placement validation
-- block persistence
-- break and drop handling
-- optional gravity or movement behavior
-- display entity management
-- catalog and creative inventory exposure
+<CardGrid>
+  <LinkCard title="Placement validation" href="/BlockEngine/concepts/system-lifecycle/#8-placement-creates-persisted-block-data" description="BlockEngine checks placement rules before writing custom state." />
+  <LinkCard title="Block persistence" href="/BlockEngine/concepts/system-lifecycle/#10-save-and-load-restore-the-world" description="Placed custom ids, state ids, and data maps survive chunk saves and restarts." />
+  <LinkCard title="Break and drops" href="/BlockEngine/code-driven/#mining-and-hardness" description="Hardness, tools, Silk Touch, creative drops, and adapter break callbacks." />
+  <LinkCard title="Gravity and movement" href="/BlockEngine/code-driven/#movement" description="Optional falling behavior plus adapter movement veto and observe hooks." />
+  <LinkCard title="Display management" href="/BlockEngine/reference/java-api/" description="Lower-level API access to BlockEngine-managed client-side display entities." />
+  <LinkCard title="Catalog and creative" href="/BlockEngine/guides/creative-inventory/" description="Expose blocks through BlockEngine catalog and vanilla creative inventory flows." />
+</CardGrid>
 
 Data-driven blocks use BlockEngine's default adapter. Java blocks can provide their own adapter when they need callbacks, custom state, or integration with another plugin.
 
@@ -45,10 +51,12 @@ For Java blocks, the adapter is the behavior surface. It defines the static bloc
 
 Minecraft clients do not know about BlockEngine block ids directly. BlockEngine bridges that gap by generating resource-pack assets:
 
-- cube block models for each state
-- item models for normal inventory items
-- language strings for item and creative-menu names
-- generated resource-pack zips that can be hosted and sent to players
+<CardGrid>
+  <LinkCard title="Block state models" href="/BlockEngine/reference/resource-packs/#generated-system-packs" description="Cube block models are generated for each configured state." />
+  <LinkCard title="Item models" href="/BlockEngine/reference/resource-packs/#creative-inventory-model-routing" description="Normal inventory items and creative placeholders route to generated models." />
+  <LinkCard title="Language strings" href="/BlockEngine/reference/resource-packs/#generated-system-packs" description="Generated translations power item and creative-menu names." />
+  <LinkCard title="Hosted packs" href="/BlockEngine/reference/resource-packs/#sending-packs" description="Generated resource-pack zips can be hosted and sent to players." />
+</CardGrid>
 
 ## Creative menu entries
 
@@ -65,6 +73,8 @@ For creative entries, the generated resource pack follows the same pattern used 
 
 ## Where to go next
 
-- Use [Create a Data Pack](/BlockEngine/guides/create-a-data-pack/) for asset-only blocks.
-- Use [Register Blocks from Java](/BlockEngine/guides/register-blocks-from-java/) for behavior-backed blocks.
-- Read [System Lifecycle](/BlockEngine/concepts/system-lifecycle/) for the detailed startup-to-placement flow.
+<CardGrid>
+  <LinkCard title="Create a Data Pack" href="/BlockEngine/guides/create-a-data-pack/" description="Use JSON and assets for decorative or configuration-only blocks." />
+  <LinkCard title="Register Blocks from Java" href="/BlockEngine/guides/register-blocks-from-java/" description="Use adapters for behavior-backed blocks and plugin integrations." />
+  <LinkCard title="System Lifecycle" href="/BlockEngine/concepts/system-lifecycle/" description="Read the detailed startup-to-placement flow." />
+</CardGrid>
