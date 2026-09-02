@@ -61,6 +61,106 @@ public final class LampPlugin extends JavaPlugin implements CustomBlockSystem {
   </TabItem>
 </Tabs>
 
+## Main plugin configuration
+
+Your plugin can implement `CustomBlockSystem` directly on the main `JavaPlugin` class. That keeps version, namespace, block registration, and resource-pack metadata in one obvious place.
+
+<CardGrid>
+  <LinkCard title="CustomBlockSystem" href="/BlockEngine/reference/java-api/" description="The Java entry point BlockEngine calls during startup to discover adapters and pack metadata." />
+  <LinkCard title="Plugin dependency" href="/BlockEngine/guides/register-blocks-from-java/" description="Paper must load BlockEngine before your plugin registers blocks." />
+  <LinkCard title="Separate resource pack" href="/BlockEngine/reference/resource-packs/#generated-system-packs" description="Each Java system can expose its own title, description, prompt, icon, URL ending, and assets." />
+</CardGrid>
+
+<Tabs syncKey="main-plugin-config">
+  <TabItem label="Main class">
+
+```java
+package com.example.lamps;
+
+import dev.auto.blockengine.api.CustomBlockSystem;
+import dev.auto.blockengine.api.blocks.BlockAdapter;
+import org.bukkit.plugin.java.JavaPlugin;
+
+import java.util.List;
+
+public final class LampPlugin extends JavaPlugin implements CustomBlockSystem {
+    @Override
+    public String pluginVersion() {
+        return getPluginMeta().getVersion();
+    }
+
+    @Override
+    public String getNamespace() {
+        return "lampdemo";
+    }
+
+    @Override
+    public List<BlockAdapter> registerAdapters() {
+        return List.of(new ToggleLampBlock());
+    }
+}
+```
+
+`pluginVersion()` should return the version of your plugin. `getNamespace()` becomes the owner of ids such as `lampdemo:toggle_lamp`. `registerAdapters()` returns every code-driven block this plugin contributes.
+
+  </TabItem>
+  <TabItem label="paper-plugin.yml">
+
+```yaml
+name: LampPlugin
+version: 1.0.0
+main: com.example.lamps.LampPlugin
+api-version: '1.21'
+dependencies:
+  server:
+    blockengine:
+      load: BEFORE
+      required: true
+```
+
+BlockEngine needs to be available before your plugin registers systems and block adapters. Keep the dependency required unless your plugin has a separate fallback mode without custom blocks.
+
+  </TabItem>
+  <TabItem label="Resource pack">
+
+```java
+@Override
+public void setPackDetails(PackDetails details) {
+    details.title("<gold>Lamp Demo")
+            .description("Models and textures for Lamp Demo blocks")
+            .prompt("<yellow>Accept to see Lamp Demo custom blocks")
+            .required(true)
+            .urlEnding("lamp-demo")
+            .assetNamespace("lampdemo")
+            .icon(getDataFolder().toPath().resolve("pack.png"))
+            .addAssets(getDataFolder().toPath().resolve("assets"));
+}
+```
+
+This creates a separate generated pack for your Java system. `title`, `description`, `prompt`, and `required` control the player-facing pack metadata. `urlEnding("lamp-demo")` gives the hosted pack a stable path. `assetNamespace("lampdemo")` declares which Minecraft asset namespace your plugin owns. `icon(...)` points at the pack icon, and `addAssets(...)` points at the resource-pack root copied into the generated pack.
+
+  </TabItem>
+  <TabItem label="Asset layout">
+
+```text
+plugins/LampPlugin/
+  pack.png
+  assets/
+    assets/
+      lampdemo/
+        textures/
+          block/
+            toggle_lamp_off.png
+            toggle_lamp_on.png
+          item/
+            lamp_remote.png
+```
+
+The first `assets/` is the root passed to `addAssets(...)`. The nested `assets/lampdemo/...` is the normal Minecraft resource-pack layout. The icon path is separate so server owners can replace the pack icon without changing texture folders.
+
+  </TabItem>
+</Tabs>
+
 ## Setting up your first block
 
 <Tabs syncKey="first-block">

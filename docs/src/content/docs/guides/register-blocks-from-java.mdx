@@ -7,6 +7,11 @@ import { CardGrid, LinkCard } from '@astrojs/starlight/components';
 
 Java integrations should implement `CustomBlockSystem`. This gives your plugin a namespace and registration callback.
 
+<CardGrid>
+  <LinkCard title="Main plugin configuration" href="/BlockEngine/code-driven/#main-plugin-configuration" description="See the complete JavaPlugin, CustomBlockSystem, paper-plugin.yml, and resource-pack setup." />
+  <LinkCard title="Resource packs" href="/BlockEngine/reference/resource-packs/#generated-system-packs" description="Learn how separate generated packs are hosted and sent to players." />
+</CardGrid>
+
 ```java
 package com.example;
 
@@ -66,16 +71,34 @@ public final class ExampleBlocks extends JavaPlugin implements CustomBlockSystem
 
 ## Resource assets
 
-Use `setPackDetails` to point BlockEngine at your asset folders. BlockEngine validates declared namespaces and copies allowed asset files into the generated resource pack.
+Use `setPackDetails` to create a separate generated resource pack for your Java system. BlockEngine validates declared namespaces and copies allowed asset files into the generated resource pack.
 
 ```java
 @Override
 public void setPackDetails(PackDetails details) {
     details.title("<green>Example Blocks")
             .description("Custom blocks from ExampleBlocks")
+            .prompt("<yellow>Accept to see Example custom blocks")
+            .required(true)
+            .urlEnding("example-blocks")
+            .assetNamespace("example")
+            .icon(getDataFolder().toPath().resolve("pack.png"))
             .addAssets(getDataFolder().toPath().resolve("assets"));
 }
 ```
+
+```text
+plugins/ExampleBlocks/
+  pack.png
+  assets/
+    assets/
+      example/
+        textures/
+          block/
+            ruby_block.png
+```
+
+`pack.png` is the icon used for this system's pack. `urlEnding(...)` makes the hosted pack path stable. `assetNamespace(...)` declares the namespace your assets belong to. `addAssets(...)` points at the root that contains the normal Minecraft `assets/<namespace>/...` folder.
 
 ## Creative-menu visibility
 
