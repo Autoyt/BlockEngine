@@ -108,6 +108,7 @@ Data packs get individual hosted resource packs, parallel to plugin-provided `Cu
 
 - BlockEngine generates normal block and item model JSON for every data block.
 - BlockEngine generates `en_us.json` entries for creative-menu enchantments and fallback item names.
+- BlockEngine writes `plugins/blockengine/generated-creative-enchantments.json` during startup; Paper realizes those enchantments on the next full server restart.
 - Declared asset roots are copied with the same allowlist used by plugin pack assets.
 - `pack.png`, `title`, `description`, `prompt`, `required`, and `url-ending` come from `pack.json`.
 - The combined `*` download still works by merging generated pack folders.

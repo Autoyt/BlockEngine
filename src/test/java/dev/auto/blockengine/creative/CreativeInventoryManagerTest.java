@@ -14,28 +14,16 @@ class CreativeInventoryManagerTest {
     Path tempDir;
 
     @Test
-    void scansExpansionPacksForCreativeBlocks() throws IOException {
-        Path pack = tempDir.resolve("expansion").resolve("packs").resolve("example");
-        Files.createDirectories(pack.resolve("blocks"));
-        Files.writeString(pack.resolve("pack.json"), """
-                {
-                  "format": 1,
-                  "namespace": "example"
-                }
-                """);
-        Files.writeString(pack.resolve("blocks").resolve("ruby_block.json"), """
-                {
-                  "item": {
-                    "name": "<red>Ruby Block"
-                  },
-                  "states": {
-                    "default": {
-                      "textures": {
-                        "all": "ruby_block"
-                      }
-                    }
+    void readsGeneratedEnchantmentManifest() throws IOException {
+        Files.writeString(tempDir.resolve("generated-creative-enchantments.json"), """
+                [
+                  {
+                    "id": "example:ruby_block",
+                    "enchantment": "example:creative/ruby_block",
+                    "name": "ruby_block",
+                    "display-name": "Ruby Block"
                   }
-                }
+                ]
                 """);
 
         var blocks = CreativeInventoryManager.bootstrapBlocks(tempDir);
@@ -46,35 +34,41 @@ class CreativeInventoryManagerTest {
     }
 
     @Test
-    void skipsBlocksOptedOutOfCreativeMenu() throws IOException {
+    void ignoresExpansionPacksUntilManifestIsWrittenOnStartup() throws IOException {
         Path pack = tempDir.resolve("expansion").resolve("packs").resolve("example");
         Files.createDirectories(pack.resolve("blocks"));
-        Files.writeString(tempDir.resolve("generated-creative-blocks.json"), """
-                [
-                  {
-                    "id": "example:hidden_block",
-                    "name": "hidden_block",
-                    "display-name": "Hidden Block"
-                  }
-                ]
-                """);
         Files.writeString(pack.resolve("pack.json"), """
                 {
                   "format": 1,
                   "namespace": "example"
                 }
                 """);
-        Files.writeString(pack.resolve("blocks").resolve("hidden_block.json"), """
+        Files.writeString(pack.resolve("blocks").resolve("ruby_block.json"), """
                 {
-                  "creative-menu": false,
                   "states": {
                     "default": {
                       "textures": {
-                        "all": "hidden_block"
+                        "all": "ruby_block"
                       }
                     }
                   }
                 }
+                """);
+
+        assertEquals(0, CreativeInventoryManager.bootstrapBlocks(tempDir).size());
+    }
+
+    @Test
+    void skipsInvalidManifestEntries() throws IOException {
+        Files.writeString(tempDir.resolve("generated-creative-enchantments.json"), """
+                [
+                  {
+                    "id": "Bad Namespace:hidden_block",
+                    "enchantment": "example:creative/hidden_block",
+                    "name": "hidden_block",
+                    "display-name": "Hidden Block"
+                  }
+                ]
                 """);
 
         assertEquals(0, CreativeInventoryManager.bootstrapBlocks(tempDir).size());
