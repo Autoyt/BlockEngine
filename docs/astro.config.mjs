@@ -24,7 +24,7 @@ export default defineConfig({
         {
           label: 'Start Here',
           items: [
-            { label: 'Overview', link: '/BlockEngine/' },
+            { label: 'Overview', link: '/' },
           ],
         },
         {
@@ -53,7 +53,7 @@ export default defineConfig({
           label: 'Reference',
           items: [
             { label: 'Data-Driven Packs', slug: 'reference/data-driven-packs' },
-            { label: 'Java API Docs', link: '/BlockEngine/api/' },
+            { label: 'Java API Docs', link: '/api/' },
           ],
         },
       ],
