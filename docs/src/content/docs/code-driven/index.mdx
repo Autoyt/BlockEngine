@@ -1,12 +1,12 @@
 ---
 title: Code-Driven Blocks
-description: Setup, APIs, adapters, block data, callbacks, assets, and testing for Java block systems.
+description: Setup, first block walkthrough, states, textures, mining, events, and testing for Java block systems.
 ---
 
-import { Aside, Card, CardGrid, Steps, TabItem, Tabs } from '@astrojs/starlight/components';
+import { Aside, Card, CardGrid, TabItem, Tabs } from '@astrojs/starlight/components';
 import DependencySnippet from '../../../components/DependencySnippet.astro';
 
-Code-driven blocks use the Java API. Use this path when your blocks need behavior: interaction callbacks, state changes, ticking, plugin integration, custom data, movement control, or private payload persistence.
+Code-driven blocks use the Java API. Use this path when a block needs behavior: interaction callbacks, state changes, ticking, plugin integration, custom data, movement control, or private payload persistence.
 
 <Aside type="tip" title="When to use this path">
   Pick code-driven blocks when the block is part of a plugin system, not just a textured cube. If a right-click should open a UI, change state, consume data, trigger effects, or call another API, write an adapter.
@@ -33,94 +33,518 @@ dependencies:
 ```
 
   </TabItem>
-  <TabItem label="Assets">
+  <TabItem label="Register system">
 
-Put assets in your plugin data folder and expose them through `PackDetails`:
-
-```text
-plugins/MyPlugin/assets/
-  assets/
-    example/
-      textures/
-        block/
-          my_block.png
-```
+Implement `CustomBlockSystem` on your plugin main class or on a dedicated object discovered by your plugin:
 
 ```java
-details.addAssets(getDataFolder().toPath().resolve("assets"));
+public final class LampPlugin extends JavaPlugin implements CustomBlockSystem {
+    @Override
+    public String pluginVersion() {
+        return getPluginMeta().getVersion();
+    }
+
+    @Override
+    public String getNamespace() {
+        return "lampdemo";
+    }
+
+    @Override
+    public List<BlockAdapter> registerAdapters() {
+        return List.of(new ToggleLampBlock());
+    }
+}
 ```
+
+`getNamespace()` owns ids such as `lampdemo:toggle_lamp`. Keep it lowercase and stable. Changing it later creates a new block family instead of updating existing placed blocks.
 
   </TabItem>
 </Tabs>
 
-## Authoring flow
+## Setting up your first block
 
-<Steps>
-  1. Implement `CustomBlockSystem` on your plugin main class.
-  2. Return a stable namespace from `getNamespace()`.
-  3. Return adapters from `registerAdapters()`.
-  4. Define each block with `BlockDefinition.Builder`.
-  5. Create initial data in `createDefaultData()`.
-  6. Add callbacks such as `onInteract()`, `onBreak()`, `onTick()`, `save()`, and `load()` as needed.
-  7. Provide textures with `PackDetails#addAssets(...)`.
-  8. Start the server once to discover the block, then restart once more for new creative entries.
-</Steps>
+<Tabs syncKey="first-block">
+  <TabItem label="Adapter">
 
-## Feature areas
-
-<Tabs syncKey="code-features">
-  <TabItem label="CustomBlockSystem" icon="code">
-
-`CustomBlockSystem` is the plugin-level integration point:
-
-<ul>
-  <li><code>pluginVersion()</code> exposes your plugin version.</li>
-  <li><code>getNamespace()</code> owns ids such as <code>example:toggle_lamp</code>.</li>
-  <li><code>requiredNamespaces()</code> declares BlockEngine namespace dependencies.</li>
-  <li><code>registerAdapters()</code> returns block behavior objects.</li>
-  <li><code>setPackDetails()</code> configures generated resource-pack metadata and assets.</li>
-  <li><code>onItemModelGeneration()</code> can register additional generated item models.</li>
-</ul>
-
-  </TabItem>
-  <TabItem label="BlockAdapter" icon="setting">
-
-`BlockAdapter` owns one block:
-
-<ul>
-  <li><code>name()</code> returns the local block path.</li>
-  <li><code>define()</code> fills a <code>BlockDefinition.Builder</code>.</li>
-  <li><code>createDefaultData()</code> creates placed-block data.</li>
-  <li>callbacks handle placement, breaking, interactions, ticking, movement, save/load, and payload recovery.</li>
-</ul>
-
-  </TabItem>
-  <TabItem label="BlockDefinition" icon="puzzle">
-
-`BlockDefinition` is the static server contract. It controls fallback material, catalog visibility, creative-menu visibility, item metadata, placement mode, default state, and state definitions.
+A `BlockAdapter` defines one block. `name()` is the local path inside your namespace, so this adapter registers `lampdemo:toggle_lamp` when used with the system above.
 
 ```java
-builder.vanillaBlock(Material.BARRIER)
-        .creativeMenu(true)
-        .catalog(true)
-        .placement(BlockDefinition.Placement.DIRECTIONAL);
+public final class ToggleLampBlock implements BlockAdapter {
+    @Override
+    public String name() {
+        return "toggle_lamp";
+    }
+
+    @Override
+    public void define(BlockDefinition.Builder builder) {
+        builder.placement(BlockDefinition.Placement.DIRECTIONAL)
+                .state("off", state -> state
+                        .hardness(0.8f)
+                        .textures(textures -> textures.all("toggle_lamp_off")))
+                .state("on", state -> state
+                        .hardness(0.8f)
+                        .textures(textures -> textures.all("toggle_lamp_on")))
+                .defaultState("off");
+    }
+
+    @Override
+    public BlockData createDefaultData(BlockCreateContext context) {
+        BlockData data = context.createData();
+        data.bool("lit", false);
+        return data;
+    }
+}
 ```
 
-  </TabItem>
-  <TabItem label="BlockData" icon="document">
+`define()` is static. Put registry-level facts there: states, placement mode, textures, break behavior, and visibility. Put per-placed-block values in `createDefaultData()`.
 
-`BlockData` stores mutable placed-block state:
+  </TabItem>
+  <TabItem label="Definition">
+
+`BlockDefinition.Builder` is the server contract for the block:
+
+```java
+builder.catalog(true)
+        .creativeMenu(true)
+        .placement(BlockDefinition.Placement.DIRECTIONAL)
+        .defaultState("off");
+```
+
+`catalog(true)` exposes the block in BlockEngine catalog flows. `creativeMenu(true)` lets BlockEngine include it in the vanilla creative inventory manifest. Both default to `true`, so only set them when you want to be explicit.
+
+`placement(...)` tells BlockEngine how to choose initial orientation. Use `NONE` for simple blocks, `HORIZONTAL_FACING` for player-facing blocks, `AXIS` for pillar-style blocks, and `DIRECTIONAL` when every face matters.
+
+  </TabItem>
+  <TabItem label="Item and block">
+
+Most blocks should not override `item(...)` or `vanillaBlock(...)`.
+
+The default item is a BlockEngine-managed `KNOWLEDGE_BOOK`. The runtime gives it the correct metadata and generated item model, and the creative-menu placeholder converts into this real item when it reaches a player inventory.
+
+```java
+builder.item(item -> item
+        .name("Toggle Lamp")
+        .lore("Right click to switch states"));
+```
+
+Use `item(...)` for display name, lore, glint, or rare cases where the base item material matters. Avoid changing `placeable(false)` unless the item should exist only as a token or UI object.
+
+The default vanilla backing block is `STONE`. Override `vanillaBlock(...)` only when you intentionally need a different fallback block for server-side behavior:
+
+```java
+builder.vanillaBlock(Material.BARRIER);
+```
+
+The resource pack controls how the block looks. The fallback block is not the texture.
+
+  </TabItem>
+</Tabs>
+
+## States
+
+States describe the block's visual and physical variants. A lamp has `off` and `on`; a machine might have `idle`, `working`, and `jammed`; a directional block can still use the same state id while placement controls orientation.
+
+<Tabs syncKey="code-states">
+  <TabItem label="Define states">
+
+```java
+builder.defaultState("idle")
+        .state("idle", state -> state
+                .hardness(1.0f)
+                .textures(textures -> textures.all("machine_idle")))
+        .state("working", state -> state
+                .hardness(1.0f)
+                .textures(textures -> textures.all("machine_working")))
+        .state("jammed", state -> state
+                .hardness(1.0f)
+                .textures(textures -> textures.all("machine_jammed")));
+```
+
+Every state must define at least one texture. State ids should be lowercase and stable because placed block data stores the current state id.
+
+  </TabItem>
+  <TabItem label="Change state">
+
+State changes are ordinary `BlockData` updates. The data object is what BlockEngine persists and uses to refresh visuals.
+
+```java
+@Override
+public boolean onInteract(BlockContext context, Player player) {
+    boolean lit = Boolean.TRUE.equals(context.data().bool("lit"));
+    context.data().bool("lit", !lit);
+    context.data().stateId(lit ? "off" : "on");
+    return true;
+}
+```
+
+Return `true` from `onInteract()` when your adapter handled the click. That lets other systems know the interaction was consumed.
+
+  </TabItem>
+  <TabItem label="State data">
+
+Use `BlockData` for information that should survive restart and be visible to other integrations:
 
 ```java
 data.string("owner", player.getUniqueId().toString());
 data.integer("uses", 0);
-data.bool("lit", false);
+data.bool("locked", true);
 ```
 
-Use public maps for data other plugins can reason about. Use adapter private payload bytes only for adapter-owned details that do not fit those maps.
+Use `save()` and `load()` only for adapter-private payloads that do not fit the public string, integer, and boolean maps.
 
   </TabItem>
-  <TabItem label="Testing" icon="approve-check-circle">
+</Tabs>
+
+## Textures and tools
+
+BlockEngine generates the model JSON for simple cube-style block states. You provide texture files and reference them by name.
+
+<Tabs syncKey="code-textures">
+  <TabItem label="Folder layout">
+
+Put assets in your plugin data folder and expose them through `PackDetails`:
+
+```text
+plugins/LampPlugin/assets/
+  assets/
+    lampdemo/
+      textures/
+        block/
+          toggle_lamp_off.png
+          toggle_lamp_on.png
+```
+
+```java
+@Override
+public void setPackDetails(PackDetails details) {
+    details.title("<gold>Lamp Demo")
+            .description("Example BlockEngine code-driven blocks")
+            .urlEnding("lamp-demo")
+            .assetNamespace("lampdemo")
+            .addAssets(getDataFolder().toPath().resolve("assets"));
+}
+```
+
+`addAssets(...)` points to the asset root. Everything under `assets/lampdemo/...` is copied into the generated resource pack after validation.
+
+  </TabItem>
+  <TabItem label="Texture faces">
+
+Use `all(...)` for the same texture on every face:
+
+```java
+state.textures(textures -> textures.all("toggle_lamp_off"));
+```
+
+Use face-specific methods when the block needs different sides:
+
+```java
+state.textures(textures -> textures
+        .top("crate_top")
+        .bottom("crate_bottom")
+        .side("crate_side")
+        .front("crate_front"));
+```
+
+Available slots are `all`, `side`, `front`, `top`, `bottom`, `north`, `south`, `east`, and `west`.
+
+  </TabItem>
+  <TabItem label="Image constraints">
+
+BlockEngine expects resource-pack-safe files under declared asset roots:
+
+- use lowercase names with underscores, such as `toggle_lamp_on.png`
+- put block textures under `assets/<namespace>/textures/block/`
+- keep texture references extensionless in Java, such as `textures.all("toggle_lamp_on")`
+- use PNG textures; keep JSON, MCMeta, and OGG files in normal Minecraft resource-pack locations
+- keep assets inside the declared root so validation can prove the pack is safe to copy
+
+Vanilla-style square textures such as `16x16`, `32x32`, or `64x64` are the easiest to reason about. Higher resolution works as a resource-pack concern, but every client must download it.
+
+  </TabItem>
+  <TabItem label="Generated models">
+
+For every state, BlockEngine generates model files similar to:
+
+```text
+assets/lampdemo/models/block/toggle_lamp/off.json
+assets/lampdemo/models/block/toggle_lamp/on.json
+assets/lampdemo/models/item/toggle_lamp.json
+```
+
+Use `onItemModelGeneration(...)` for extra generated item models that are not the normal block item model:
+
+```java
+@Override
+public void onItemModelGeneration(GeneratedItemModel.Registry registry) {
+    registry.register(GeneratedItemModel.builder(new NamespacedKey("lampdemo", "lamp_remote"))
+            .parent("minecraft:item/generated")
+            .texture("layer0", "lampdemo:item/lamp_remote")
+            .build());
+}
+```
+
+This hook creates model JSON. It does not create PNG files; those still come from `PackDetails#addAssets(...)`.
+
+  </TabItem>
+</Tabs>
+
+## Mining and hardness
+
+Mining settings live on each state because two states of the same block can break differently.
+
+```java
+state.hardness(1.5f)
+        .miningSpeed(1.0f)
+        .miningProfile(Material.STONE)
+        .preferredTool(BlockDefinition.ToolType.PICKAXE)
+        .requirePreferredToolForDrops(true)
+        .dropsItem(true)
+        .dropInCreative(false);
+```
+
+`hardness(...)` controls how long the custom block takes to break. `miningSpeed(...)` is a multiplier for BlockEngine's mining calculation. `miningProfile(...)` points at a vanilla block material whose mining behavior should be used as a reference.
+
+`preferredTool(...)` and `requirePreferredToolForDrops(...)` let you create familiar survival rules: for example, stone-like blocks mine best with a pickaxe and only drop when the player uses the right tool. `requireSilkTouchForDrops(true)` is useful for fragile or special blocks.
+
+`unbreakable(true)` prevents normal breaking. `dropsItem(false)` prevents item drops. `dropInCreative(false)` is normally what you want so creative-mode breaks do not duplicate items.
+
+## Movement
+
+Movement settings also live on states:
+
+```java
+state.gravity(true)
+        .dispenserPlaceable(true)
+        .gravityBreaksOnPartialBlock(true);
+```
+
+Use gravity for sand-like blocks. `gravityBreaksOnPartialBlock(true)` makes falling blocks break instead of resting on partial collision supports such as slabs or torches.
+
+Adapters can veto or observe movement:
+
+```java
+@Override
+public boolean canMove(BlockContext context, Block from, Block to, MoveCause cause) {
+    return cause != MoveCause.GRAVITY || !Boolean.TRUE.equals(context.data().bool("locked"));
+}
+
+@Override
+public void onMove(BlockContext context, Block from, Block to, MoveCause cause) {
+    Integer moves = context.data().integer("moves");
+    context.data().integer("moves", moves == null ? 1 : moves + 1);
+}
+```
+
+## Adapter callbacks
+
+These methods are local to the block adapter and are best when the behavior belongs to that one block type.
+
+<Tabs syncKey="adapter-callbacks">
+  <TabItem label="Place and break">
+
+```java
+@Override
+public void onPlace(BlockContext context) {
+    context.data().integer("placements", 1);
+}
+
+@Override
+public boolean onBreak(BlockContext context) {
+    return !Boolean.TRUE.equals(context.data().bool("locked"));
+}
+```
+
+`onPlace(...)` runs after the placed block has data. `onBreak(...)` returns `false` to cancel breaking for this adapter.
+
+  </TabItem>
+  <TabItem label="Interact">
+
+```java
+@Override
+public boolean onInteract(BlockContext context, Player player) {
+    Integer uses = context.data().integer("uses");
+    context.data().integer("uses", uses == null ? 1 : uses + 1);
+    player.sendMessage(Component.text("Clicked " + context.blockId()));
+    return true;
+}
+```
+
+Use interactions for block-local actions such as toggles, menus, counters, locks, and plugin-owned workflows.
+
+  </TabItem>
+  <TabItem label="Tick">
+
+```java
+@Override
+public boolean ticking() {
+    return true;
+}
+
+@Override
+public void onTick(BlockContext context) {
+    Integer charge = context.data().integer("charge");
+    context.data().integer("charge", Math.min(100, charge == null ? 1 : charge + 1));
+}
+```
+
+Only return `true` from `ticking()` for blocks that actually need scheduled work. Ticking every placed block is powerful, but it is also the easiest way to create avoidable server load.
+
+  </TabItem>
+  <TabItem label="Private payload">
+
+```java
+@Override
+public byte[] save(BlockData data) {
+    return new byte[0];
+}
+
+@Override
+public void load(BlockData data, byte[] payload) {
+    // Restore adapter-private fields here.
+}
+
+@Override
+public boolean recoverPayload(BlockData data, byte[] payload, Throwable error) {
+    return true;
+}
+```
+
+BlockEngine already saves position, block id, state id, and public `BlockData` maps. Use private payloads only for data your adapter fully owns.
+
+  </TabItem>
+</Tabs>
+
+## Events
+
+Events are for cross-cutting integrations that need to observe or guard many blocks, including blocks owned by other systems.
+
+<Tabs syncKey="code-events">
+  <TabItem label="Placement">
+
+```java
+@EventHandler(ignoreCancelled = true)
+public void onBlockEnginePlace(BlockEngineBlockPlaceEvent event) {
+    if (event.player() != null && event.blockId().startsWith("lampdemo:")) {
+        event.player().sendMessage(Component.text("Placing " + event.blockId()));
+    }
+}
+
+@EventHandler
+public void onBlockEnginePlaced(BlockEngineBlockPlacedEvent event) {
+    getLogger().info("Placed " + event.blockId() + " as " + event.stateId());
+}
+```
+
+`BlockEngineBlockPlaceEvent` fires before BlockEngine places or replaces a custom block record and can be cancelled. `BlockEngineBlockPlacedEvent` fires after placement with the created `BlockData`.
+
+  </TabItem>
+  <TabItem label="Breaking">
+
+```java
+@EventHandler(ignoreCancelled = true)
+public void onBlockEngineBreak(BlockEngineBlockBreakEvent event) {
+    if (event.blockId().equals("lampdemo:toggle_lamp")
+            && !event.player().hasPermission("lampdemo.break")) {
+        event.setCancelled(true);
+    }
+}
+
+@EventHandler
+public void onBlockEngineBroken(BlockEngineBlockBrokenEvent event) {
+    getLogger().info("Broken " + event.blockId() + ", dropped=" + event.droppedItem());
+}
+```
+
+Use the cancellable break event for protection logic. Use the after event for analytics, quests, cleanup, and effects.
+
+  </TabItem>
+  <TabItem label="Data save">
+
+```java
+@EventHandler(ignoreCancelled = true)
+public void onDataSave(BlockEngineBlockDataSaveEvent event) {
+    event.context().data().integer("last_save_x", event.block().getX());
+}
+
+@EventHandler
+public void onDataSaved(BlockEngineBlockDataSavedEvent event) {
+    getLogger().fine("Saved " + event.blockId() + " state " + event.stateId());
+}
+```
+
+The save event fires before mutable custom block data is written back to storage. The saved event fires after the pending chunk state has been updated.
+
+  </TabItem>
+  <TabItem label="Movement">
+
+```java
+@EventHandler(ignoreCancelled = true)
+public void onGravity(BlockEngineGravityEvent event) {
+    if (event.blockId().equals("lampdemo:toggle_lamp")) {
+        event.setCancelled(true);
+    }
+}
+```
+
+`BlockEngineGravityEvent` fires when a custom block is about to fall. Listeners can cancel it or change `stopBlock(...)` before the move happens.
+
+  </TabItem>
+  <TabItem label="Storage">
+
+```java
+@EventHandler
+public void onChunkSave(BlockEngineChunkSaveEvent event) {
+    getLogger().fine("Saving " + event.blockCount() + " custom blocks");
+}
+
+@EventHandler
+public void onChunkSaved(BlockEngineChunkSavedEvent event) {
+    if (event.removedPersistentData()) {
+        getLogger().fine("Cleared empty BlockEngine chunk data");
+    }
+}
+```
+
+Chunk save events are useful for diagnostics, tooling, and tests. They report custom block and display counts for the chunk being persisted.
+
+  </TabItem>
+  <TabItem label="Any change">
+
+```java
+@EventHandler
+public void onBlockEngineModification(BlockEngineModificationEvent event) {
+    getLogger().info(event.action() + " at " + event.block().getLocation());
+}
+```
+
+`BlockEngineModificationEvent` is the broad audit event. It fires after BlockEngine mutates custom state through placement, clearing, removal, or stale-record reconciliation.
+
+  </TabItem>
+</Tabs>
+
+## Resource packs
+
+Code-driven systems get their own generated resource packs. That keeps plugin assets separated from BlockEngine's core generated pack and from data-driven packs.
+
+```java
+@Override
+public void setPackDetails(PackDetails details) {
+    details.title("<gold>Lamp Demo")
+            .description("Models and textures for Lamp Demo")
+            .prompt("<yellow>Accept to see Lamp Demo custom blocks")
+            .required(true)
+            .urlEnding("lamp-demo")
+            .assetNamespace("lampdemo")
+            .addAssets(getDataFolder().toPath().resolve("assets"));
+}
+```
+
+Use `assetNamespace(...)` to declare which namespaces your pack contributes. Use `urlEnding(...)` to make the hosted download path stable and readable.
+
+Read the full resource-pack reference for generated pack layout, individual pack downloads, creative inventory model routing, and troubleshooting.
+
+## Testing
 
 Useful in-game checks:
 
@@ -132,10 +556,7 @@ Useful in-game checks:
 /blockengine catalog <namespace>
 ```
 
-Check server logs for namespace validation, duplicate ids, asset validation, and generated resource-pack output.
-
-  </TabItem>
-</Tabs>
+Check server logs for namespace validation, duplicate ids, asset validation, generated resource-pack output, and creative-menu manifest messages.
 
 ## Complete example
 

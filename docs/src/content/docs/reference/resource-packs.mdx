@@ -34,9 +34,46 @@ It contains BlockEngine's generated backing block, break-stage models, block mod
 
 Each Java `CustomBlockSystem` can provide its own pack metadata and assets with `PackDetails`. BlockEngine validates declared namespaces, copies safe asset files, generates models for blocks in that namespace, and hosts the result as a separate pack.
 
+```java
+@Override
+public void setPackDetails(PackDetails details) {
+    details.title("<gold>Example Blocks")
+            .description("Textures and models for Example Blocks")
+            .prompt("<yellow>Accept to see Example custom blocks")
+            .required(true)
+            .urlEnding("example-blocks")
+            .assetNamespace("example")
+            .addAssets(getDataFolder().toPath().resolve("assets"));
+}
+```
+
+Each system pack can be resent or downloaded independently. This is useful when one plugin owns a large set of textures, or when server owners want to debug a single integration without rebuilding every other pack.
+
 ## Generated data packs
 
 Each loaded data-driven pack gets a hosted resource pack. The pack's `title`, `description`, `prompt`, `required`, `url-ending`, `icon`, and `assets` values come from `pack.json`.
+
+## Asset and image constraints
+
+BlockEngine copies only files that are safe to include in Minecraft resource packs. Keep custom block assets inside a declared asset root and use normal resource-pack paths:
+
+```text
+assets/<namespace>/textures/block/<texture>.png
+assets/<namespace>/textures/item/<texture>.png
+assets/<namespace>/sounds/<sound>.ogg
+assets/<namespace>/models/...
+assets/<namespace>/sounds.json
+```
+
+For block textures:
+
+- use PNG files
+- use lowercase file names with underscores or hyphens
+- reference textures without `.png` from Java or JSON
+- prefer square vanilla-style sizes such as `16x16`, `32x32`, or `64x64`
+- keep large textures intentional because every connected client must download them
+
+BlockEngine generates simple block and item model JSON for BlockEngine blocks. You normally provide textures, not hand-written models. Add manual model JSON only for extra custom assets that your plugin uses outside the standard generated block model path.
 
 ## Sending packs
 
