@@ -6,5 +6,6 @@
   "prompt": "",
   "url-ending": "sample-expansion",
   "required": true,
-  "catalog": true
+  "catalog": true,
+  "creative-menu": true
 }

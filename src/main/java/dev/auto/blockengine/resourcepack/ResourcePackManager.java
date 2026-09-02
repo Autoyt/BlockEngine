@@ -1,9 +1,12 @@
 package dev.auto.blockengine.resourcepack;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import dev.auto.blockengine.Main;
 import dev.auto.blockengine.api.CustomBlockSystem;
 import dev.auto.blockengine.api.resourcepack.GeneratedItemModel;
+import dev.auto.blockengine.creative.BlockDisplayNames;
+import dev.auto.blockengine.creative.CreativeInventoryManager;
 import dev.auto.blockengine.datapack.BlockPack;
 import dev.auto.blockengine.datapack.DataBlockPacks;
 import dev.auto.blockengine.registry.BlockRegistry;
@@ -126,6 +129,7 @@ public final class ResourcePackManager {
             for (dev.auto.blockengine.types.BlockDefinition registered : BlockRegistry.getBlocks()) {
                 ItemModelGenerator.generateBlock(root, registered.apiDefinition());
             }
+            writeCreativeTranslations(root, BlockRegistry.getBlocks());
             for (GeneratedItemModel model : generatedItemModels()) {
                 ItemModelGenerator.generateItemModel(root, model);
             }
@@ -444,6 +448,9 @@ public final class ResourcePackManager {
                     ItemModelGenerator.generateBlock(root, registered.apiDefinition());
                 }
             }
+            writeCreativeTranslations(root, BlockRegistry.getBlocks().stream()
+                    .filter(registered -> namespaces.contains(registered.name().namespace()))
+                    .toList());
             system.onItemModelGeneration(model -> {
                 try {
                     ItemModelGenerator.generateItemModel(root, model);
@@ -504,6 +511,9 @@ public final class ResourcePackManager {
                     ItemModelGenerator.generateBlock(root, registered.apiDefinition());
                 }
             }
+            writeCreativeTranslations(root, BlockRegistry.getBlocks().stream()
+                    .filter(registered -> blockPack.namespace().equals(registered.name().namespace()))
+                    .toList());
 
             zip(root, zip);
             byte[] sha1 = sha1(zip);
@@ -532,6 +542,39 @@ public final class ResourcePackManager {
             }
         }
         return models;
+    }
+
+    private static void writeCreativeTranslations(
+            @NotNull Path root,
+            @NotNull Collection<dev.auto.blockengine.types.BlockDefinition> blocks
+    ) throws IOException {
+        Map<String, ObjectNode> translations = new LinkedHashMap<>();
+        for (dev.auto.blockengine.types.BlockDefinition block : blocks) {
+            if (!block.apiDefinition().creativeMenu()) {
+                continue;
+            }
+            ObjectNode lang = translations.computeIfAbsent(block.name().namespace(), ignored -> Main.getJsonMapper().createObjectNode());
+            String displayName = BlockDisplayNames.plain(block.apiDefinition().item().name(), block);
+            lang.put(CreativeInventoryManager.blockTranslationKey(block.id()), displayName);
+            lang.put(CreativeInventoryManager.enchantmentTranslationKey(block.id()), displayName);
+        }
+
+        for (Map.Entry<String, ObjectNode> entry : translations.entrySet()) {
+            Path file = root.resolve("assets")
+                    .resolve(entry.getKey())
+                    .resolve("lang")
+                    .resolve("en_us.json");
+            ObjectNode lang = Main.getJsonMapper().createObjectNode();
+            if (Files.isRegularFile(file)) {
+                JsonNode existing = Main.getJsonMapper().readTree(file.toFile());
+                if (existing.isObject()) {
+                    existing.fields().forEachRemaining(field -> lang.set(field.getKey(), field.getValue()));
+                }
+            }
+            entry.getValue().fields().forEachRemaining(field -> lang.set(field.getKey(), field.getValue()));
+            Files.createDirectories(file.getParent());
+            Main.getJsonMapper().writeValue(file.toFile(), lang);
+        }
     }
 
     private static void validateAssetNamespaces(

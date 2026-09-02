@@ -175,7 +175,8 @@ public final class BlockPackLoader {
         }
 
         boolean packCatalog = boolValue(root, "catalog", true);
-        List<BlockPackBlock> blocks = loadBlocks(normalizedFolder, packCatalog);
+        boolean packCreativeMenu = boolValue(root, "creative-menu", true);
+        List<BlockPackBlock> blocks = loadBlocks(normalizedFolder, packCatalog, packCreativeMenu);
         if (blocks.isEmpty()) {
             throw new IllegalArgumentException("Pack does not define any blocks in blocks/**/*.json.");
         }
@@ -190,6 +191,7 @@ public final class BlockPackLoader {
                 dependencies,
                 boolValue(root, "required", true),
                 packCatalog,
+                packCreativeMenu,
                 icon,
                 assetRoots,
                 blocks
@@ -212,7 +214,11 @@ public final class BlockPackLoader {
         return namespaces;
     }
 
-    private static @NotNull List<BlockPackBlock> loadBlocks(@NotNull Path folder, boolean packCatalog) throws IOException {
+    private static @NotNull List<BlockPackBlock> loadBlocks(
+            @NotNull Path folder,
+            boolean packCatalog,
+            boolean packCreativeMenu
+    ) throws IOException {
         Path blocksRoot = folder.resolve("blocks").normalize();
         if (!Files.isDirectory(blocksRoot)) {
             return List.of();
@@ -226,7 +232,7 @@ public final class BlockPackLoader {
                     .sorted()
                     .toList()) {
                 try {
-                    blocks.add(loadBlock(blocksRoot, file, packCatalog));
+                    blocks.add(loadBlock(blocksRoot, file, packCatalog, packCreativeMenu));
                 } catch (RuntimeException exception) {
                     throw new IllegalArgumentException(file + ": " + exception.getMessage(), exception);
                 }
@@ -238,7 +244,8 @@ public final class BlockPackLoader {
     private static @NotNull BlockPackBlock loadBlock(
             @NotNull Path blocksRoot,
             @NotNull Path file,
-            boolean packCatalog
+            boolean packCatalog,
+            boolean packCreativeMenu
     ) throws IOException {
         JsonNode root = Main.getJsonMapper().readTree(file.toFile());
         String fallbackName = blocksRoot.relativize(file).toString().replace('\\', '/');
@@ -266,6 +273,7 @@ public final class BlockPackLoader {
                 name,
                 vanillaBlock,
                 boolValue(root, "catalog", packCatalog),
+                boolValue(root, "creative-menu", packCreativeMenu),
                 placement,
                 item,
                 defaultState,

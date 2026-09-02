@@ -4,7 +4,7 @@
 
 BlockEngine supports "non logical" custom blocks that are added with JSON files and resource-pack assets only. A pack author can define decorative, breakable, placeable, textured blocks without writing a `BlockAdapter`, compiling a plugin, or implementing callbacks.
 
-The runtime sees these blocks as normal BlockEngine blocks. They use the existing registry, persistence, placement, mining, gravity, catalog, item, and resource-pack generation paths.
+The runtime sees these blocks as normal BlockEngine blocks. They use the existing registry, persistence, placement, mining, gravity, catalog, creative-menu, item, and resource-pack generation paths.
 
 ## Pack Layout
 
@@ -38,6 +38,7 @@ plugins/blockengine/expansion/packs/
   "dependencies": ["other_namespace"],
   "required": true,
   "catalog": true,
+  "creative-menu": true,
   "icon": "pack.png",
   "assets": ["assets"]
 }
@@ -50,6 +51,7 @@ Each file in `blocks/**/*.json` defines one block. If `name` is omitted, the pat
   "name": "polished_basalt",
   "vanilla-block": "barrier",
   "catalog": true,
+  "creative-menu": true,
   "placement": "directional",
   "item": {
     "material": "knowledge_book",
@@ -105,6 +107,7 @@ Data blocks are discovered after code-backed `CustomBlockSystem` adapters. Dupli
 Data packs get individual hosted resource packs, parallel to plugin-provided `CustomBlockSystem` packs:
 
 - BlockEngine generates normal block and item model JSON for every data block.
+- BlockEngine generates `en_us.json` entries for creative-menu enchantments and fallback item names.
 - Declared asset roots are copied with the same allowlist used by plugin pack assets.
 - `pack.png`, `title`, `description`, `prompt`, `required`, and `url-ending` come from `pack.json`.
 - The combined `*` download still works by merging generated pack folders.
@@ -122,6 +125,7 @@ The loader validates before registration:
 - Every block must define at least one state.
 - `default-state` must exist.
 - Every state must define at least one texture.
+- `creative-menu` defaults to `true` at pack and block level.
 - Enum values are case-insensitive and may use hyphens.
 - Pack asset and icon paths must stay inside the pack folder.
 

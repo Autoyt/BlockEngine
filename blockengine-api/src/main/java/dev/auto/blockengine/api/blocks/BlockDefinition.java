@@ -26,6 +26,7 @@ public final class BlockDefinition {
     private final @NotNull String name;
     private final @NotNull Material defaultBlock;
     private final boolean catalog;
+    private final boolean creativeMenu;
     private final @NotNull Item item;
     private final @NotNull Placement placement;
     private final @NotNull String defaultState;
@@ -35,6 +36,7 @@ public final class BlockDefinition {
             @NotNull String name,
             @NotNull Material defaultBlock,
             boolean catalog,
+            boolean creativeMenu,
             @NotNull Item item,
             @NotNull Placement placement,
             @NotNull String defaultState,
@@ -43,6 +45,7 @@ public final class BlockDefinition {
         this.name = Objects.requireNonNull(name, "name");
         this.defaultBlock = Objects.requireNonNull(defaultBlock, "defaultBlock");
         this.catalog = catalog;
+        this.creativeMenu = creativeMenu;
         this.item = Objects.requireNonNull(item, "item");
         this.placement = Objects.requireNonNull(placement, "placement");
         this.defaultState = Objects.requireNonNull(defaultState, "defaultState");
@@ -83,6 +86,10 @@ public final class BlockDefinition {
 
     public boolean catalog() {
         return catalog;
+    }
+
+    public boolean creativeMenu() {
+        return creativeMenu;
     }
 
     public @NotNull Item item() {
@@ -247,6 +254,7 @@ public final class BlockDefinition {
         private final @NotNull String name;
         private @NotNull Material defaultBlock = Material.STONE;
         private boolean catalog = true;
+        private boolean creativeMenu = true;
         private @NotNull Item item = new Item(Material.KNOWLEDGE_BOOK, null, List.of(), false, true);
         private @NotNull Placement placement = Placement.NONE;
         private @NotNull String defaultState = "default";
@@ -271,6 +279,11 @@ public final class BlockDefinition {
 
         public @NotNull Builder catalog(boolean catalog) {
             this.catalog = catalog;
+            return this;
+        }
+
+        public @NotNull Builder creativeMenu(boolean creativeMenu) {
+            this.creativeMenu = creativeMenu;
             return this;
         }
 
@@ -306,7 +319,7 @@ public final class BlockDefinition {
             if (states.isEmpty()) {
                 state(defaultState, state -> state.textures(textures -> textures.all("missing")));
             }
-            return new BlockDefinition(name, defaultBlock, catalog, item, placement, defaultState, states);
+            return new BlockDefinition(name, defaultBlock, catalog, creativeMenu, item, placement, defaultState, states);
         }
     }
 

@@ -59,6 +59,10 @@
           "type": "boolean",
           "default": true
         },
+        "creative-menu": {
+          "type": "boolean",
+          "default": true
+        },
         "icon": {
           "$ref": "#/$defs/relativePath"
         },
@@ -89,6 +93,10 @@
         },
         "catalog": {
           "type": "boolean"
+        },
+        "creative-menu": {
+          "type": "boolean",
+          "default": true
         },
         "placement": {
           "$ref": "#/$defs/placement"

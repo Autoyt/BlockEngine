@@ -17,6 +17,7 @@ public record BlockPack(
         @NotNull List<String> dependencies,
         boolean required,
         boolean catalog,
+        boolean creativeMenu,
         @Nullable Path icon,
         @NotNull List<Path> assetRoots,
         @NotNull List<BlockPackBlock> blocks

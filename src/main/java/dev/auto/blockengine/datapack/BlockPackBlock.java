@@ -14,6 +14,7 @@ public record BlockPackBlock(
         @NotNull String name,
         @NotNull Material vanillaBlock,
         boolean catalog,
+        boolean creativeMenu,
         @NotNull BlockDefinition.Placement placement,
         @NotNull Item item,
         @NotNull String defaultState,

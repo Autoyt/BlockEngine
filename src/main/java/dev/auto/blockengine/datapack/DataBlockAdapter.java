@@ -25,6 +25,7 @@ public final class DataBlockAdapter implements BlockAdapter {
         builder
                 .setDefaultBlock(block.vanillaBlock())
                 .catalog(block.catalog())
+                .creativeMenu(block.creativeMenu())
                 .placement(block.placement())
                 .defaultState(block.defaultState())
                 .item(item -> item

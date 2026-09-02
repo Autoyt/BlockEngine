@@ -11,10 +11,13 @@ import dev.auto.blockengine.commands.CatalogCommand;
 import dev.auto.blockengine.commands.DebugCommands;
 import dev.auto.blockengine.commands.OverideFillCommand;
 import dev.auto.blockengine.commands.PerfCommand;
+import dev.auto.blockengine.creative.CreativeInventoryListeners;
+import dev.auto.blockengine.creative.CreativeInventoryManager;
 import dev.auto.blockengine.defaultadapters.DebugBlocks;
 import dev.auto.blockengine.entity.ManagedDisplayManager;
 import dev.auto.blockengine.integrity.BlockIntegrityManager;
 import dev.auto.blockengine.listeners.GameListener;
+import dev.auto.blockengine.registry.BlockRegistry;
 import dev.auto.blockengine.registry.DiscoverySystem;
 import dev.auto.blockengine.resourcepack.ResourcePackManager;
 import dev.auto.blockengine.runtime.BlockTicker;
@@ -67,6 +70,7 @@ public final class Main extends JavaPlugin {
         registerCommand("perf", new PerfCommand(debugCommands));
 
         new CatalogListeners();
+        new CreativeInventoryListeners();
         new OverideFillCommand();
         new GameListener();
 
@@ -87,6 +91,7 @@ public final class Main extends JavaPlugin {
     private void reloadDiscoveredSystems() {
         DiscoverySystem.discoverBlocks();
         DebugBlocks.register();
+        CreativeInventoryManager.writeBootstrapManifest(BlockRegistry.getBlocks());
         ResourcePackManager.getInstance().reload();
     }
 
