@@ -5,6 +5,7 @@ import dev.auto.blockengine.chat.BlockEngineChat;
 import net.kyori.adventure.text.Component;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCreativeEvent;
@@ -21,11 +22,13 @@ public final class CreativeInventoryListeners implements Listener {
         Main.getInstance().getServer().getPluginManager().registerEvents(this, Main.getInstance());
     }
 
-    @EventHandler
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onCreative(@NotNull InventoryCreativeEvent event) {
         ItemStack converted = CreativeInventoryManager.convertCreativeStack(event.getCursor());
-        if (converted != null) {
+        if (converted != event.getCursor()) {
+            event.setCancelled(true);
             event.setCursor(converted);
+            placeCreativeItem(event, converted);
         }
         convertCurrentItem(event);
         if (event.getWhoClicked() instanceof Player player) {
@@ -106,6 +109,19 @@ public final class CreativeInventoryListeners implements Listener {
         ItemStack converted = CreativeInventoryManager.convertCreativeStack(current);
         if (converted != current) {
             event.setCurrentItem(converted);
+        }
+    }
+
+    private static void placeCreativeItem(@NotNull InventoryCreativeEvent event, @NotNull ItemStack converted) {
+        int rawSlot = event.getRawSlot();
+        if (rawSlot < 0 || rawSlot >= event.getView().countSlots() || event.getClickedInventory() == null) {
+            return;
+        }
+
+        event.setCurrentItem(converted);
+        event.getView().setItem(rawSlot, converted);
+        if (event.getWhoClicked() instanceof Player player) {
+            player.updateInventory();
         }
     }
 }
