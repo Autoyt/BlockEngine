@@ -11,6 +11,8 @@ import org.bukkit.event.inventory.InventoryCreativeEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
+import org.bukkit.inventory.Inventory;
+import org.bukkit.inventory.InventoryView;
 import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.NotNull;
 
@@ -25,6 +27,7 @@ public final class CreativeInventoryListeners implements Listener {
         if (converted != null) {
             event.setCursor(converted);
         }
+        convertCurrentItem(event);
         if (event.getWhoClicked() instanceof Player player) {
             scanNextTick(player);
         }
@@ -39,6 +42,7 @@ public final class CreativeInventoryListeners implements Listener {
         if (cursor != event.getCursor()) {
             event.setCursor(cursor);
         }
+        convertCurrentItem(event);
         scanNextTick(player);
     }
 
@@ -82,12 +86,26 @@ public final class CreativeInventoryListeners implements Listener {
             player.setItemOnCursor(cursor);
         }
 
-        for (int slot = 0; slot < player.getInventory().getSize(); slot++) {
-            ItemStack current = player.getInventory().getItem(slot);
+        InventoryView view = player.getOpenInventory();
+        scan(view.getTopInventory());
+        scan(view.getBottomInventory());
+    }
+
+    private static void scan(@NotNull Inventory inventory) {
+        for (int slot = 0; slot < inventory.getSize(); slot++) {
+            ItemStack current = inventory.getItem(slot);
             ItemStack converted = CreativeInventoryManager.convertCreativeStack(current);
             if (converted != current) {
-                player.getInventory().setItem(slot, converted);
+                inventory.setItem(slot, converted);
             }
+        }
+    }
+
+    private static void convertCurrentItem(@NotNull InventoryClickEvent event) {
+        ItemStack current = event.getCurrentItem();
+        ItemStack converted = CreativeInventoryManager.convertCreativeStack(current);
+        if (converted != current) {
+            event.setCurrentItem(converted);
         }
     }
 }
