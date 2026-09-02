@@ -14,6 +14,9 @@ import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Locale;
 
 public final class ItemModelGenerator {
@@ -33,6 +36,39 @@ public final class ItemModelGenerator {
     ) throws IOException {
         assert definition.namespace() != null;
         modernItem(root, definition, definition.defaultState(), CreativeInventoryManager.itemModelKey(definition.id()).getKey());
+    }
+
+    public static void generateCreativeEnchantedBookModel(
+            @NotNull Path root,
+            @NotNull Collection<dev.auto.blockengine.types.BlockDefinition> blocks
+    ) throws IOException {
+        List<dev.auto.blockengine.types.BlockDefinition> creativeBlocks = blocks.stream()
+                .filter(block -> block.apiDefinition().creativeMenu())
+                .sorted(Comparator.comparing(dev.auto.blockengine.types.BlockDefinition::id))
+                .toList();
+        if (creativeBlocks.isEmpty()) {
+            return;
+        }
+
+        ObjectNode model = itemModel("minecraft:item/enchanted_book");
+        for (int index = creativeBlocks.size() - 1; index >= 0; index--) {
+            dev.auto.blockengine.types.BlockDefinition block = creativeBlocks.get(index);
+            model = storedEnchantmentCondition(
+                    block,
+                    itemModel(block.name().namespace() + ":item/" + block.name().name()),
+                    model
+            );
+        }
+
+        Path output = root.resolve("assets")
+                .resolve("minecraft")
+                .resolve("items")
+                .resolve("enchanted_book.json");
+        Files.createDirectories(output.getParent());
+
+        ObjectNode rootNode = Main.getJsonMapper().createObjectNode();
+        rootNode.set("model", model);
+        Main.getJsonMapper().writeValue(output.toFile(), rootNode);
     }
 
     public static void generateBackingBlock(@NotNull Path root) throws IOException {
@@ -223,6 +259,33 @@ public final class ItemModelGenerator {
         model.put("model", definition.namespace() + ":block/" + definition.name() + "/" + stateId);
 
         Main.getJsonMapper().writeValue(output.toFile(), rootNode);
+    }
+
+    private static @NotNull ObjectNode storedEnchantmentCondition(
+            @NotNull dev.auto.blockengine.types.BlockDefinition block,
+            @NotNull ObjectNode onTrue,
+            @NotNull ObjectNode onFalse
+    ) {
+        ObjectNode condition = Main.getJsonMapper().createObjectNode();
+        condition.put("type", "minecraft:condition");
+        condition.put("property", "minecraft:component");
+        condition.put("predicate", "minecraft:stored_enchantments");
+
+        ArrayNode value = condition.putArray("value");
+        ObjectNode enchantment = value.addObject();
+        enchantment.put("enchantments", CreativeInventoryManager.enchantmentKey(block.id()).asString());
+        enchantment.putObject("levels").put("min", 1);
+
+        condition.set("on_true", onTrue);
+        condition.set("on_false", onFalse);
+        return condition;
+    }
+
+    private static @NotNull ObjectNode itemModel(@NotNull String modelPath) {
+        ObjectNode model = Main.getJsonMapper().createObjectNode();
+        model.put("type", "minecraft:model");
+        model.put("model", modelPath);
+        return model;
     }
 
     private static @NotNull String texture(@NotNull BlockDefinition definition, String... paths) {

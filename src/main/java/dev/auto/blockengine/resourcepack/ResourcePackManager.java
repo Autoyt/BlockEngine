@@ -559,6 +559,7 @@ public final class ResourcePackManager {
             lang.put(CreativeInventoryManager.enchantmentTranslationKey(block.id()), displayName);
             ItemModelGenerator.generateCreativeEnchantmentItemModel(root, block.apiDefinition());
         }
+        ItemModelGenerator.generateCreativeEnchantedBookModel(root, blocks);
 
         for (Map.Entry<String, ObjectNode> entry : translations.entrySet()) {
             Path file = root.resolve("assets")

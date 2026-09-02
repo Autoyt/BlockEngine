@@ -60,9 +60,7 @@ public final class CreativeInventoryManager {
             @NotNull EnchantmentRegistryEntry.Builder builder,
             @NotNull CreativeBlock block
     ) {
-        builder.description(block.richName() == null
-                        ? Component.translatable(enchantmentTranslationKey(block.id()))
-                        : BlockDisplayNames.rich(block.richName()))
+        builder.description(Component.translatable(enchantmentTranslationKey(block.id())))
                 .supportedItems(RegistrySet.keySet(
                         RegistryKey.ITEM,
                         List.of(ItemTypeKeys.KNOWLEDGE_BOOK, ItemTypeKeys.ENCHANTED_BOOK)
@@ -159,9 +157,6 @@ public final class CreativeInventoryManager {
             node.put("item-model", itemModelKey(block.id()).asString());
             node.put("name", block.apiDefinition().name());
             node.put("display-name", BlockDisplayNames.plain(block.apiDefinition().item().name(), block));
-            if (block.apiDefinition().item().name() != null && !block.apiDefinition().item().name().isBlank()) {
-                node.put("rich-name", block.apiDefinition().item().name());
-            }
         });
         try {
             Files.createDirectories(file.getParent());
@@ -213,13 +208,11 @@ public final class CreativeInventoryManager {
                 }
                 String name = text(node, "name", parts[1]);
                 String displayName = text(node, "display-name", BlockDisplayNames.fallback(name, id));
-                String richName = text(node, "rich-name", "");
                 blocks.put(id, new CreativeBlock(
                         id,
                         parts[0],
                         parts[1],
-                        displayName,
-                        richName.isBlank() ? null : richName
+                        displayName
                 ));
             }
         } catch (IOException exception) {
@@ -257,8 +250,7 @@ public final class CreativeInventoryManager {
             @NotNull String id,
             @NotNull String namespace,
             @NotNull String name,
-            @NotNull String displayName,
-            @Nullable String richName
+            @NotNull String displayName
     ) {
         public CreativeBlock {
             Objects.requireNonNull(id, "id");

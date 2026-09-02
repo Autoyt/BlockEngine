@@ -22,8 +22,7 @@ class CreativeInventoryManagerTest {
                     "enchantment": "example:creative/ruby_block",
                     "item-model": "example:creative/ruby_block",
                     "name": "ruby_block",
-                    "display-name": "Ruby Block",
-                    "rich-name": "<red>Ruby Block"
+                    "display-name": "Ruby Block"
                   }
                 ]
                 """);
@@ -33,7 +32,6 @@ class CreativeInventoryManagerTest {
         assertEquals(1, blocks.size());
         assertEquals("example:ruby_block", blocks.getFirst().id());
         assertEquals("Ruby Block", blocks.getFirst().displayName());
-        assertEquals("<red>Ruby Block", blocks.getFirst().richName());
     }
 
     @Test
