@@ -18,6 +18,14 @@ public class BlockEngineChunkSaveEvent extends Event {
     private final int displayCount;
     private final boolean removingPersistentData;
 
+    /**
+     * Creates a new pre-chunk-save event.
+     *
+     * @param chunk Bukkit chunk being written
+     * @param blockCount number of custom block records being written
+     * @param displayCount number of managed display records being written
+     * @param removingPersistentData true when BlockEngine is removing stored data
+     */
     public BlockEngineChunkSaveEvent(
             @NotNull Chunk chunk,
             int blockCount,
@@ -30,18 +38,39 @@ public class BlockEngineChunkSaveEvent extends Event {
         this.removingPersistentData = removingPersistentData;
     }
 
+    /**
+     * Returns the Bukkit chunk being written.
+     *
+     * @return chunk being saved
+     */
     public @NotNull Chunk chunk() {
         return chunk;
     }
 
+    /**
+     * Returns the number of custom block records being written.
+     *
+     * @return custom block record count
+     */
     public int blockCount() {
         return blockCount;
     }
 
+    /**
+     * Returns the number of managed display records being written.
+     *
+     * @return managed display record count
+     */
     public int displayCount() {
         return displayCount;
     }
 
+    /**
+     * Returns whether BlockEngine is removing its persistent data from the
+     * chunk.
+     *
+     * @return true when persistent data is being removed
+     */
     public boolean removingPersistentData() {
         return removingPersistentData;
     }
@@ -51,6 +80,11 @@ public class BlockEngineChunkSaveEvent extends Event {
         return HANDLERS;
     }
 
+    /**
+     * Returns the handler list for Bukkit's event system.
+     *
+     * @return event handler list
+     */
     public static @NotNull HandlerList getHandlerList() {
         return HANDLERS;
     }

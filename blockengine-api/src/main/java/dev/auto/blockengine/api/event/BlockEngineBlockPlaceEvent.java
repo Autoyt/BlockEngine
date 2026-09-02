@@ -14,6 +14,9 @@ import java.util.Objects;
 
 /**
  * Fired before BlockEngine places or replaces a custom block record.
+ *
+ * <p>Cancel this event to stop the placement before BlockEngine updates its
+ * stored custom block data, backing vanilla block, and managed displays.</p>
  */
 public class BlockEngineBlockPlaceEvent extends Event implements Cancellable {
     private static final HandlerList HANDLERS = new HandlerList();
@@ -27,6 +30,17 @@ public class BlockEngineBlockPlaceEvent extends Event implements Cancellable {
     private final @Nullable String previousStateId;
     private boolean cancelled;
 
+    /**
+     * Creates a new pre-placement event.
+     *
+     * @param block Bukkit block being placed into
+     * @param definition custom block definition being placed
+     * @param player placing player, or null for API/plugin placement
+     * @param placedAgainst face the block was placed against, or null
+     * @param stateId state id being placed
+     * @param previousBlockId previous custom block id, or null
+     * @param previousStateId previous state id, or null
+     */
     public BlockEngineBlockPlaceEvent(
             @NotNull Block block,
             @NotNull BlockDefinition definition,
@@ -45,34 +59,75 @@ public class BlockEngineBlockPlaceEvent extends Event implements Cancellable {
         this.previousStateId = previousStateId;
     }
 
+    /**
+     * Returns the Bukkit block being modified.
+     *
+     * @return affected block
+     */
     public @NotNull Block block() {
         return block;
     }
 
+    /**
+     * Returns the custom block definition being placed.
+     *
+     * @return block definition
+     */
     public @NotNull BlockDefinition definition() {
         return definition;
     }
 
+    /**
+     * Returns the full BlockEngine id being placed.
+     *
+     * @return full block id
+     */
     public @NotNull String blockId() {
         return definition.id();
     }
 
+    /**
+     * Returns the player placing the block, if any.
+     *
+     * @return placing player, or null
+     */
     public @Nullable Player player() {
         return player;
     }
 
+    /**
+     * Returns the face this block was placed against, if known.
+     *
+     * @return placed-against face, or null
+     */
     public @Nullable BlockFace placedAgainst() {
         return placedAgainst;
     }
 
+    /**
+     * Returns the state id being placed.
+     *
+     * @return state id
+     */
     public @NotNull String stateId() {
         return stateId;
     }
 
+    /**
+     * Returns the previous custom block id at this position, if one existed.
+     *
+     * @return previous block id, or null
+     */
     public @Nullable String previousBlockId() {
         return previousBlockId;
     }
 
+    /**
+     * Returns the previous custom block state id at this position, if one
+     * existed.
+     *
+     * @return previous state id, or null
+     */
     public @Nullable String previousStateId() {
         return previousStateId;
     }
@@ -92,6 +147,11 @@ public class BlockEngineBlockPlaceEvent extends Event implements Cancellable {
         return HANDLERS;
     }
 
+    /**
+     * Returns the handler list for Bukkit's event system.
+     *
+     * @return event handler list
+     */
     public static @NotNull HandlerList getHandlerList() {
         return HANDLERS;
     }

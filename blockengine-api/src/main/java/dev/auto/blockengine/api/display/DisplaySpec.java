@@ -470,12 +470,20 @@ public final class DisplaySpec {
         /**
          * Sets the left transform quaternion.
          *
+         * @param x quaternion x component
+         * @param y quaternion y component
+         * @param z quaternion z component
+         * @param w quaternion w component
          * @return this builder
          */
         public @NotNull Builder leftRotation(float x, float y, float z, float w) { leftRotationX = x; leftRotationY = y; leftRotationZ = z; leftRotationW = w; return this; }
         /**
          * Sets the right transform quaternion.
          *
+         * @param x quaternion x component
+         * @param y quaternion y component
+         * @param z quaternion z component
+         * @param w quaternion w component
          * @return this builder
          */
         public @NotNull Builder rightRotation(float x, float y, float z, float w) { rightRotationX = x; rightRotationY = y; rightRotationZ = z; rightRotationW = w; return this; }
@@ -486,15 +494,40 @@ public final class DisplaySpec {
          * @return this builder
          */
         public @NotNull Builder billboard(byte billboard) { this.billboard = billboard; return this; }
-        /** @return this builder */
+        /**
+         * Sets the number of ticks before transform interpolation starts.
+         *
+         * @param ticks interpolation delay in ticks
+         * @return this builder
+         */
         public @NotNull Builder transformationInterpolationDelay(int ticks) { transformationInterpolationDelay = ticks; return this; }
-        /** @return this builder */
+        /**
+         * Sets the number of ticks used for transform interpolation.
+         *
+         * @param ticks interpolation duration in ticks
+         * @return this builder
+         */
         public @NotNull Builder transformationInterpolationDuration(int ticks) { transformationInterpolationDuration = ticks; return this; }
-        /** @return this builder */
+        /**
+         * Sets the number of ticks used for position and rotation interpolation.
+         *
+         * @param ticks interpolation duration in ticks
+         * @return this builder
+         */
         public @NotNull Builder posRotInterpolationDuration(int ticks) { posRotInterpolationDuration = ticks; return this; }
-        /** @return this builder */
+        /**
+         * Sets the display shadow radius metadata value.
+         *
+         * @param shadowRadius shadow radius
+         * @return this builder
+         */
         public @NotNull Builder shadowRadius(float shadowRadius) { this.shadowRadius = shadowRadius; return this; }
-        /** @return this builder */
+        /**
+         * Sets the display shadow strength metadata value.
+         *
+         * @param shadowStrength shadow strength
+         * @return this builder
+         */
         public @NotNull Builder shadowStrength(float shadowStrength) { this.shadowStrength = shadowStrength; return this; }
         /**
          * Sets the display bounding dimensions.
@@ -504,11 +537,29 @@ public final class DisplaySpec {
          * @return this builder
          */
         public @NotNull Builder dimensions(float width, float height) { this.width = width; this.height = height; return this; }
-        /** @return this builder */
+        /**
+         * Sets whether the glowing entity flag is enabled.
+         *
+         * @param glowing true to render the display as glowing
+         * @return this builder
+         */
         public @NotNull Builder glowing(boolean glowing) { this.glowing = glowing; return this; }
-        /** @return this builder */
+        /**
+         * Sets whether the invisible entity flag is enabled.
+         *
+         * <p>Item display contents can still render when this flag is set,
+         * matching vanilla display-entity behavior.</p>
+         *
+         * @param invisible true to enable the invisible flag
+         * @return this builder
+         */
         public @NotNull Builder invisible(boolean invisible) { this.invisible = invisible; return this; }
-        /** @return this builder */
+        /**
+         * Sets the display glow color override.
+         *
+         * @param glowColorOverride RGB color value, or -1 for the default
+         * @return this builder
+         */
         public @NotNull Builder glowColorOverride(int glowColorOverride) { this.glowColorOverride = glowColorOverride; return this; }
         /**
          * Sets which players can see the display.

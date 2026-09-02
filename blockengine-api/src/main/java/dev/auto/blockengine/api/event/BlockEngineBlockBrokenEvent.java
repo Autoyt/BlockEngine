@@ -20,6 +20,15 @@ public class BlockEngineBlockBrokenEvent extends Event {
     private final @NotNull String stateId;
     private final boolean droppedItem;
 
+    /**
+     * Creates a new post-break event.
+     *
+     * @param block Bukkit block that was broken
+     * @param player player who broke the block
+     * @param blockId full custom block id that was removed
+     * @param stateId state id that was removed
+     * @param droppedItem true if BlockEngine dropped the custom block item
+     */
     public BlockEngineBlockBrokenEvent(
             @NotNull Block block,
             @NotNull Player player,
@@ -34,22 +43,47 @@ public class BlockEngineBlockBrokenEvent extends Event {
         this.droppedItem = droppedItem;
     }
 
+    /**
+     * Returns the Bukkit block that was broken.
+     *
+     * @return affected block
+     */
     public @NotNull Block block() {
         return block;
     }
 
+    /**
+     * Returns the player who broke the block.
+     *
+     * @return breaking player
+     */
     public @NotNull Player player() {
         return player;
     }
 
+    /**
+     * Returns the full custom block id that was removed.
+     *
+     * @return full block id
+     */
     public @NotNull String blockId() {
         return blockId;
     }
 
+    /**
+     * Returns the state id that was removed.
+     *
+     * @return state id
+     */
     public @NotNull String stateId() {
         return stateId;
     }
 
+    /**
+     * Returns whether BlockEngine dropped the custom block item.
+     *
+     * @return true if an item was dropped
+     */
     public boolean droppedItem() {
         return droppedItem;
     }
@@ -59,6 +93,11 @@ public class BlockEngineBlockBrokenEvent extends Event {
         return HANDLERS;
     }
 
+    /**
+     * Returns the handler list for Bukkit's event system.
+     *
+     * @return event handler list
+     */
     public static @NotNull HandlerList getHandlerList() {
         return HANDLERS;
     }

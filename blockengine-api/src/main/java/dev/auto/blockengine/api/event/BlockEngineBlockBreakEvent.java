@@ -12,6 +12,9 @@ import java.util.Objects;
 
 /**
  * Fired before a player breaks a BlockEngine custom block.
+ *
+ * <p>Cancel this event to stop BlockEngine's custom break handling for the
+ * block.</p>
  */
 public class BlockEngineBlockBreakEvent extends Event implements Cancellable {
     private static final HandlerList HANDLERS = new HandlerList();
@@ -21,6 +24,13 @@ public class BlockEngineBlockBreakEvent extends Event implements Cancellable {
     private final @NotNull Player player;
     private boolean cancelled;
 
+    /**
+     * Creates a new pre-break event.
+     *
+     * @param block Bukkit block being broken
+     * @param context custom block context
+     * @param player player breaking the block
+     */
     public BlockEngineBlockBreakEvent(
             @NotNull Block block,
             @NotNull BlockContext context,
@@ -31,22 +41,47 @@ public class BlockEngineBlockBreakEvent extends Event implements Cancellable {
         this.player = Objects.requireNonNull(player, "player");
     }
 
+    /**
+     * Returns the Bukkit block being broken.
+     *
+     * @return affected block
+     */
     public @NotNull Block block() {
         return block;
     }
 
+    /**
+     * Returns the custom block context for the break action.
+     *
+     * @return block context
+     */
     public @NotNull BlockContext context() {
         return context;
     }
 
+    /**
+     * Returns the full BlockEngine id being broken.
+     *
+     * @return full block id
+     */
     public @NotNull String blockId() {
         return context.blockId();
     }
 
+    /**
+     * Returns the state id being broken.
+     *
+     * @return state id
+     */
     public @NotNull String stateId() {
         return context.stateId();
     }
 
+    /**
+     * Returns the player breaking the block.
+     *
+     * @return breaking player
+     */
     public @NotNull Player player() {
         return player;
     }
@@ -66,6 +101,11 @@ public class BlockEngineBlockBreakEvent extends Event implements Cancellable {
         return HANDLERS;
     }
 
+    /**
+     * Returns the handler list for Bukkit's event system.
+     *
+     * @return event handler list
+     */
     public static @NotNull HandlerList getHandlerList() {
         return HANDLERS;
     }

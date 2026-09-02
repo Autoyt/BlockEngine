@@ -24,28 +24,55 @@ public abstract class BlockContext {
         this.data = Objects.requireNonNull(data, "data");
     }
 
+    /**
+     * Returns the adapter that owns the placed block.
+     *
+     * @return owning block adapter
+     */
     public final @NotNull BlockAdapter adapter() {
         return adapter;
     }
 
+    /**
+     * Returns mutable persisted data for the placed block.
+     *
+     * @return placed-block data
+     */
     public final @NotNull BlockData data() {
         return data;
     }
 
+    /**
+     * Returns the full BlockEngine id for the placed block.
+     *
+     * @return full block id, such as {@code myplugin:lamp}
+     */
     public final @NotNull String blockId() {
         return data.blockId();
     }
 
+    /**
+     * Returns the current state id for the placed block.
+     *
+     * @return state id
+     */
     public final @NotNull String stateId() {
         return data.stateId();
     }
 
+    /**
+     * Changes the current BlockEngine block state.
+     *
+     * @param stateId new state id from the block definition
+     */
     public final void stateId(@NotNull String stateId) {
         data.stateId(stateId);
     }
 
     /**
      * Convenience alias for changing the current BlockEngine blockstate.
+     *
+     * @param stateId new state id from the block definition
      */
     public final void setState(@NotNull String stateId) {
         data.stateId(stateId);

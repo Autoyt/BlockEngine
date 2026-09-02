@@ -11,9 +11,9 @@ import java.util.Objects;
 
 /**
  * Fired when BlockEngine detects a custom block should fall.
- * <p>
- * External listeners may cancel this event to keep the block in place, or
- * change {@link #stopBlock()} before BlockEngine performs the move.
+ *
+ * <p>External listeners may cancel this event to keep the block in place, or
+ * change {@link #stopBlock(Block)} before BlockEngine performs the move.</p>
  */
 public class BlockEngineGravityEvent extends Event implements Cancellable {
     private static final HandlerList HANDLERS = new HandlerList();
@@ -24,6 +24,14 @@ public class BlockEngineGravityEvent extends Event implements Cancellable {
     private @NotNull Block stopBlock;
     private boolean cancelled;
 
+    /**
+     * Creates a new gravity movement event.
+     *
+     * @param startBlock current Bukkit block position
+     * @param stopBlock target Bukkit block position
+     * @param definition custom block definition being moved
+     * @param stateId state id being moved
+     */
     public BlockEngineGravityEvent(
             @NotNull Block startBlock,
             @NotNull Block stopBlock,
@@ -36,26 +44,56 @@ public class BlockEngineGravityEvent extends Event implements Cancellable {
         this.stateId = Objects.requireNonNull(stateId, "stateId");
     }
 
+    /**
+     * Returns the current Bukkit block position.
+     *
+     * @return starting block
+     */
     public @NotNull Block startBlock() {
         return startBlock;
     }
 
+    /**
+     * Returns the target Bukkit block position.
+     *
+     * @return target block
+     */
     public @NotNull Block stopBlock() {
         return stopBlock;
     }
 
+    /**
+     * Changes the target Bukkit block position.
+     *
+     * @param stopBlock target block
+     */
     public void stopBlock(@NotNull Block stopBlock) {
         this.stopBlock = Objects.requireNonNull(stopBlock, "stopBlock");
     }
 
+    /**
+     * Returns the custom block definition being moved.
+     *
+     * @return block definition
+     */
     public @NotNull BlockDefinition definition() {
         return definition;
     }
 
+    /**
+     * Returns the full custom block id being moved.
+     *
+     * @return full block id
+     */
     public @NotNull String blockId() {
         return definition.id();
     }
 
+    /**
+     * Returns the state id being moved.
+     *
+     * @return state id
+     */
     public @NotNull String stateId() {
         return stateId;
     }
@@ -75,6 +113,11 @@ public class BlockEngineGravityEvent extends Event implements Cancellable {
         return HANDLERS;
     }
 
+    /**
+     * Returns the handler list for Bukkit's event system.
+     *
+     * @return event handler list
+     */
     public static @NotNull HandlerList getHandlerList() {
         return HANDLERS;
     }

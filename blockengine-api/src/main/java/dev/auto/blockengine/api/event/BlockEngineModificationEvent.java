@@ -25,6 +25,16 @@ public class BlockEngineModificationEvent extends Event {
     private final @Nullable String newBlockId;
     private final @Nullable String newStateId;
 
+    /**
+     * Creates a new BlockEngine modification event.
+     *
+     * @param action mutation action
+     * @param block Bukkit block whose BlockEngine state changed
+     * @param previousBlockId custom block id before the mutation, or null
+     * @param previousStateId state id before the mutation, or null
+     * @param newBlockId custom block id after the mutation, or null
+     * @param newStateId state id after the mutation, or null
+     */
     public BlockEngineModificationEvent(
             @NotNull Action action,
             @NotNull Block block,
@@ -100,6 +110,11 @@ public class BlockEngineModificationEvent extends Event {
         return HANDLERS;
     }
 
+    /**
+     * Returns the handler list for Bukkit's event system.
+     *
+     * @return event handler list
+     */
     public static @NotNull HandlerList getHandlerList() {
         return HANDLERS;
     }
