@@ -5,6 +5,8 @@ description: The moving parts behind custom block registration, rendering, items
 
 BlockEngine splits custom blocks into three responsibilities: registration, runtime behavior, and client presentation. That shape is similar to Paper's own documentation style: the server owns behavior, while resource packs describe what the client should display.
 
+The important design rule is that a custom block is not only an item model. A BlockEngine block has a server id, a runtime adapter, one or more states, item metadata, generated client assets, and persisted placed-block data.
+
 ## Registration
 
 Every block has a stable namespaced id:
@@ -14,6 +16,15 @@ namespace:block_name
 ```
 
 Code-backed blocks are registered by plugins implementing `CustomBlockSystem`. JSON-backed blocks are loaded from expansion packs at startup and converted into the same internal block definition type.
+
+Each registered block produces a `BlockDefinition`. The definition contains:
+
+- the vanilla fallback block used in the world
+- item material, title, lore, glint, and placeability
+- catalog and creative-menu visibility
+- placement mode
+- state ids and textures
+- mining, drops, sound, and movement rules
 
 ## Runtime behavior
 
@@ -27,6 +38,8 @@ Once registered, blocks flow through the same systems:
 - catalog and creative inventory exposure
 
 Data-driven blocks use BlockEngine's default adapter. Java blocks can provide their own adapter when they need callbacks, custom state, or integration with another plugin.
+
+For Java blocks, the adapter is the behavior surface. It defines the static block and receives callbacks for placement, breaking, interaction, ticking, movement, save, load, and payload recovery.
 
 ## Client presentation
 
@@ -49,3 +62,9 @@ The creative entry is only a placeholder. When a player takes it from the creati
 ## Resource pack model routing
 
 For creative entries, the generated resource pack follows the same pattern used by data packs: `assets/minecraft/items/enchanted_book.json` checks the `minecraft:stored_enchantments` component and routes matching BlockEngine creative enchantments to the block's custom item model.
+
+## Where to go next
+
+- Use [Create a Data Pack](/BlockEngine/guides/create-a-data-pack/) for asset-only blocks.
+- Use [Register Blocks from Java](/BlockEngine/guides/register-blocks-from-java/) for behavior-backed blocks.
+- Read [System Lifecycle](/BlockEngine/concepts/system-lifecycle/) for the detailed startup-to-placement flow.

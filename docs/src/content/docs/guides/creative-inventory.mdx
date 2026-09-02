@@ -11,6 +11,8 @@ Modern Paper can expose custom enchantments in the creative inventory. BlockEngi
 
 That entry is not the final block item. It is a discovery-safe placeholder that can exist early enough for the creative menu.
 
+The placeholder is necessary because the vanilla creative inventory is built before normal plugin runtime item creation can know about every loaded block. The enchantment is the stable registry object; the real BlockEngine item is created when the player takes it.
+
 ## Startup manifest
 
 BlockEngine writes:
@@ -21,6 +23,8 @@ plugins/blockengine/generated-creative-enchantments.json
 
 The manifest is built from currently discovered blocks. On the next full server restart, the bootstrapper reads it and registers those enchantments early enough for the creative menu.
 
+Manifest entries are generated only for blocks where creative-menu visibility is enabled. The default is `true` for both Java block definitions and data-driven packs.
+
 ## Resource-pack appearance
 
 The generated resource pack overrides the enchanted book item model and checks `minecraft:stored_enchantments`. When it finds a BlockEngine creative enchantment, it displays the matching custom block item model.
@@ -28,3 +32,11 @@ The generated resource pack overrides the enchanted book item model and checks `
 ## Inventory conversion
 
 When a player takes the creative entry and places it in an inventory slot, BlockEngine converts the placeholder into the real block item immediately. The resulting item uses the same metadata as items created through BlockEngine commands, catalog flows, or drops.
+
+That conversion runs for creative placement events, normal inventory clicks, drags, open inventory scans, and dropped items. The goal is that the enchanted-book representation is only seen in the creative menu, while inventories receive the real item.
+
+## Troubleshooting
+
+If a block exists but is missing from the creative menu, restart the server after the manifest has been written. Players with `blockengine.debug` receive a join message when newly discovered entries require another restart.
+
+If the creative entry looks like a normal enchanted book, resend or re-accept the generated resource pack. The visual model depends on the generated `assets/minecraft/items/enchanted_book.json` routing file.

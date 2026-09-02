@@ -5,6 +5,8 @@ description: Add custom blocks with JSON and resource-pack assets.
 
 Data-driven packs are the fastest way to add simple custom blocks. They are meant for blocks that do not need Java callbacks.
 
+For a complete copyable project, see [JSON Ruby Block Pack](/BlockEngine/examples/json-ruby-block-pack/).
+
 ## Folder layout
 
 Place packs in the BlockEngine plugin data folder:
@@ -86,3 +88,15 @@ If `name` is omitted, the file path under `blocks/` becomes the block name. In t
 ## Restart behavior
 
 New creative-menu entries are discovered during startup and realized on the next full restart. Players with `blockengine.debug` are notified on join when new entries were found and another restart is required.
+
+## Common checks
+
+If the block loads but does not look right, check the generated pack first:
+
+```text
+/blockengine packs list
+/blockengine packs resend *
+/blockengine packs download *
+```
+
+If the block does not register, check the server log for validation errors. The loader rejects invalid namespaces, missing states, missing textures, invalid materials, paths outside the pack folder, and duplicate block ids.

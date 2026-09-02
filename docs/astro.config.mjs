@@ -9,7 +9,7 @@ export default defineConfig({
       title: 'BlockEngine',
       description: 'Documentation for the BlockEngine Paper plugin and Java API.',
       logo: {
-        src: './src/assets/logo.svg',
+        src: './src/assets/blockengine-icon.png',
         alt: 'BlockEngine',
       },
       social: [
@@ -25,12 +25,29 @@ export default defineConfig({
           label: 'Start Here',
           items: [
             { label: 'Overview', link: '/BlockEngine/' },
+          ],
+        },
+        {
+          label: 'Concepts',
+          items: [
             { label: 'How BlockEngine Works', slug: 'concepts/how-it-works' },
+            { label: 'System Lifecycle', slug: 'concepts/system-lifecycle' },
           ],
         },
         {
           label: 'Guides',
-          autogenerate: { directory: 'guides' },
+          items: [
+            { label: 'Create a Data Pack', slug: 'guides/create-a-data-pack' },
+            { label: 'Register Blocks from Java', slug: 'guides/register-blocks-from-java' },
+            { label: 'Creative Inventory', slug: 'guides/creative-inventory' },
+          ],
+        },
+        {
+          label: 'End-to-End Examples',
+          items: [
+            { label: 'JSON Ruby Block Pack', slug: 'examples/json-ruby-block-pack' },
+            { label: 'Java Lamp Block Plugin', slug: 'examples/java-lamp-block-plugin' },
+          ],
         },
         {
           label: 'Reference',

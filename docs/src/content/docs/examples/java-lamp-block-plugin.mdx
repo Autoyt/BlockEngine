@@ -1,0 +1,189 @@
+---
+title: Java Lamp Block Plugin
+description: A complete Java integration example with a custom adapter, state changes, assets, and testing.
+---
+
+This example creates a Java plugin that registers one BlockEngine block: `example:toggle_lamp`. Right-clicking the placed block toggles its state between `off` and `on`.
+
+## 1. Add BlockEngine as a dependency
+
+In your plugin's Gradle build, depend on the BlockEngine API:
+
+```kotlin
+repositories {
+    mavenCentral()
+    maven("https://repo.papermc.io/repository/maven-public/")
+    maven("https://maven.pkg.github.com/Autoyt/BlockEngine")
+}
+
+dependencies {
+    compileOnly("dev.auto:blockengine-api:1.0.4-RELEASE")
+    compileOnly("io.papermc.paper:paper-api:1.21.11-R0.1-SNAPSHOT")
+}
+```
+
+GitHub Packages may require credentials depending on repository visibility and package settings.
+
+## 2. Depend on BlockEngine in Paper
+
+Your `paper-plugin.yml` should load after BlockEngine:
+
+```yaml
+name: ExampleBlocks
+version: 1.0.0
+main: com.example.ExampleBlocksPlugin
+api-version: '1.21'
+dependencies:
+  server:
+    blockengine:
+      load: BEFORE
+      required: true
+```
+
+## 3. Implement `CustomBlockSystem`
+
+```java
+package com.example;
+
+import dev.auto.blockengine.api.CustomBlockSystem;
+import dev.auto.blockengine.api.blocks.BlockAdapter;
+import org.bukkit.plugin.java.JavaPlugin;
+
+import java.util.List;
+
+public final class ExampleBlocksPlugin extends JavaPlugin implements CustomBlockSystem {
+    @Override
+    public String pluginVersion() {
+        return getPluginMeta().getVersion();
+    }
+
+    @Override
+    public String getNamespace() {
+        return "example";
+    }
+
+    @Override
+    public List<BlockAdapter> registerAdapters() {
+        return List.of(new ToggleLampBlock());
+    }
+
+    @Override
+    public void setPackDetails(PackDetails details) {
+        details.title("<gold>Example Blocks")
+                .description("Example BlockEngine assets")
+                .urlEnding("example-blocks")
+                .required(true)
+                .addAssets(getDataFolder().toPath().resolve("assets"));
+    }
+}
+```
+
+## 4. Implement the adapter
+
+```java
+package com.example;
+
+import dev.auto.blockengine.api.blocks.BlockAdapter;
+import dev.auto.blockengine.api.blocks.BlockContext;
+import dev.auto.blockengine.api.blocks.BlockCreateContext;
+import dev.auto.blockengine.api.blocks.BlockData;
+import dev.auto.blockengine.api.blocks.BlockDefinition;
+import org.bukkit.Material;
+import org.bukkit.entity.Player;
+
+public final class ToggleLampBlock implements BlockAdapter {
+    @Override
+    public String name() {
+        return "toggle_lamp";
+    }
+
+    @Override
+    public void define(BlockDefinition.Builder builder) {
+        builder.vanillaBlock(Material.BARRIER)
+                .creativeMenu(true)
+                .catalog(true)
+                .placement(BlockDefinition.Placement.DIRECTIONAL)
+                .item(item -> item
+                        .material(Material.KNOWLEDGE_BOOK)
+                        .name("<gold>Toggle Lamp")
+                        .lore("<gray>Right-click to switch states")
+                        .placeable(true))
+                .defaultState("off")
+                .state("off", state -> state
+                        .hardness(0.8f)
+                        .miningProfile(Material.REDSTONE_LAMP)
+                        .preferredTool(BlockDefinition.ToolType.PICKAXE)
+                        .textures(textures -> textures.all("toggle_lamp_off"))
+                        .sounds(sounds -> sounds
+                                .place("minecraft:block.lantern.place")
+                                .breakSound("minecraft:block.lantern.break")))
+                .state("on", state -> state
+                        .hardness(0.8f)
+                        .miningProfile(Material.REDSTONE_LAMP)
+                        .preferredTool(BlockDefinition.ToolType.PICKAXE)
+                        .textures(textures -> textures.all("toggle_lamp_on"))
+                        .sounds(sounds -> sounds
+                                .place("minecraft:block.lantern.place")
+                                .breakSound("minecraft:block.lantern.break")));
+    }
+
+    @Override
+    public BlockData createDefaultData(BlockCreateContext context) {
+        BlockData data = context.createData();
+        data.bool("lit", false);
+        return data;
+    }
+
+    @Override
+    public boolean onInteract(BlockContext context, Player player) {
+        boolean lit = Boolean.TRUE.equals(context.data().bool("lit"));
+        context.data().bool("lit", !lit);
+        context.setState(lit ? "off" : "on");
+        return true;
+    }
+}
+```
+
+## 5. Add assets
+
+Create these files in your plugin data folder:
+
+```text
+plugins/ExampleBlocks/assets/
+  assets/
+    example/
+      textures/
+        block/
+          toggle_lamp_off.png
+          toggle_lamp_on.png
+```
+
+BlockEngine copies the `assets` root into the generated resource pack and generates the model JSON for both states.
+
+## 6. Start, restart, and test
+
+Start the server once so BlockEngine discovers the block and writes creative metadata. Restart once more if you want the block in the vanilla creative inventory.
+
+Useful commands:
+
+```text
+/blockengine debug plugins example
+/blockengine debug blocks example
+/blockengine debug give example:toggle_lamp
+/blockengine packs resend example-blocks
+/blockengine catalog example
+```
+
+Place the lamp, right-click it, and confirm the state changes from `off` to `on`.
+
+## 7. What this example covers
+
+- Java namespace registration
+- adapter-backed block definition
+- custom item name and lore
+- two generated block states
+- texture asset copying
+- resource-pack hosting
+- creative inventory visibility
+- placed-block state data
+- interaction callbacks

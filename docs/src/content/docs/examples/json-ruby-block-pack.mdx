@@ -1,0 +1,149 @@
+---
+title: JSON Ruby Block Pack
+description: A complete data-driven pack example from folder layout to in-game testing.
+---
+
+This example creates a single decorative custom block named `example:ruby_block` using JSON and one texture file.
+
+## 1. Create the pack folder
+
+Create this folder in the BlockEngine plugin data directory:
+
+```text
+plugins/blockengine/expansion/packs/ruby_pack/
+```
+
+Inside it, create:
+
+```text
+ruby_pack/
+  pack.json
+  blocks/
+    ruby_block.json
+  assets/
+    assets/
+      example/
+        textures/
+          block/
+            ruby_block.png
+  pack.png
+```
+
+The repeated `assets/assets/example/...` path is intentional. The first `assets/` is the pack asset root declared in `pack.json`. Everything inside it is copied into the generated Minecraft resource pack.
+
+## 2. Add `pack.json`
+
+```json
+{
+  "format": 1,
+  "namespace": "example",
+  "title": "<gold>Ruby Pack",
+  "description": "A small BlockEngine data pack example.",
+  "prompt": "<gold>Ruby Pack</gold>\n<gray>Custom block assets are required.</gray>",
+  "url-ending": "ruby-pack",
+  "required": true,
+  "catalog": true,
+  "creative-menu": true,
+  "icon": "pack.png",
+  "assets": ["assets"]
+}
+```
+
+## 3. Add `blocks/ruby_block.json`
+
+```json
+{
+  "vanilla-block": "barrier",
+  "catalog": true,
+  "creative-menu": true,
+  "placement": "directional",
+  "item": {
+    "material": "knowledge_book",
+    "name": "<red>Ruby Block",
+    "lore": [
+      "<dark_gray>Decorative",
+      "<gray>Data-driven BlockEngine block"
+    ],
+    "glint": false,
+    "placeable": true
+  },
+  "default-state": "default",
+  "states": {
+    "default": {
+      "hardness": 1.25,
+      "mining-speed": 1.0,
+      "mining-profile": "stone",
+      "preferred-tools": ["pickaxe"],
+      "require-preferred-tool-for-drops": false,
+      "require-silk-touch-for-drops": false,
+      "drops-item": true,
+      "drop-in-creative": false,
+      "movement": {
+        "gravity": false,
+        "dispenser-placeable": true,
+        "breaks-via-gravity": false
+      },
+      "textures": {
+        "all": "ruby_block"
+      },
+      "sounds": {
+        "place": "minecraft:block.stone.place",
+        "break": "minecraft:block.stone.break",
+        "mining": "minecraft:block.stone.hit",
+        "step": "minecraft:block.stone.step"
+      }
+    }
+  }
+}
+```
+
+## 4. Add the texture
+
+Place a 16x16 or 32x32 PNG at:
+
+```text
+ruby_pack/assets/assets/example/textures/block/ruby_block.png
+```
+
+The block texture name in JSON is `ruby_block`, so BlockEngine resolves it to:
+
+```text
+example:block/ruby_block
+```
+
+## 5. Start the server
+
+Start or restart the server. BlockEngine loads the pack, registers `example:ruby_block`, generates resource-pack files, and writes creative enchantment entries to:
+
+```text
+plugins/blockengine/generated-creative-enchantments.json
+```
+
+If this is the first time the block exists, restart the server once more so Paper can register the creative enchantment during bootstrap.
+
+## 6. Test in-game
+
+Use these commands as an operator:
+
+```text
+/blockengine debug blocks list
+/blockengine debug give example:ruby_block
+/blockengine packs resend *
+/blockengine catalog example
+```
+
+Then place the item. It should become a BlockEngine managed block using the ruby texture from the generated resource pack.
+
+## 7. Expected generated assets
+
+BlockEngine generates paths like:
+
+```text
+generated-resource-pack/data-packs/ruby-pack/
+  assets/example/models/block/ruby_block/default.json
+  assets/example/models/item/ruby_block.json
+  assets/example/items/ruby_block.json
+  assets/example/lang/en_us.json
+```
+
+The data pack's own texture is copied into the generated pack. You do not need to write model JSON for simple cube blocks.

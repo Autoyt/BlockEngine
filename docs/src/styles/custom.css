@@ -1,15 +1,34 @@
 :root {
-  --sl-color-accent-low: #d9f3ee;
-  --sl-color-accent: #0f766e;
-  --sl-color-accent-high: #063f3a;
+  --sl-color-accent-low: #fff1d8;
+  --sl-color-accent: #ff9f2e;
+  --sl-color-accent-high: #643000;
+  --sl-color-orange-light: #ffc46b;
+  --sl-color-orange-hot: #ff6a2e;
 }
 
 :root[data-theme='dark'] {
-  --sl-color-accent-low: #093d38;
-  --sl-color-accent: #62d6c8;
-  --sl-color-accent-high: #c9fff8;
+  --sl-color-accent-low: #4c2500;
+  --sl-color-accent: #ff9f2e;
+  --sl-color-accent-high: #ffe1b1;
+  --sl-color-bg: #16120d;
+  --sl-color-bg-sidebar: #100d09;
+  --sl-color-bg-nav: #100d09;
+  --sl-color-hairline-light: #3a2a18;
 }
 
-.hero img {
-  border-radius: 8px;
+.site-title img {
+  image-rendering: pixelated;
+}
+
+.hero img,
+.sl-markdown-content img {
+  border-radius: 6px;
+}
+
+.sl-markdown-content code:not(:where(.expressive-code code)) {
+  border: 1px solid color-mix(in srgb, var(--sl-color-accent) 24%, transparent);
+}
+
+.sl-markdown-content a:not(:where(.not-content *)) {
+  text-decoration-color: var(--sl-color-orange-light);
 }

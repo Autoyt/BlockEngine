@@ -1,0 +1,104 @@
+---
+title: System Lifecycle
+description: A detailed startup-to-runtime explanation of how BlockEngine discovers, renders, places, persists, and exposes custom blocks.
+---
+
+BlockEngine is built around a clear boundary: Minecraft and Paper own the server process, worlds, inventories, registries, and resource-pack protocol. BlockEngine adds a custom-block layer on top by registering block definitions, generating client assets, and storing placed-block state.
+
+This page follows a block from disk or Java code all the way to a player placing it in-world.
+
+## 1. Bootstrap registers creative placeholders
+
+Paper requires registry-backed objects such as enchantments to be registered during bootstrap, before normal plugin enable logic has discovered every runtime block.
+
+BlockEngine solves this with a startup manifest:
+
+```text
+plugins/blockengine/generated-creative-enchantments.json
+```
+
+During bootstrap, BlockEngine reads that manifest and registers one creative enchantment for each previously discovered creative-visible block. Those enchantments are what let Minecraft show entries in the creative inventory early enough.
+
+New blocks are not visible in the creative inventory until the next full restart because the manifest is written after discovery.
+
+## 2. Plugin enable loads systems and packs
+
+During normal startup, BlockEngine discovers two block sources:
+
+- Java plugins implementing `CustomBlockSystem`
+- JSON expansion packs under `plugins/blockengine/expansion/packs/`
+
+Both sources become the same internal block representation. This keeps later systems simple: placement, mining, persistence, catalog views, item generation, and resource-pack generation do not need to care whether the block started as Java or JSON.
+
+## 3. Namespaces protect ownership
+
+Every block belongs to a namespace:
+
+```text
+example:ruby_block
+```
+
+For Java systems, the namespace comes from `CustomBlockSystem#getNamespace()`. For JSON packs, it comes from `pack.json`.
+
+BlockEngine validates dependencies and refuses duplicate block ids. A block id should be treated as stable public data once worlds contain placed blocks, because placed-block persistence stores that id.
+
+## 4. Definitions describe the server contract
+
+A `BlockDefinition` tells BlockEngine what the block is allowed to do:
+
+- `vanillaBlock` is the fallback Bukkit block material used in-world
+- `item` controls the inventory representation
+- `creativeMenu` and `catalog` control visibility
+- `placement` controls orientation behavior
+- `states` define textures, hardness, drops, sounds, and movement
+
+Data packs express this in JSON. Java adapters express it through `BlockDefinition.Builder`.
+
+## 5. Resource packs describe the client view
+
+Minecraft clients only understand vanilla blocks, items, models, textures, and language files. BlockEngine generates resource packs so the client can render custom blocks and items:
+
+```text
+assets/<namespace>/models/block/<block>/<state>.json
+assets/<namespace>/models/item/<block>.json
+assets/<namespace>/items/<block>.json
+assets/<namespace>/lang/en_us.json
+```
+
+Data-pack and plugin-provided assets are copied into generated packs after validation. BlockEngine can host individual packs and a combined `*` pack.
+
+## 6. Creative entries use datapack-style model routing
+
+Creative entries begin as enchanted books because Paper can expose custom enchantments in the creative inventory.
+
+The generated resource pack overrides:
+
+```text
+assets/minecraft/items/enchanted_book.json
+```
+
+That model checks the book's `minecraft:stored_enchantments` component. If it finds a BlockEngine creative enchantment, it renders the matching block item model. This is the same kind of component-driven routing used by data packs.
+
+## 7. Inventory conversion makes the placeholder real
+
+The creative-menu book is only a placeholder. When a player takes it from the creative menu and places it into an inventory slot, BlockEngine converts it immediately into the real custom block item.
+
+The converted item contains BlockEngine metadata, uses the configured item model, and can be placed like any other BlockEngine item.
+
+## 8. Placement creates persisted block data
+
+When the player places the item, BlockEngine validates the placement rules, creates `BlockData`, sets the world fallback block, and records the custom block id and state.
+
+For Java adapters, `createDefaultData()` creates the initial data object and `onPlace()` can react after placement. Data-driven blocks use the default adapter and normal configured state behavior.
+
+## 9. Runtime events keep plugins informed
+
+BlockEngine fires API events for major lifecycle moments such as placement, break, removal, modification, and chunk persistence. Java adapters also receive direct callbacks when they own the block behavior.
+
+Use events for observing or coordinating with other plugins. Use adapters when the block itself owns the behavior.
+
+## 10. Save and load restore the world
+
+BlockEngine persists placed custom blocks separately from vanilla block state. The world stores a vanilla fallback material, while BlockEngine stores the custom id, state id, and public data maps.
+
+Adapters can also save private payload bytes when they need data that does not fit the public map structure. If private payload recovery fails, the adapter can decide whether the block should remain with fallback data or be treated as unloadable.

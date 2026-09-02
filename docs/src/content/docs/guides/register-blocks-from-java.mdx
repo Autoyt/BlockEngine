@@ -9,29 +9,55 @@ Java integrations should implement `CustomBlockSystem`. This gives your plugin a
 package com.example;
 
 import dev.auto.blockengine.api.CustomBlockSystem;
+import dev.auto.blockengine.api.blocks.BlockAdapter;
+import dev.auto.blockengine.api.blocks.BlockCreateContext;
+import dev.auto.blockengine.api.blocks.BlockData;
 import dev.auto.blockengine.api.blocks.BlockDefinition;
 import org.bukkit.Material;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import java.util.List;
+
 public final class ExampleBlocks extends JavaPlugin implements CustomBlockSystem {
+    @Override
+    public String pluginVersion() {
+        return getPluginMeta().getVersion();
+    }
+
     @Override
     public String getNamespace() {
         return "example";
     }
 
     @Override
-    public void registerBlocks(Registration registration) {
-        registration.block(BlockDefinition.builder("ruby_block")
-                .vanillaBlock(Material.BARRIER)
-                .creativeMenu(true)
-                .item(item -> item
-                        .material(Material.KNOWLEDGE_BOOK)
-                        .name("<red>Ruby Block")
-                        .placeable(true))
-                .state("default", state -> state
-                        .hardness(1.25)
-                        .textures(textures -> textures.all("ruby_block")))
-                .build());
+    public List<BlockAdapter> registerAdapters() {
+        return List.of(new RubyBlock());
+    }
+
+    private static final class RubyBlock implements BlockAdapter {
+        @Override
+        public String name() {
+            return "ruby_block";
+        }
+
+        @Override
+        public void define(BlockDefinition.Builder builder) {
+            builder.vanillaBlock(Material.BARRIER)
+                    .creativeMenu(true)
+                    .item(item -> item
+                            .material(Material.KNOWLEDGE_BOOK)
+                            .name("<red>Ruby Block")
+                            .placeable(true))
+                    .state("default", state -> state
+                            .hardness(1.25f)
+                            .miningProfile(Material.STONE)
+                            .textures(textures -> textures.all("ruby_block")));
+        }
+
+        @Override
+        public BlockData createDefaultData(BlockCreateContext context) {
+            return context.createData();
+        }
     }
 }
 ```
@@ -45,7 +71,7 @@ Use `setPackDetails` to point BlockEngine at your asset folders. BlockEngine val
 public void setPackDetails(PackDetails details) {
     details.title("<green>Example Blocks")
             .description("Custom blocks from ExampleBlocks")
-            .assets(getDataFolder().toPath().resolve("assets"));
+            .addAssets(getDataFolder().toPath().resolve("assets"));
 }
 ```
 
