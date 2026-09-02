@@ -42,9 +42,3 @@ The generated resource pack overrides the enchanted book item model and checks `
 When a player takes the creative entry and places it in an inventory slot, BlockEngine converts the placeholder into the real block item immediately. The resulting item uses the same metadata as items created through BlockEngine commands, catalog flows, or drops.
 
 That conversion runs for creative placement events, normal inventory clicks, drags, open inventory scans, and dropped items. The goal is that the enchanted-book representation is only seen in the creative menu, while inventories receive the real item.
-
-## Troubleshooting
-
-If a block exists but is missing from the creative menu, restart the server after the manifest has been written. Players with `blockengine.debug` receive a join message when newly discovered entries require another restart.
-
-If the creative entry looks like a normal enchanted book, resend or re-accept the generated resource pack. The visual model depends on the generated `assets/minecraft/items/enchanted_book.json` routing file.

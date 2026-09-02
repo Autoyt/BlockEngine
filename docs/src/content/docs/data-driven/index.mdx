@@ -60,7 +60,7 @@ Use zip packs when distributing a finished block pack to another server.
 ## Feature areas
 
 <Tabs syncKey="data-pack-features">
-  <TabItem label="Pack metadata" icon="document">
+  <TabItem label="Pack metadata">
 
 `pack.json` owns namespace-level settings:
 
@@ -73,7 +73,7 @@ Use zip packs when distributing a finished block pack to another server.
 </CardGrid>
 
   </TabItem>
-  <TabItem label="Block item" icon="puzzle">
+  <TabItem label="Block item">
 
 The `item` object controls the inventory representation:
 
@@ -90,7 +90,7 @@ The `item` object controls the inventory representation:
 MiniMessage works for the final BlockEngine item title and lore. Creative-menu enchantment titles use generated translation strings.
 
   </TabItem>
-  <TabItem label="States" icon="setting">
+  <TabItem label="States">
 
 States define how the block behaves and renders:
 
@@ -106,7 +106,7 @@ States define how the block behaves and renders:
 Every block must have at least one state, and `default-state` must point at a defined state.
 
   </TabItem>
-  <TabItem label="Placement" icon="add-document">
+  <TabItem label="Placement">
 
 `placement` controls orientation behavior:
 
@@ -119,7 +119,7 @@ Every block must have at least one state, and `default-state` must point at a de
 Supported values are `none`, `horizontal-facing`, `axis`, and `directional`.
 
   </TabItem>
-  <TabItem label="Creative and catalog" icon="star">
+  <TabItem label="Creative and catalog">
 
 `creative-menu` and `catalog` default to `true`. Disable them per pack or per block:
 
