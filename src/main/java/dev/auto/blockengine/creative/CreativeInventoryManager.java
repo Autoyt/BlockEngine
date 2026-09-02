@@ -60,7 +60,9 @@ public final class CreativeInventoryManager {
             @NotNull EnchantmentRegistryEntry.Builder builder,
             @NotNull CreativeBlock block
     ) {
-        builder.description(Component.translatable(enchantmentTranslationKey(block.id())))
+        builder.description(block.richName() == null
+                        ? Component.translatable(enchantmentTranslationKey(block.id()))
+                        : BlockDisplayNames.rich(block.richName()))
                 .supportedItems(RegistrySet.keySet(
                         RegistryKey.ITEM,
                         List.of(ItemTypeKeys.KNOWLEDGE_BOOK, ItemTypeKeys.ENCHANTED_BOOK)
@@ -82,6 +84,11 @@ public final class CreativeInventoryManager {
     public static @NotNull NamespacedKey enchantmentKey(@NotNull String blockId) {
         String[] parts = splitBlockId(blockId);
         return new NamespacedKey(parts[0], ENCHANTMENT_PREFIX + parts[1]);
+    }
+
+    public static @NotNull NamespacedKey itemModelKey(@NotNull String blockId) {
+        String[] parts = splitBlockId(blockId);
+        return new NamespacedKey(parts[0], "creative/" + parts[1]);
     }
 
     public static @NotNull String blockTranslationKey(@NotNull String blockId) {
@@ -149,8 +156,12 @@ public final class CreativeInventoryManager {
             ObjectNode node = root.addObject();
             node.put("id", block.id());
             node.put("enchantment", enchantmentKey(block.id()).asString());
+            node.put("item-model", itemModelKey(block.id()).asString());
             node.put("name", block.apiDefinition().name());
             node.put("display-name", BlockDisplayNames.plain(block.apiDefinition().item().name(), block));
+            if (block.apiDefinition().item().name() != null && !block.apiDefinition().item().name().isBlank()) {
+                node.put("rich-name", block.apiDefinition().item().name());
+            }
         });
         try {
             Files.createDirectories(file.getParent());
@@ -202,7 +213,14 @@ public final class CreativeInventoryManager {
                 }
                 String name = text(node, "name", parts[1]);
                 String displayName = text(node, "display-name", BlockDisplayNames.fallback(name, id));
-                blocks.put(id, new CreativeBlock(id, parts[0], parts[1], displayName));
+                String richName = text(node, "rich-name", "");
+                blocks.put(id, new CreativeBlock(
+                        id,
+                        parts[0],
+                        parts[1],
+                        displayName,
+                        richName.isBlank() ? null : richName
+                ));
             }
         } catch (IOException exception) {
             // Bootstrap logging is handled by the caller; a stale manifest should not block startup.
@@ -239,7 +257,8 @@ public final class CreativeInventoryManager {
             @NotNull String id,
             @NotNull String namespace,
             @NotNull String name,
-            @NotNull String displayName
+            @NotNull String displayName,
+            @Nullable String richName
     ) {
         public CreativeBlock {
             Objects.requireNonNull(id, "id");

@@ -557,6 +557,7 @@ public final class ResourcePackManager {
             String displayName = BlockDisplayNames.plain(block.apiDefinition().item().name(), block);
             lang.put(CreativeInventoryManager.blockTranslationKey(block.id()), displayName);
             lang.put(CreativeInventoryManager.enchantmentTranslationKey(block.id()), displayName);
+            ItemModelGenerator.generateCreativeEnchantmentItemModel(root, block.apiDefinition());
         }
 
         for (Map.Entry<String, ObjectNode> entry : translations.entrySet()) {

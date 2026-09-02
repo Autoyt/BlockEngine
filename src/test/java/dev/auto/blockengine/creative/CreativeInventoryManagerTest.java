@@ -20,8 +20,10 @@ class CreativeInventoryManagerTest {
                   {
                     "id": "example:ruby_block",
                     "enchantment": "example:creative/ruby_block",
+                    "item-model": "example:creative/ruby_block",
                     "name": "ruby_block",
-                    "display-name": "Ruby Block"
+                    "display-name": "Ruby Block",
+                    "rich-name": "<red>Ruby Block"
                   }
                 ]
                 """);
@@ -31,6 +33,7 @@ class CreativeInventoryManagerTest {
         assertEquals(1, blocks.size());
         assertEquals("example:ruby_block", blocks.getFirst().id());
         assertEquals("Ruby Block", blocks.getFirst().displayName());
+        assertEquals("<red>Ruby Block", blocks.getFirst().richName());
     }
 
     @Test
@@ -65,6 +68,7 @@ class CreativeInventoryManagerTest {
                   {
                     "id": "Bad Namespace:hidden_block",
                     "enchantment": "example:creative/hidden_block",
+                    "item-model": "example:creative/hidden_block",
                     "name": "hidden_block",
                     "display-name": "Hidden Block"
                   }

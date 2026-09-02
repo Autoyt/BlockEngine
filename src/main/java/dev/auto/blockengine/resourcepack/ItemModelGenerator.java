@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import dev.auto.blockengine.Main;
 import dev.auto.blockengine.api.blocks.BlockDefinition;
 import dev.auto.blockengine.api.resourcepack.GeneratedItemModel;
+import dev.auto.blockengine.creative.CreativeInventoryManager;
 import org.bukkit.Material;
 import org.jetbrains.annotations.NotNull;
 
@@ -24,6 +25,14 @@ public final class ItemModelGenerator {
             blockStateModel(root, definition, entry.getKey(), entry.getValue());
         }
         blockItemModel(root, definition);
+    }
+
+    public static void generateCreativeEnchantmentItemModel(
+            @NotNull Path root,
+            @NotNull BlockDefinition definition
+    ) throws IOException {
+        assert definition.namespace() != null;
+        modernItem(root, definition, definition.defaultState(), CreativeInventoryManager.itemModelKey(definition.id()).getKey());
     }
 
     public static void generateBackingBlock(@NotNull Path root) throws IOException {
