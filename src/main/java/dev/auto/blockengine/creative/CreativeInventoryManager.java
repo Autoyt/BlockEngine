@@ -43,6 +43,7 @@ public final class CreativeInventoryManager {
     private static final Pattern NAME_PATTERN = Pattern.compile("^[a-z0-9._-]+(?:/[a-z0-9._-]+)*$");
     private static final String MANIFEST_FILE = "generated-creative-enchantments.json";
     private static final String ENCHANTMENT_PREFIX = "creative/";
+    private static int pendingRestartEntries = 0;
 
     private CreativeInventoryManager() {
     }
@@ -128,19 +129,29 @@ public final class CreativeInventoryManager {
         return null;
     }
 
+    public static int pendingRestartEntries() {
+        return pendingRestartEntries;
+    }
+
     public static void writeBootstrapManifest(@NotNull Collection<BlockDefinition> blocks) {
         Path file = Main.getInstance().getDataFolder().toPath().resolve(MANIFEST_FILE);
+        Map<String, CreativeBlock> realizedBlocks = new LinkedHashMap<>();
+        readManifest(file, realizedBlocks);
+
         ArrayNode root = MAPPER.createArrayNode();
-        blocks.stream()
+        List<BlockDefinition> creativeBlocks = blocks.stream()
                 .filter(block -> block.apiDefinition().creativeMenu())
                 .sorted(Comparator.comparing(BlockDefinition::id))
-                .forEach(block -> {
-                    ObjectNode node = root.addObject();
-                    node.put("id", block.id());
-                    node.put("enchantment", enchantmentKey(block.id()).asString());
-                    node.put("name", block.apiDefinition().name());
-                    node.put("display-name", BlockDisplayNames.plain(block.apiDefinition().item().name(), block));
-                });
+                .toList();
+        pendingRestartEntries = newEntries(creativeBlocks, realizedBlocks.keySet());
+
+        creativeBlocks.forEach(block -> {
+            ObjectNode node = root.addObject();
+            node.put("id", block.id());
+            node.put("enchantment", enchantmentKey(block.id()).asString());
+            node.put("name", block.apiDefinition().name());
+            node.put("display-name", BlockDisplayNames.plain(block.apiDefinition().item().name(), block));
+        });
         try {
             Files.createDirectories(file.getParent());
             MAPPER.writeValue(file.toFile(), root);
@@ -148,6 +159,19 @@ public final class CreativeInventoryManager {
             Main.getInstance().getLogger().warning("Failed to write BlockEngine creative manifest: "
                     + exception.getMessage());
         }
+    }
+
+    private static int newEntries(
+            @NotNull Collection<BlockDefinition> currentBlocks,
+            @NotNull Collection<String> realizedBlockIds
+    ) {
+        int entries = 0;
+        for (BlockDefinition block : currentBlocks) {
+            if (!realizedBlockIds.contains(block.id())) {
+                entries++;
+            }
+        }
+        return entries;
     }
 
     private static @Nullable String blockId(@NotNull Collection<Enchantment> enchantments) {
