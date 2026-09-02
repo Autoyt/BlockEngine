@@ -26,13 +26,12 @@ public final class CreativeInventoryListeners implements Listener {
     public void onCreative(@NotNull InventoryCreativeEvent event) {
         ItemStack converted = CreativeInventoryManager.convertCreativeStack(event.getCursor());
         if (converted != event.getCursor()) {
-            event.setCancelled(true);
             event.setCursor(converted);
             placeCreativeItem(event, converted);
         }
         convertCurrentItem(event);
         if (event.getWhoClicked() instanceof Player player) {
-            scanNextTick(player);
+            scanSoon(player);
         }
     }
 
@@ -46,13 +45,13 @@ public final class CreativeInventoryListeners implements Listener {
             event.setCursor(cursor);
         }
         convertCurrentItem(event);
-        scanNextTick(player);
+        scanSoon(player);
     }
 
     @EventHandler
     public void onDrag(@NotNull InventoryDragEvent event) {
         if (event.getWhoClicked() instanceof Player player) {
-            scanNextTick(player);
+            scanSoon(player);
         }
     }
 
@@ -79,8 +78,9 @@ public final class CreativeInventoryListeners implements Listener {
                         BlockEngineChat.WHITE)));
     }
 
-    private static void scanNextTick(@NotNull Player player) {
+    private static void scanSoon(@NotNull Player player) {
         Main.getInstance().getServer().getScheduler().runTask(Main.getInstance(), () -> scan(player));
+        Main.getInstance().getServer().getScheduler().runTaskLater(Main.getInstance(), () -> scan(player), 1L);
     }
 
     private static void scan(@NotNull Player player) {
@@ -113,13 +113,18 @@ public final class CreativeInventoryListeners implements Listener {
     }
 
     private static void placeCreativeItem(@NotNull InventoryCreativeEvent event, @NotNull ItemStack converted) {
-        int rawSlot = event.getRawSlot();
-        if (rawSlot < 0 || rawSlot >= event.getView().countSlots() || event.getClickedInventory() == null) {
-            return;
+        Inventory clicked = event.getClickedInventory();
+        int slot = event.getSlot();
+        if (clicked != null && slot >= 0 && slot < clicked.getSize()) {
+            clicked.setItem(slot, converted);
         }
 
-        event.setCurrentItem(converted);
-        event.getView().setItem(rawSlot, converted);
+        int rawSlot = event.getRawSlot();
+        if (rawSlot >= 0 && rawSlot < event.getView().countSlots()) {
+            event.setCurrentItem(converted);
+            event.getView().setItem(rawSlot, converted);
+        }
+
         if (event.getWhoClicked() instanceof Player player) {
             player.updateInventory();
         }
