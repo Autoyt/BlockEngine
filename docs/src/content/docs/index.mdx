@@ -1,0 +1,37 @@
+---
+title: Overview
+description: Learn what BlockEngine adds to a Paper server and where to start.
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+BlockEngine is a Paper plugin for building custom blocks that behave like first-class server objects while staying compatible with Minecraft clients through generated resource packs.
+
+It gives plugin authors and pack authors the same core path:
+
+- register a block id such as `example:ruby_block`
+- define how the item looks and places
+- generate the resource-pack models and translations
+- persist placed custom blocks in loaded worlds
+- expose blocks through catalog and creative-menu flows
+
+## Pick an integration path
+
+<CardGrid>
+  <Card title="Data-driven packs" icon="document">
+    Use JSON files and textures to add decorative, placeable blocks without writing Java.
+  </Card>
+  <Card title="Java API" icon="code">
+    Implement `CustomBlockSystem` when your blocks need custom runtime behavior or plugin-owned registration.
+  </Card>
+  <Card title="Resource packs" icon="puzzle">
+    Let BlockEngine generate the item models, block models, translations, and hosted pack files.
+  </Card>
+</CardGrid>
+
+## Useful links
+
+- [How BlockEngine Works](/BlockEngine/concepts/how-it-works/)
+- [Create a Data Pack](/BlockEngine/guides/create-a-data-pack/)
+- [Register Blocks from Java](/BlockEngine/guides/register-blocks-from-java/)
+- [Java API Docs](/BlockEngine/api/)

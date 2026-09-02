@@ -1,0 +1,30 @@
+---
+title: Creative Inventory
+description: How BlockEngine exposes custom blocks through the vanilla creative menu.
+---
+
+BlockEngine's creative-menu system is built around Paper bootstrap enchantment registration and resource-pack item model routing.
+
+## Why enchantments?
+
+Modern Paper can expose custom enchantments in the creative inventory. BlockEngine uses one hidden creative enchantment per custom block and lets Minecraft produce an enchanted-book entry.
+
+That entry is not the final block item. It is a discovery-safe placeholder that can exist early enough for the creative menu.
+
+## Startup manifest
+
+BlockEngine writes:
+
+```text
+plugins/blockengine/generated-creative-enchantments.json
+```
+
+The manifest is built from currently discovered blocks. On the next full server restart, the bootstrapper reads it and registers those enchantments early enough for the creative menu.
+
+## Resource-pack appearance
+
+The generated resource pack overrides the enchanted book item model and checks `minecraft:stored_enchantments`. When it finds a BlockEngine creative enchantment, it displays the matching custom block item model.
+
+## Inventory conversion
+
+When a player takes the creative entry and places it in an inventory slot, BlockEngine converts the placeholder into the real block item immediately. The resulting item uses the same metadata as items created through BlockEngine commands, catalog flows, or drops.

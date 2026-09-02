@@ -1,3 +1,5 @@
+import org.gradle.external.javadoc.StandardJavadocDocletOptions
+
 plugins {
     id("java-library")
     id("maven-publish")
@@ -19,6 +21,18 @@ dependencies {
 java {
     toolchain.languageVersion = JavaLanguageVersion.of(21)
     withSourcesJar()
+    withJavadocJar()
+}
+
+tasks.withType<Javadoc>().configureEach {
+    isFailOnError = false
+    options.encoding = "UTF-8"
+    (options as StandardJavadocDocletOptions).apply {
+        charSet = "UTF-8"
+        docEncoding = "UTF-8"
+        addBooleanOption("Xdoclint:none", true)
+        links("https://jd.papermc.io/paper/1.21.11/")
+    }
 }
 
 publishing {

@@ -30,3 +30,8 @@ server/world/
 server/world_nether/
 server/world_the_end/
 server/.console_history
+
+# Docs
+docs/node_modules/
+docs/dist/
+.astro/

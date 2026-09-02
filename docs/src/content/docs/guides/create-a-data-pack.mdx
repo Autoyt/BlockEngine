@@ -1,0 +1,88 @@
+---
+title: Create a Data Pack
+description: Add custom blocks with JSON and resource-pack assets.
+---
+
+Data-driven packs are the fastest way to add simple custom blocks. They are meant for blocks that do not need Java callbacks.
+
+## Folder layout
+
+Place packs in the BlockEngine plugin data folder:
+
+```text
+plugins/blockengine/expansion/packs/
+  example_pack/
+    pack.json
+    blocks/
+      ruby_block.json
+    assets/
+      assets/example/textures/block/ruby_block.png
+    pack.png
+```
+
+Zip files are supported too, as long as the zip contains the same layout.
+
+## Pack metadata
+
+Create `pack.json`:
+
+```json
+{
+  "format": 1,
+  "namespace": "example",
+  "title": "<green>Example Blocks",
+  "description": "Decorative blocks for BlockEngine",
+  "url-ending": "example",
+  "required": true,
+  "catalog": true,
+  "creative-menu": true,
+  "icon": "pack.png",
+  "assets": ["assets"]
+}
+```
+
+`creative-menu` defaults to `true` at the pack level. Set it to `false` when the pack should stay out of the creative inventory by default.
+
+## Add a block
+
+Create `blocks/ruby_block.json`:
+
+```json
+{
+  "vanilla-block": "barrier",
+  "catalog": true,
+  "creative-menu": true,
+  "placement": "directional",
+  "item": {
+    "material": "knowledge_book",
+    "name": "<red>Ruby Block",
+    "lore": ["<dark_gray>Decorative"],
+    "glint": false,
+    "placeable": true
+  },
+  "default-state": "default",
+  "states": {
+    "default": {
+      "hardness": 1.25,
+      "mining-speed": 1.0,
+      "mining-profile": "stone",
+      "preferred-tools": ["pickaxe"],
+      "textures": {
+        "all": "ruby_block"
+      },
+      "sounds": {
+        "place": "minecraft:block.stone.place",
+        "break": "minecraft:block.stone.break",
+        "mining": "minecraft:block.stone.hit",
+        "step": "minecraft:block.stone.step"
+      }
+    }
+  }
+}
+```
+
+If `name` is omitted, the file path under `blocks/` becomes the block name. In this example, the id becomes `example:ruby_block`.
+
+## Restart behavior
+
+New creative-menu entries are discovered during startup and realized on the next full restart. Players with `blockengine.debug` are notified on join when new entries were found and another restart is required.

@@ -85,4 +85,22 @@ tasks {
         dependsOn("copyPluginJar")
         finalizedBy("restartLocalServer")
     }
+
+    register<Exec>("buildStarlightDocs") {
+        group = "documentation"
+        description = "Builds the Starlight documentation site."
+        workingDir(layout.projectDirectory.dir("docs"))
+        commandLine(if (System.getProperty("os.name").lowercase().contains("windows")) "npm.cmd" else "npm", "run", "build")
+    }
+
+    register<Copy>("assembleGithubPagesDocs") {
+        group = "documentation"
+        description = "Assembles the GitHub Pages site with BlockEngine docs and API Javadocs."
+        dependsOn("buildStarlightDocs", ":blockengine-api:javadoc")
+        from(layout.projectDirectory.dir("docs/dist"))
+        from(project(":blockengine-api").layout.buildDirectory.dir("docs/javadoc")) {
+            into("api")
+        }
+        into(layout.buildDirectory.dir("github-pages"))
+    }
 }
