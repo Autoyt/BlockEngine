@@ -552,6 +552,14 @@ public final class ChunkEngine {
             return copy;
         }
 
+        public boolean equalsData(@NotNull BlockData other) {
+            return blockId.equals(other.blockId())
+                    && stateId.equals(other.stateId())
+                    && stringData.equals(other.stringData())
+                    && intData.equals(other.intData())
+                    && booleanData.equals(other.booleanData());
+        }
+
         @Override
         public @NotNull String blockId() {
             return blockId;
@@ -718,7 +726,14 @@ public final class ChunkEngine {
             boolean dropsItem = version < 3 || in.readBoolean();
             boolean dropInCreative = version >= 4 && in.readBoolean();
             SimpleBlockData data = readBlockData(in);
-            byte[] payload = in.readNBytes(in.readInt());
+            int payloadLength = in.readInt();
+            if (payloadLength < 0 || payloadLength > 16 * 1024 * 1024) {
+                throw new IOException("Invalid adapter payload length: " + payloadLength);
+            }
+            byte[] payload = in.readNBytes(payloadLength);
+            if (payload.length != payloadLength) {
+                throw new IOException("Truncated adapter payload");
+            }
             List<StoredDisplay> displays = new ArrayList<>();
             if (version >= 6) {
                 int displayCount = in.readInt();

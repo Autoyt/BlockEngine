@@ -21,7 +21,9 @@ import org.bukkit.inventory.ItemStack;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 public final class VirtualItemDisplay {
@@ -64,6 +66,7 @@ public final class VirtualItemDisplay {
 
     private final int id;
     private final UUID uuid;
+    private final Map<UUID, Integer> metadataHashes = new HashMap<>();
 
     private Location location;
     private ItemStack itemStack = new ItemStack(Material.AIR);
@@ -351,6 +354,11 @@ public final class VirtualItemDisplay {
     }
 
     public void updateMetadata(Player player) {
+        int hash = metadataHash();
+        Integer previousHash = metadataHashes.put(player.getUniqueId(), hash);
+        if (previousHash != null && previousHash == hash) {
+            return;
+        }
         List<EntityData<?>> metadata = new ArrayList<>();
         metadata.add(new EntityData<>(ENTITY_FLAGS_INDEX, EntityDataTypes.BYTE, buildEntityFlags()));
         metadata.add(new EntityData<>(DISPLAY_TRANSFORMATION_INTERPOLATION_DELAY_INDEX, EntityDataTypes.INT, transformationInterpolationDelay));
@@ -431,6 +439,7 @@ public final class VirtualItemDisplay {
     }
 
     public void destroy(Player player) {
+        metadataHashes.remove(player.getUniqueId());
         PacketEvents.getAPI().getPlayerManager().sendPacket(player, new WrapperPlayServerDestroyEntities(id));
     }
 
@@ -453,6 +462,31 @@ public final class VirtualItemDisplay {
             flags |= ENTITY_FLAG_GLOWING;
         }
         return flags;
+    }
+
+    private int metadataHash() {
+        int result = Byte.hashCode(buildEntityFlags());
+        result = 31 * result + transformationInterpolationDelay;
+        result = 31 * result + transformationInterpolationDuration;
+        result = 31 * result + posRotInterpolationDuration;
+        result = 31 * result + Float.hashCode(translationX);
+        result = 31 * result + Float.hashCode(translationY);
+        result = 31 * result + Float.hashCode(translationZ);
+        result = 31 * result + Float.hashCode(scaleX);
+        result = 31 * result + Float.hashCode(scaleY);
+        result = 31 * result + Float.hashCode(scaleZ);
+        result = 31 * result + leftRotation.hashCode();
+        result = 31 * result + rightRotation.hashCode();
+        result = 31 * result + billboard;
+        result = 31 * result + brightness;
+        result = 31 * result + Float.hashCode(viewRange);
+        result = 31 * result + Float.hashCode(shadowRadius);
+        result = 31 * result + Float.hashCode(shadowStrength);
+        result = 31 * result + Float.hashCode(width);
+        result = 31 * result + Float.hashCode(height);
+        result = 31 * result + glowColorOverride;
+        result = 31 * result + itemStack.hashCode();
+        return 31 * result + displayContext;
     }
 
     private static int packBrightness(int blockLight, int skyLight) {

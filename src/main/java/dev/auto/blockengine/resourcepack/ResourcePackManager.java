@@ -161,7 +161,7 @@ public final class ResourcePackManager {
 
         catch (IOException exception) {
             Main.getInstance().getLogger().severe("Failed to generate BlockEngine resource pack.");
-            exception.printStackTrace();
+            Main.getInstance().getLogger().log(java.util.logging.Level.SEVERE, "Resource-pack generation failure", exception);
             pack = new GeneratedPack(
                     packId(url(config)),
                     root,

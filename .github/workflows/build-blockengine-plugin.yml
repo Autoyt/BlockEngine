@@ -5,6 +5,7 @@ on:
     tags:
       - "plugin-v*"
   workflow_dispatch:
+  pull_request:
 
 permissions:
   contents: write
@@ -30,8 +31,8 @@ jobs:
       - name: Make Gradle wrapper executable
         run: chmod +x gradlew
 
-      - name: Build plugin
-        run: ./gradlew shadowJar
+      - name: Test and build plugin
+        run: ./gradlew test shadowJar
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v5

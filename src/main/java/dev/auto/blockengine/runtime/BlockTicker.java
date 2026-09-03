@@ -11,7 +11,6 @@ import org.bukkit.scheduler.BukkitTask;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -77,16 +76,20 @@ public final class BlockTicker {
     }
 
     private void tick() {
-        List<BlockLocationKey> blocks = new ArrayList<>(tickingBlocks);
-        for (BlockLocationKey location : blocks) {
+        long started = System.nanoTime();
+        int processed = 0;
+        int changed = 0;
+        for (var iterator = tickingBlocks.iterator(); iterator.hasNext();) {
+            BlockLocationKey location = iterator.next();
+            processed++;
             RuntimeBlockView view = ChunkEngine.getBlock(location);
             if (view == null) {
-                tickingBlocks.remove(location);
+                iterator.remove();
                 continue;
             }
             BlockDefinition definition = BlockRegistry.getBlock(view.storedBlock().blockId());
             if (definition == null || !definition.adapter().ticking()) {
-                tickingBlocks.remove(location);
+                iterator.remove();
                 continue;
             }
             World world = Bukkit.getWorld(view.location().worldId());
@@ -98,6 +101,7 @@ public final class BlockTicker {
             if (context == null) {
                 continue;
             }
+            ChunkEngine.SimpleBlockData before = ChunkEngine.SimpleBlockData.copyOf(context.data());
             try {
                 definition.adapter().onTick(context);
             } catch (RuntimeException exception) {
@@ -107,9 +111,11 @@ public final class BlockTicker {
             }
 
             RuntimeBlockView current = ChunkEngine.getBlock(view.location());
-            if (current != null && current.storedBlock().blockId().equals(context.blockId())) {
+            if (!before.equalsData(context.data()) && current != null && current.storedBlock().blockId().equals(context.blockId())) {
                 BlockDataManager.getInstance().save(block, context);
+                changed++;
             }
         }
+        PerformanceMetrics.record(PerformanceMetrics.TICKER, System.nanoTime() - started, processed, changed);
     }
 }

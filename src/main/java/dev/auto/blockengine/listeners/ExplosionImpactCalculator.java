@@ -19,6 +19,7 @@ final class ExplosionImpactCalculator {
     }
 
     static @NotNull Set<BlockLocationKey> affectedByExplosion(@NotNull Location origin, @NotNull List<Block> blocks) {
+        long started = System.nanoTime();
         World world = origin.getWorld();
         if (world == null || protectedByWater(world.getBlockAt(origin))) {
             return Set.of();
@@ -27,6 +28,9 @@ final class ExplosionImpactCalculator {
         double radius = radius(origin, blocks);
         Set<BlockLocationKey> affected = affectedByExplosion(origin, radius);
         affected.addAll(storedCustomBlocksInRange(origin, radius));
+        dev.auto.blockengine.runtime.PerformanceMetrics.record(
+                dev.auto.blockengine.runtime.PerformanceMetrics.EXPLOSION,
+                System.nanoTime() - started, affected.size(), 0);
         return affected;
     }
 
@@ -71,11 +75,19 @@ final class ExplosionImpactCalculator {
 
         double radiusSquared = radius * radius;
         for (ChunkEngine.LoadedChunk chunk : ChunkEngine.chunks()) {
+            if (!chunk.key().worldId().equals(world.getUID())) {
+                continue;
+            }
+            int chunkCenterX = (chunk.key().x() << 4) + 8;
+            int chunkCenterZ = (chunk.key().z() << 4) + 8;
+            double chunkDx = chunkCenterX - origin.getX();
+            double chunkDz = chunkCenterZ - origin.getZ();
+            double chunkReach = radius + 12.0;
+            if (chunkDx * chunkDx + chunkDz * chunkDz > chunkReach * chunkReach) {
+                continue;
+            }
             for (RuntimeBlockView block : chunk.blocks()) {
                 BlockLocationKey location = block.location();
-                if (!location.worldId().equals(world.getUID())) {
-                    continue;
-                }
                 double dx = location.x() + 0.5 - origin.getX();
                 double dy = location.y() + 0.5 - origin.getY();
                 double dz = location.z() + 0.5 - origin.getZ();

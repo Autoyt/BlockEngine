@@ -7,6 +7,7 @@ import dev.auto.blockengine.entity.PacketEntityManager;
 import dev.auto.blockengine.entity.VirtualItemDisplay;
 import dev.auto.blockengine.items.ItemManager;
 import dev.auto.blockengine.runtime.ChunkEngine;
+import dev.auto.blockengine.runtime.PerformanceMetrics;
 import dev.auto.blockengine.runtime.RuntimeBlockView;
 import dev.auto.blockengine.types.BlockLocationKey;
 import org.bukkit.Bukkit;
@@ -224,6 +225,7 @@ public final class VisibilityManager {
     }
 
     private void recalculate(@NotNull Player player, @NotNull PlayerVisibility state, boolean force) {
+        long started = System.nanoTime();
         VisibilityConfig visibilityConfig = config();
         int radius = visibilityConfig.effectiveChunkRadius();
         Chunk chunk = player.getLocation().getChunk();
@@ -235,6 +237,7 @@ public final class VisibilityManager {
 
         Map<UUID, DesiredDisplay> desired = collectDesired(player, center, radius, visibilityConfig);
         reconcile(player, state, desired);
+        PerformanceMetrics.record(PerformanceMetrics.VISIBILITY, System.nanoTime() - started, 1, desired.size());
         state.centerChunk(center);
         state.radius(radius);
     }

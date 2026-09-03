@@ -31,6 +31,7 @@ import lombok.Getter;
 import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
 import org.bukkit.Material;
+import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -40,6 +41,7 @@ public final class Main extends JavaPlugin {
     @Getter
     private static final ObjectMapper jsonMapper = new ObjectMapper()
             .enable(SerializationFeature.INDENT_OUTPUT);
+
     @Getter
     private static final Material backingBlock = Material.BARRIER;
 
@@ -60,16 +62,19 @@ public final class Main extends JavaPlugin {
         PacketEvents.getAPI().init();
         BlockEngine.setManagedDisplayService(ManagedDisplayManager.getInstance());
         BlockEngine.setManagedWorldFactory(ManagedWorld::new);
+
         configSave(false);
         VisibilityManager.getInstance().register(this);
         BlockIntegrityManager.getInstance().register(this);
         BlockTicker.getInstance().register(this);
-        registerCommand("catalog", new CatalogCommand());
+
         DebugCommands debugCommands = new DebugCommands(this);
         BlockEngineCommand blockEngineCommand = new BlockEngineCommand(this, debugCommands);
+
         registerCommand("blockengine", blockEngineCommand);
         registerCommand("be", blockEngineCommand);
         registerCommand("perf", new PerfCommand(debugCommands));
+        registerCommand("catalog", new CatalogCommand());
 
         new CatalogListeners();
         new CreativeInventoryListeners();
@@ -77,7 +82,7 @@ public final class Main extends JavaPlugin {
         new SudoBlockListeners();
         new GameListener();
 
-        for (org.bukkit.World world : Bukkit.getWorlds()) {
+        for (World world : Bukkit.getWorlds()) {
             for (Chunk chunk : world.getLoadedChunks()) {
                 ChunkEngine.load(chunk, VisibilityManager.getInstance().config());
                 BlockIntegrityManager.getInstance().enqueue(chunk);
@@ -102,9 +107,11 @@ public final class Main extends JavaPlugin {
     public void onDisable() {
         SudoBlockManager.getInstance().flushPendingNow();
         ChunkEngine.flushNow();
+
         for (Player player : Bukkit.getOnlinePlayers()) {
             VisibilityManager.getInstance().cleanup(player);
         }
+
         CatalogListeners.cleanup();
         ResourcePackManager.getInstance().stop();
         BlockIntegrityManager.getInstance().stop();
@@ -123,6 +130,7 @@ public final class Main extends JavaPlugin {
 
         saveResource("config.yml", overwriteFromJar);
         reloadConfig();
+
         getConfig().options().copyDefaults(true);
         saveConfig();
     }

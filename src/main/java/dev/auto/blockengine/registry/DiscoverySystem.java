@@ -85,7 +85,7 @@ public final class DiscoverySystem {
                     BlockRegistry.registerBlock(adapter, entry.namespace());
                 } catch (Exception e) {
                     Main.getInstance().getLogger().severe("Failed to register block adapter " + adapter.getClass().getName() + " from plugin " + entry.plugin().getName());
-                    e.printStackTrace();
+                    Main.getInstance().getLogger().log(java.util.logging.Level.SEVERE, "Adapter registration failure", e);
                 }
             }
         }
@@ -107,7 +107,7 @@ public final class DiscoverySystem {
         } catch (RuntimeException exception) {
             Main.getInstance().getLogger().severe("Plugin " + plugin.getName()
                     + " failed while declaring BlockEngine namespace dependencies.");
-            exception.printStackTrace();
+            Main.getInstance().getLogger().log(java.util.logging.Level.SEVERE, "BlockEngine discovery failure", exception);
             return null;
         }
         if (dependencies == null || dependencies.isEmpty()) {

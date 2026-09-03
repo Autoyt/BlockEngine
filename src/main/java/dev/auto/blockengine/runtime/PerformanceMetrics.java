@@ -18,6 +18,10 @@ public final class PerformanceMetrics {
     public static final String BLOCK_WRITE = "block-write";
     public static final String ADAPTER_LOAD = "adapter-load";
     public static final String ADAPTER_SAVE = "adapter-save";
+    public static final String TICKER = "ticker";
+    public static final String INTEGRITY = "integrity";
+    public static final String EXPLOSION = "explosion";
+    public static final String VISIBILITY = "visibility";
 
     private static final Map<String, Series> SERIES = new HashMap<>();
     private static boolean enabled = true;
@@ -95,7 +99,8 @@ public final class PerformanceMetrics {
                 windowBytes += sample.bytes();
             }
             long avgNanos = windowNanos / window.size();
-            long p95Nanos = nanos.get(Math.min(nanos.size() - 1, (int) Math.floor(nanos.size() * 0.95)));
+            int p95Index = Math.max(0, (int) Math.ceil(nanos.size() * 0.95) - 1);
+            long p95Nanos = nanos.get(Math.min(nanos.size() - 1, p95Index));
             long maxNanos = nanos.get(nanos.size() - 1);
             long avgUnits = windowUnits / window.size();
             long avgBytes = windowBytes / window.size();

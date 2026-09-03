@@ -49,14 +49,11 @@ public final class ItemManager {
         if (item.glint()) {
             meta.setEnchantmentGlintOverride(true);
         }
+
         meta.setMaxStackSize(64);
 
         stack.setItemMeta(meta);
         return stack;
-    }
-
-    public static @NotNull ItemStack createSudo(@NotNull BlockDefinition block) {
-        return createSudo(block, block.apiDefinition().defaultState());
     }
 
     public static @NotNull ItemStack createSudo(@NotNull BlockDefinition block, @Nullable String stateId) {
@@ -68,23 +65,16 @@ public final class ItemManager {
         meta.getPersistentDataContainer().set(SUDO_BLOCK_ID_KEY, PersistentDataType.STRING, block.id());
         meta.getPersistentDataContainer().set(SUDO_STATE_ID_KEY, PersistentDataType.STRING, resolvedState);
         itemModel(meta, modelKey(block, resolvedState));
+
         meta.displayName(Component.text("Placeholder: ", NamedTextColor.RED, TextDecoration.BOLD)
                 .append(BlockDisplayNames.itemName(block.apiDefinition().item().name(), block)
                         .decoration(TextDecoration.BOLD, false)));
+
         meta.lore(java.util.List.of(
                 Component.text("[!] PLACEHOLDER BLOCK", NamedTextColor.RED, TextDecoration.BOLD),
-                Component.text()
-                        .append(Component.text("! ", NamedTextColor.RED, TextDecoration.BOLD))
-                        .append(Component.text("Structure-building placeholder only.", NamedTextColor.GRAY))
-                        .build(),
-                Component.text()
-                        .append(Component.text("! ", NamedTextColor.RED, TextDecoration.BOLD))
-                        .append(Component.text("Not a full BlockEngine block.", NamedTextColor.GRAY))
-                        .build(),
-                Component.text()
-                        .append(Component.text("! ", NamedTextColor.RED, TextDecoration.BOLD))
-                        .append(Component.text("Saved structures convert it during generation.", NamedTextColor.GRAY))
-                        .build(),
+                BlockDisplayNames.rich("<red><bold>! </bold><gray>Structure-building placeholder only."),
+                BlockDisplayNames.rich("<red><bold>! </bold><gray>Not a full BlockEngine block."),
+                BlockDisplayNames.rich("<red><bold>! </bold><gray>Saved structures convert it during generation."),
                 Component.text("Block: " + block.id(), NamedTextColor.DARK_GRAY),
                 Component.text("State: " + resolvedState, NamedTextColor.DARK_GRAY)
         ));
@@ -102,18 +92,9 @@ public final class ItemManager {
         meta.displayName(Component.text("Block Engine Wand", NamedTextColor.LIGHT_PURPLE, TextDecoration.BOLD));
         meta.lore(java.util.List.of(
                 Component.text("Structure authoring tool", NamedTextColor.DARK_PURPLE),
-                Component.text()
-                        .append(Component.text("Click ", NamedTextColor.LIGHT_PURPLE))
-                        .append(Component.text("full blocks to make placeholders.", NamedTextColor.GRAY))
-                        .build(),
-                Component.text()
-                        .append(Component.text("Click ", NamedTextColor.LIGHT_PURPLE))
-                        .append(Component.text("placeholders to restore full blocks.", NamedTextColor.GRAY))
-                        .build(),
-                Component.text()
-                        .append(Component.text("Sneak-click ", NamedTextColor.LIGHT_PURPLE))
-                        .append(Component.text("placeholders to toggle previews.", NamedTextColor.GRAY))
-                        .build()
+                BlockDisplayNames.rich("<light_purple>Click <gray>full blocks to make placeholders."),
+                BlockDisplayNames.rich("<light_purple>Click <gray>placeholders to restore full blocks."),
+                BlockDisplayNames.rich("<light_purple>Sneak-click <gray>placeholders to toggle previews.")
         ));
         meta.setEnchantmentGlintOverride(true);
         meta.setMaxStackSize(1);

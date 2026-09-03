@@ -406,6 +406,10 @@ public final class DebugCommands implements BasicCommand, Listener {
         BlockEngineChat.send(sender, DebugStyle.header("adapter payload"));
         runtimeTiming(sender, "adapter load", PerformanceMetrics.snapshot(PerformanceMetrics.ADAPTER_LOAD), "calls", "blocks");
         runtimeTiming(sender, "adapter save", PerformanceMetrics.snapshot(PerformanceMetrics.ADAPTER_SAVE), "calls", "blocks");
+        runtimeTiming(sender, "block ticker", PerformanceMetrics.snapshot(PerformanceMetrics.TICKER), "blocks", "changed blocks");
+        runtimeTiming(sender, "integrity", PerformanceMetrics.snapshot(PerformanceMetrics.INTEGRITY), "chunks", "blocks");
+        runtimeTiming(sender, "explosion", PerformanceMetrics.snapshot(PerformanceMetrics.EXPLOSION), "blocks", "blocks");
+        runtimeTiming(sender, "visibility", PerformanceMetrics.snapshot(PerformanceMetrics.VISIBILITY), "refreshes", "displays");
 
         BlockEngineChat.send(sender, DebugStyle.header("event phases"));
         perfActivity(sender, "placement", placement);

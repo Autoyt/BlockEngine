@@ -410,6 +410,12 @@ public class GameListener implements Listener {
     }
 
     private void explode(Location origin, List<Block> vanillaBlocks) {
+        // Sudo markers are vanilla chests, so they are destroyed through the
+        // vanilla explosion list rather than BlockRemover. Clean up their
+        // persistent preview displays before the blocks disappear.
+        for (Block block : vanillaBlocks) {
+            SudoBlockManager.getInstance().removePreviewIfMarker(block);
+        }
         vanillaBlocks.removeIf(block -> block(block) != null);
 
         World world = origin.getWorld();

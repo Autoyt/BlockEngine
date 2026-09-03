@@ -6,6 +6,7 @@ import dev.auto.blockengine.api.event.BlockEngineModificationEvent;
 import dev.auto.blockengine.entity.ManagedDisplayManager;
 import dev.auto.blockengine.event.BlockEngineEvents;
 import dev.auto.blockengine.runtime.ChunkEngine;
+import dev.auto.blockengine.runtime.PerformanceMetrics;
 import dev.auto.blockengine.runtime.RuntimeBlockView;
 import dev.auto.blockengine.types.BlockLocationKey;
 import dev.auto.blockengine.visibility.VisibilityManager;
@@ -27,6 +28,8 @@ public final class BlockIntegrityManager {
     private static final BlockIntegrityManager instance = new BlockIntegrityManager();
     private final @NotNull Queue<ChunkEngine.Key> queuedChunks = new ArrayDeque<>();
     private final @NotNull Set<ChunkEngine.Key> queuedKeys = new HashSet<>();
+    private final @NotNull Queue<BlockLocationKey> queuedBlocks = new ArrayDeque<>();
+    private final @NotNull Set<BlockLocationKey> queuedBlockKeys = new HashSet<>();
     private @Nullable IntegrityConfig config;
     private @Nullable BukkitTask task;
 
@@ -61,6 +64,8 @@ public final class BlockIntegrityManager {
         }
         queuedChunks.clear();
         queuedKeys.clear();
+        queuedBlocks.clear();
+        queuedBlockKeys.clear();
     }
 
     public void enqueue(@NotNull Chunk chunk) {
@@ -89,8 +94,10 @@ public final class BlockIntegrityManager {
         if (!config().postTickVerification()) {
             return;
         }
-        Bukkit.getScheduler().runTask(Main.getInstance(), () ->
-                reconcileBlock(block, BlockEngineModificationEvent.Action.RECONCILE_STALE_BLOCK));
+        BlockLocationKey key = location(block);
+        if (queuedBlockKeys.add(key)) {
+            queuedBlocks.add(key);
+        }
     }
 
     public int reconcileChunk(@NotNull Chunk chunk) {
@@ -164,11 +171,26 @@ public final class BlockIntegrityManager {
     }
 
     private void processQueue() {
+        long started = System.nanoTime();
+        int processed = 0;
+        while (processed < 128) {
+            BlockLocationKey key = queuedBlocks.poll();
+            if (key == null) {
+                break;
+            }
+            queuedBlockKeys.remove(key);
+            World world = Bukkit.getWorld(key.worldId());
+            if (world != null && world.isChunkLoaded(key.x() >> 4, key.z() >> 4)) {
+                reconcileBlock(world.getBlockAt(key.x(), key.y(), key.z()), BlockEngineModificationEvent.Action.RECONCILE_STALE_BLOCK);
+            }
+            processed++;
+        }
         IntegrityConfig loadedConfig = config();
+        int chunks = 0;
         for (int i = 0; i < loadedConfig.chunksPerTick(); i++) {
             ChunkEngine.Key key = queuedChunks.poll();
             if (key == null) {
-                return;
+                break;
             }
             queuedKeys.remove(key);
             World world = Bukkit.getWorld(key.worldId());
@@ -176,7 +198,9 @@ public final class BlockIntegrityManager {
                 continue;
             }
             reconcileChunk(world.getChunkAt(key.x(), key.z()));
+            chunks++;
         }
+        PerformanceMetrics.record(PerformanceMetrics.INTEGRITY, System.nanoTime() - started, chunks, processed);
     }
 
     private static @NotNull BlockLocationKey location(@NotNull Block block) {

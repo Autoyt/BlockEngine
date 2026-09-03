@@ -39,7 +39,7 @@ public final class ResourcePackHost {
             Main.getInstance().getLogger().info("Serving " + packs.size() + " BlockEngine resource pack(s).");
         } catch (IOException exception) {
             Main.getInstance().getLogger().severe("Failed to start BlockEngine resource pack host.");
-            exception.printStackTrace();
+            Main.getInstance().getLogger().log(java.util.logging.Level.SEVERE, "Resource-pack host startup failure", exception);
         }
     }
 
