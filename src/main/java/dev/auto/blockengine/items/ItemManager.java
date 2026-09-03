@@ -188,14 +188,14 @@ public final class ItemManager {
         return new NamespacedKey(Main.getInstance(), "block_engine_wand");
     }
 
-    public static @NotNull NamespacedKey wandFeedbackModelKey(boolean success) {
-        return new NamespacedKey(Main.getInstance(), success ? "wand_feedback_yes" : "wand_feedback_no");
+    public static @NotNull NamespacedKey wandFeedbackModelKey(boolean sudoConversion) {
+        return new NamespacedKey(Main.getInstance(), sudoConversion ? "wand_feedback_yes" : "wand_feedback_no");
     }
 
-    public static @NotNull ItemStack wandFeedback(boolean success) {
+    public static @NotNull ItemStack wandFeedback(boolean sudoConversion) {
         ItemStack stack = new ItemStack(Material.PAPER);
         ItemMeta meta = stack.getItemMeta();
-        itemModel(meta, wandFeedbackModelKey(success));
+        itemModel(meta, wandFeedbackModelKey(sudoConversion));
         stack.setItemMeta(meta);
         return stack;
     }

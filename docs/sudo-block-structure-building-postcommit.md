@@ -8,7 +8,7 @@
 - Added persistent BlockEngine-style preview displays for placed sudo markers.
 - Added the Block Engine Wand item, resource-pack model generation, and debug give command.
 - Added wand actions for toggling real custom blocks into sudo markers and sudo markers back into real custom blocks.
-- Added one-second wand feedback overlays, chimes, and purple particles for successful and failed wand transitions.
+- Added one-second wand feedback overlays, chimes, and purple particles for wand transition direction: check for sudo conversion, X for conversion back to a solid custom block.
 - Changed creative pick-block for real custom blocks and sudo markers to give/select the corresponding sudo item behind creative-mode and permission checks.
 - Added a shared sudo marker transformer that records sudo marker chests, replaces them with barriers, and schedules server-thread custom block placement from `AsyncStructureGenerateEvent` or plugin-driven `Structure#place(...)` calls.
 - Added a bounded vanilla structure-block fallback scan for creative structure builders after structure-block interaction or redstone activation.

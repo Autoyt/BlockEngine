@@ -181,12 +181,12 @@ public final class SudoBlockManager {
         return convertMarkerNow(block);
     }
 
-    public void playWandFeedback(@NotNull Player player, @NotNull Block block, boolean success) {
-        Location center = block.getLocation().add(0.5, 1.15, 0.5);
+    public void playWandFeedback(@NotNull Player player, @NotNull Block block, boolean sudoConversion) {
+        Location center = block.getLocation().add(0.5, 0.5, 0.5);
         DisplaySpec spec = DisplaySpec.builder(center)
-                .itemStack(ItemManager.wandFeedback(success))
-                .scale(0.65f, 0.65f, 0.65f)
-                .billboard(DisplaySpec.BILLBOARD_CENTER)
+                .itemStack(ItemManager.wandFeedback(sudoConversion))
+                .scale(2.03f, 2.03f, 2.03f)
+                .displayContext(DisplaySpec.DISPLAY_CONTEXT_FIXED)
                 .brightness(15)
                 .viewRange(12.0f)
                 .shadowRadius(0.0f)
@@ -208,10 +208,10 @@ public final class SudoBlockManager {
         );
         player.playSound(
                 center,
-                success ? Sound.BLOCK_AMETHYST_BLOCK_CHIME : Sound.BLOCK_NOTE_BLOCK_CHIME,
+                sudoConversion ? Sound.BLOCK_AMETHYST_BLOCK_CHIME : Sound.BLOCK_NOTE_BLOCK_CHIME,
                 SoundCategory.BLOCKS,
                 0.8f,
-                success ? 1.55f : 0.65f
+                sudoConversion ? 1.55f : 0.65f
         );
     }
 

@@ -193,13 +193,15 @@ public final class ItemModelGenerator {
         Path modelPath = root.resolve("assets")
                 .resolve(namespace)
                 .resolve("models")
-                .resolve("item")
+                .resolve("block")
                 .resolve(key + ".json");
         Files.createDirectories(modelPath.getParent());
 
         ObjectNode model = Main.getJsonMapper().createObjectNode();
-        model.put("parent", "minecraft:item/generated");
-        model.putObject("textures").put("layer0", namespace + ":item/" + key);
+        model.put("parent", "minecraft:block/cube_all");
+        ObjectNode textures = model.putObject("textures");
+        textures.put("all", namespace + ":item/" + key);
+        textures.put("particle", namespace + ":item/" + key);
         Main.getJsonMapper().writeValue(modelPath.toFile(), model);
 
         Path itemPath = root.resolve("assets")
@@ -211,7 +213,7 @@ public final class ItemModelGenerator {
         ObjectNode item = Main.getJsonMapper().createObjectNode();
         ObjectNode itemModel = item.putObject("model");
         itemModel.put("type", "minecraft:model");
-        itemModel.put("model", namespace + ":item/" + key);
+        itemModel.put("model", namespace + ":block/" + key);
         Main.getJsonMapper().writeValue(itemPath.toFile(), item);
     }
 

@@ -92,7 +92,7 @@ public final class SudoBlockListeners implements Listener {
         if (manager.isSudoMarker(clicked)) {
             if (manager.convertMarkerToCustomBlock(clicked)) {
                 BlockEngineChat.success(player, "Converted sudo marker to a real custom block.");
-                manager.playWandFeedback(player, clicked, true);
+                manager.playWandFeedback(player, clicked, false);
             } else {
                 BlockEngineChat.error(player, "That sudo marker no longer points at a registered custom block.");
                 manager.playWandFeedback(player, clicked, false);
