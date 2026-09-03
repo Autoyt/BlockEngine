@@ -125,6 +125,7 @@ public final class ResourcePackManager {
             copyIcon(root, null);
             ItemModelGenerator.generateBackingBlock(root);
             ItemModelGenerator.generateWand(root);
+            ItemModelGenerator.generateWandFeedback(root);
             demoTextures(root);
 
             for (dev.auto.blockengine.types.BlockDefinition registered : BlockRegistry.getBlocks()) {

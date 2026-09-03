@@ -13,14 +13,19 @@ import dev.auto.blockengine.runtime.RuntimeBlockView;
 import dev.auto.blockengine.types.BlockDefinition;
 import dev.auto.blockengine.types.BlockLocationKey;
 import org.bukkit.Bukkit;
+import org.bukkit.Color;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
+import org.bukkit.Particle;
+import org.bukkit.Sound;
+import org.bukkit.SoundCategory;
 import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockState;
 import org.bukkit.block.Structure;
 import org.bukkit.block.TileState;
+import org.bukkit.entity.Player;
 import org.bukkit.block.structure.UsageMode;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.persistence.PersistentDataContainer;
@@ -170,6 +175,44 @@ public final class SudoBlockManager {
         );
         placeMarker(block, definition.id(), customBlock.storedBlock().stateId());
         return true;
+    }
+
+    public boolean convertMarkerToCustomBlock(@NotNull Block block) {
+        return convertMarkerNow(block);
+    }
+
+    public void playWandFeedback(@NotNull Player player, @NotNull Block block, boolean success) {
+        Location center = block.getLocation().add(0.5, 1.15, 0.5);
+        DisplaySpec spec = DisplaySpec.builder(center)
+                .itemStack(ItemManager.wandFeedback(success))
+                .scale(0.65f, 0.65f, 0.65f)
+                .billboard(DisplaySpec.BILLBOARD_CENTER)
+                .brightness(15)
+                .viewRange(12.0f)
+                .shadowRadius(0.0f)
+                .shadowStrength(0.0f)
+                .build();
+        var handle = ManagedDisplayManager.getInstance().create(spec, DisplayPersistence.TRANSIENT);
+        Bukkit.getScheduler().runTaskLater(Main.getInstance(), handle::remove, 20L);
+
+        World world = block.getWorld();
+        world.spawnParticle(
+                Particle.DUST,
+                center,
+                24,
+                0.35,
+                0.22,
+                0.35,
+                0.0,
+                new Particle.DustOptions(Color.fromRGB(176, 72, 255), 1.25f)
+        );
+        player.playSound(
+                center,
+                success ? Sound.BLOCK_AMETHYST_BLOCK_CHIME : Sound.BLOCK_NOTE_BLOCK_CHIME,
+                SoundCategory.BLOCKS,
+                0.8f,
+                success ? 1.55f : 0.65f
+        );
     }
 
     public void recordStructureMarker(@NotNull World world, int x, int y, int z, @NotNull String blockId, @Nullable String stateId) {

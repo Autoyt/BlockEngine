@@ -77,22 +77,41 @@ public final class SudoBlockListeners implements Listener {
             return;
         }
 
-        if (manager.isSudoMarker(clicked)) {
+        Player player = event.getPlayer();
+        if (manager.isSudoMarker(clicked) && player.isSneaking()) {
             SudoBlockManager.PreviewToggle result = manager.togglePreview(clicked);
             if (result == SudoBlockManager.PreviewToggle.VISIBLE) {
-                BlockEngineChat.success(event.getPlayer(), "Sudo block preview shown.");
+                BlockEngineChat.success(player, "Sudo block preview shown.");
             } else if (result == SudoBlockManager.PreviewToggle.HIDDEN) {
-                BlockEngineChat.success(event.getPlayer(), "Sudo block preview hidden.");
+                BlockEngineChat.success(player, "Sudo block preview hidden.");
+            }
+            manager.playWandFeedback(player, clicked, result != SudoBlockManager.PreviewToggle.NOT_A_MARKER);
+            return;
+        }
+
+        if (manager.isSudoMarker(clicked)) {
+            if (manager.convertMarkerToCustomBlock(clicked)) {
+                BlockEngineChat.success(player, "Converted sudo marker to a real custom block.");
+                manager.playWandFeedback(player, clicked, true);
+            } else {
+                BlockEngineChat.error(player, "That sudo marker no longer points at a registered custom block.");
+                manager.playWandFeedback(player, clicked, false);
             }
             return;
         }
 
         RuntimeBlockView customBlock = customBlock(clicked);
         if (customBlock == null) {
+            BlockEngineChat.error(player, "That is not a BlockEngine custom block or sudo marker.");
+            manager.playWandFeedback(player, clicked, false);
             return;
         }
         if (manager.convertCustomBlockToMarker(clicked, customBlock)) {
-            BlockEngineChat.success(event.getPlayer(), "Converted custom block to a sudo structure marker.");
+            BlockEngineChat.success(player, "Converted custom block to a sudo structure marker.");
+            manager.playWandFeedback(player, clicked, true);
+        } else {
+            BlockEngineChat.error(player, "Could not convert that custom block to a sudo marker.");
+            manager.playWandFeedback(player, clicked, false);
         }
     }
 

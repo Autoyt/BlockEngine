@@ -102,8 +102,8 @@ public final class ItemManager {
         meta.displayName(Component.text("Block Engine Wand", NamedTextColor.GOLD, TextDecoration.BOLD));
         meta.lore(java.util.List.of(
                 Component.text("Structure building tool", NamedTextColor.YELLOW),
-                Component.text("Click sudo blocks to toggle previews.", NamedTextColor.GRAY),
-                Component.text("Click custom blocks to convert them to sudo blocks.", NamedTextColor.GRAY)
+                Component.text("Click custom blocks to toggle sudo mode.", NamedTextColor.GRAY),
+                Component.text("Sneak-click sudo blocks to toggle previews.", NamedTextColor.GRAY)
         ));
         meta.setEnchantmentGlintOverride(true);
         meta.setMaxStackSize(1);
@@ -186,6 +186,18 @@ public final class ItemManager {
 
     public static @NotNull NamespacedKey wandModelKey() {
         return new NamespacedKey(Main.getInstance(), "block_engine_wand");
+    }
+
+    public static @NotNull NamespacedKey wandFeedbackModelKey(boolean success) {
+        return new NamespacedKey(Main.getInstance(), success ? "wand_feedback_yes" : "wand_feedback_no");
+    }
+
+    public static @NotNull ItemStack wandFeedback(boolean success) {
+        ItemStack stack = new ItemStack(Material.PAPER);
+        ItemMeta meta = stack.getItemMeta();
+        itemModel(meta, wandFeedbackModelKey(success));
+        stack.setItemMeta(meta);
+        return stack;
     }
 
     static void itemModel(@NotNull ItemMeta meta, @NotNull NamespacedKey key) {

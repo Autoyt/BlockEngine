@@ -10,8 +10,10 @@ import org.bukkit.Material;
 import org.jetbrains.annotations.NotNull;
 
 import javax.imageio.ImageIO;
+import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collection;
@@ -158,6 +160,74 @@ public final class ItemModelGenerator {
         itemModel.put("type", "minecraft:model");
         itemModel.put("model", namespace + ":item/block_engine_wand");
         Main.getJsonMapper().writeValue(itemPath.toFile(), item);
+    }
+
+    public static void generateWandFeedback(@NotNull Path root) throws IOException {
+        generateWandFeedback(root, "yes");
+        generateWandFeedback(root, "no");
+    }
+
+    private static void generateWandFeedback(@NotNull Path root, @NotNull String name) throws IOException {
+        String namespace = Main.getInstance().getName().toLowerCase(Locale.ROOT);
+        String key = "wand_feedback_" + name;
+        Path texture = root.resolve("assets")
+                .resolve(namespace)
+                .resolve("textures")
+                .resolve("item")
+                .resolve(key + ".png");
+        Files.createDirectories(texture.getParent());
+        try (InputStream input = Main.getInstance().getResource("resource/" + name + ".png")) {
+            BufferedImage icon = input == null ? fallbackFeedback(name.equals("yes")) : ImageIO.read(input);
+            if (icon == null) {
+                icon = fallbackFeedback(name.equals("yes"));
+            }
+            BufferedImage centered = new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB);
+            int x = Math.max(0, (centered.getWidth() - icon.getWidth()) / 2);
+            int y = Math.max(0, (centered.getHeight() - icon.getHeight()) / 2);
+            Graphics2D graphics = centered.createGraphics();
+            graphics.drawImage(icon, x, y, null);
+            graphics.dispose();
+            ImageIO.write(centered, "png", texture.toFile());
+        }
+
+        Path modelPath = root.resolve("assets")
+                .resolve(namespace)
+                .resolve("models")
+                .resolve("item")
+                .resolve(key + ".json");
+        Files.createDirectories(modelPath.getParent());
+
+        ObjectNode model = Main.getJsonMapper().createObjectNode();
+        model.put("parent", "minecraft:item/generated");
+        model.putObject("textures").put("layer0", namespace + ":item/" + key);
+        Main.getJsonMapper().writeValue(modelPath.toFile(), model);
+
+        Path itemPath = root.resolve("assets")
+                .resolve(namespace)
+                .resolve("items")
+                .resolve(key + ".json");
+        Files.createDirectories(itemPath.getParent());
+
+        ObjectNode item = Main.getJsonMapper().createObjectNode();
+        ObjectNode itemModel = item.putObject("model");
+        itemModel.put("type", "minecraft:model");
+        itemModel.put("model", namespace + ":item/" + key);
+        Main.getJsonMapper().writeValue(itemPath.toFile(), item);
+    }
+
+    private static @NotNull BufferedImage fallbackFeedback(boolean success) {
+        BufferedImage image = new BufferedImage(10, 10, BufferedImage.TYPE_INT_ARGB);
+        int color = success ? 0xFF35D66B : 0xFFFF3355;
+        for (int index = 0; index < image.getWidth(); index++) {
+            if (success) {
+                image.setRGB(index, Math.min(image.getHeight() - 1, 6 + index / 3), color);
+                image.setRGB(Math.min(image.getWidth() - 1, index + 3), Math.max(0, 8 - index), color);
+            } else {
+                image.setRGB(index, index, color);
+                image.setRGB(index, image.getHeight() - index - 1, color);
+            }
+        }
+        return image;
     }
 
     public static void breakOverlays(@NotNull Path root) throws IOException {
