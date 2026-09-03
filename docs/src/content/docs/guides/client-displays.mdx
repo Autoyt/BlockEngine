@@ -1,0 +1,126 @@
+---
+title: Client Displays
+description: Create BlockEngine-managed client-side item displays for props, overlays, markers, and block-attached visuals.
+---
+
+import { CardGrid, LinkCard, Aside } from '@astrojs/starlight/components';
+
+Client displays are BlockEngine-managed packet entities that render item-display visuals to Minecraft clients without spawning Bukkit entities in the world.
+
+Use them when a block needs extra presentation beyond its normal generated model: attached props, animated overlays, per-player markers, previews, or a display item that uses one of your generated resource-pack models.
+
+<Aside type="tip" title="Prefer normal block rendering first">
+  Most custom blocks should use block definitions, states, and textures. Client displays are a lower-level visual primitive for plugins that need extra control.
+</Aside>
+
+## Entry point
+
+Get the display service after BlockEngine has enabled:
+
+```java
+ManagedDisplayService displays = BlockEngine.managedDisplays();
+```
+
+The service owns packet entity ids, viewer refreshes, persistence, cleanup, and chunk or block lifecycle integration. Mutating calls should be made on the Bukkit server thread.
+
+## Create a display
+
+A display starts from a `DisplaySpec`. The spec includes the display location, rendered item, optional item model override, transform metadata, lighting, billboard mode, interpolation, and audience.
+
+```java
+import dev.auto.blockengine.api.BlockEngine;
+import dev.auto.blockengine.api.display.DisplayAppearance;
+import dev.auto.blockengine.api.display.DisplayAudience;
+import dev.auto.blockengine.api.display.DisplayPersistence;
+import dev.auto.blockengine.api.display.DisplaySpec;
+import dev.auto.blockengine.api.display.ManagedDisplayHandle;
+import org.bukkit.Location;
+import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
+import org.bukkit.inventory.ItemStack;
+
+Location location = block.getLocation().add(0.5, 1.15, 0.5);
+NamespacedKey model = new NamespacedKey(plugin, "ruby_marker");
+
+DisplaySpec spec = DisplaySpec.builder(location)
+    .appearance(DisplayAppearance.model(Material.PAPER, model))
+    .scale(0.75f, 0.75f, 0.75f)
+    .translation(0.0f, 0.25f, 0.0f)
+    .viewRange(16.0f)
+    .brightness(0x00F000F0)
+    .build();
+
+ManagedDisplayHandle handle = BlockEngine.managedDisplays()
+    .create(spec, DisplayPersistence.PERSISTENT_WORLD);
+```
+
+Use a vanilla carrier item such as `PAPER` with an item model key when the visual comes from your resource pack. Use a plain `ItemStack` when vanilla item rendering is enough.
+
+## Persistence modes
+
+Choose the lifetime that matches the visual:
+
+<CardGrid>
+  <LinkCard title="TRANSIENT" href="/BlockEngine/api/dev/auto/blockengine/api/display/DisplayPersistence.html#TRANSIENT" description="Memory-only. Good for previews, temporary markers, particles-as-items, or displays you recreate manually." />
+  <LinkCard title="PERSISTENT_WORLD" href="/BlockEngine/api/dev/auto/blockengine/api/display/DisplayPersistence.html#PERSISTENT_WORLD" description="Stored in the chunk containing the display anchor and restored when that chunk loads." />
+  <LinkCard title="PERSISTENT_BLOCK_ATTACHED" href="/BlockEngine/api/dev/auto/blockengine/api/display/DisplayPersistence.html#PERSISTENT_BLOCK_ATTACHED" description="Stored on a custom block record and removed automatically when the owning custom block is removed." />
+</CardGrid>
+
+## Block-attached displays
+
+For visuals that belong to one custom block, create a block-attached display. The `key` is a stable plugin-defined slot name on that block. Creating another attached display with the same key replaces that slot.
+
+```java
+DisplaySpec spec = DisplaySpec.builder(block.getLocation().add(0.5, 1.0, 0.5))
+    .itemStack(customIndicatorItem)
+    .scale(0.5f, 0.5f, 0.5f)
+    .build();
+
+ManagedDisplayHandle handle = BlockEngine.managedDisplays()
+    .createBlockAttached(block, "status-indicator", spec);
+```
+
+Block-attached displays may be visually offset from the block, but they are stored with the owning custom block. When the block is moved or removed through BlockEngine-managed operations, the display follows that lifecycle.
+
+## Per-player displays
+
+Use `DisplayAudience` when only some players should see a display.
+
+```java
+DisplaySpec spec = DisplaySpec.builder(player.getLocation().add(0.0, 1.5, 0.0))
+    .itemStack(markerItem)
+    .audience(DisplayAudience.only(player))
+    .billboard(DisplaySpec.BILLBOARD_CENTER)
+    .build();
+
+BlockEngine.managedDisplays().create(spec, DisplayPersistence.TRANSIENT);
+```
+
+You can also call `createFor(player, spec, persistence)` as a shortcut, or update an existing display with `handle.audience(DisplayAudience.except(player))`.
+
+## Update or remove
+
+`ManagedDisplayHandle` is the mutable reference to a live display. A handle can become invalid after removal, chunk unload, owner removal, or shutdown, so update methods return `false` when the display is no longer available.
+
+```java
+handle.update(builder -> builder
+    .translation(0.0f, 0.5f, 0.0f)
+    .glowing(true)
+    .glowColorOverride(0xFF3355));
+
+handle.appearance(DisplayAppearance.item(new ItemStack(Material.EMERALD)));
+handle.remove();
+```
+
+Persistent display updates mark the owning storage dirty and refresh nearby viewers, so metadata changes become visible without requiring players to reconnect.
+
+## API reference
+
+<CardGrid>
+  <LinkCard title="ManagedDisplayService" href="/BlockEngine/api/dev/auto/blockengine/api/display/ManagedDisplayService.html" description="Create, find, query, and remove BlockEngine-managed displays." />
+  <LinkCard title="ManagedDisplayHandle" href="/BlockEngine/api/dev/auto/blockengine/api/display/ManagedDisplayHandle.html" description="Update appearance, audience, model keys, and full display specs." />
+  <LinkCard title="DisplaySpec" href="/BlockEngine/api/dev/auto/blockengine/api/display/DisplaySpec.html" description="Immutable display state for location, item rendering, transforms, interpolation, and metadata." />
+  <LinkCard title="DisplayAppearance" href="/BlockEngine/api/dev/auto/blockengine/api/display/DisplayAppearance.html" description="Convenience value for an item stack plus optional item model override." />
+  <LinkCard title="DisplayAudience" href="/BlockEngine/api/dev/auto/blockengine/api/display/DisplayAudience.html" description="Per-player include and exclude rules for packet visibility." />
+  <LinkCard title="DisplayPersistence" href="/BlockEngine/api/dev/auto/blockengine/api/display/DisplayPersistence.html" description="Lifetime and storage modes for managed displays." />
+</CardGrid>

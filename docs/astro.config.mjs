@@ -60,6 +60,7 @@ export default defineConfig({
           label: 'Shared Systems',
           items: [
             { label: 'Creative Inventory', slug: 'guides/creative-inventory' },
+            { label: 'Client Displays', slug: 'guides/client-displays' },
           ],
         },
         {
