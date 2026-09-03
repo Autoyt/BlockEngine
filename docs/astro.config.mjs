@@ -8,6 +8,7 @@ export default defineConfig({
     starlight({
       title: 'BlockEngine',
       description: 'Documentation for the BlockEngine Paper plugin and Java API.',
+      favicon: '/images/blockengine-icon.png',
       logo: {
         src: './src/assets/blockengine-icon.png',
         alt: 'BlockEngine',
