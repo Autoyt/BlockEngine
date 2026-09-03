@@ -3,7 +3,9 @@ title: Client Displays
 description: Create BlockEngine-managed client-side item displays for props, overlays, markers, and block-attached visuals.
 ---
 
-import { CardGrid, LinkCard, Aside } from '@astrojs/starlight/components';
+import { CardGrid, LinkCard, Aside, TabItem, Tabs } from '@astrojs/starlight/components';
+
+## Client displays
 
 Client displays are BlockEngine-managed packet entities that render item-display visuals to Minecraft clients without spawning Bukkit entities in the world.
 
@@ -26,6 +28,9 @@ The service owns packet entity ids, viewer refreshes, persistence, cleanup, and 
 ## Create a display
 
 A display starts from a `DisplaySpec`. The spec includes the display location, rendered item, optional item model override, transform metadata, lighting, billboard mode, interpolation, and audience.
+
+<Tabs syncKey="client-display-create">
+  <TabItem label="Basic display">
 
 ```java
 import dev.auto.blockengine.api.BlockEngine;
@@ -55,6 +60,48 @@ ManagedDisplayHandle handle = BlockEngine.managedDisplays()
 ```
 
 Use a vanilla carrier item such as `PAPER` with an item model key when the visual comes from your resource pack. Use a plain `ItemStack` when vanilla item rendering is enough.
+
+  </TabItem>
+  <TabItem label="Bunny ears demo">
+
+This demo attaches two small display items above a custom block. Each ear is stored on the owning block record, so the ears are removed automatically when the custom block is removed.
+
+```java
+import dev.auto.blockengine.api.BlockEngine;
+import dev.auto.blockengine.api.display.DisplaySpec;
+import dev.auto.blockengine.api.display.ManagedDisplayService;
+import org.bukkit.Material;
+import org.bukkit.block.Block;
+import org.bukkit.inventory.ItemStack;
+
+public void addBunnyEars(Block block) {
+    ManagedDisplayService displays = BlockEngine.managedDisplays();
+
+    DisplaySpec leftEar = DisplaySpec.builder(block.getLocation().add(0.30, 1.18, 0.50))
+        .itemStack(new ItemStack(Material.WHITE_WOOL))
+        .scale(0.18f, 0.65f, 0.18f)
+        .translation(0.0f, 0.22f, 0.0f)
+        .viewRange(24.0f)
+        .brightness(0x00F000F0)
+        .build();
+
+    DisplaySpec rightEar = DisplaySpec.builder(block.getLocation().add(0.70, 1.18, 0.50))
+        .itemStack(new ItemStack(Material.WHITE_WOOL))
+        .scale(0.18f, 0.65f, 0.18f)
+        .translation(0.0f, 0.22f, 0.0f)
+        .viewRange(24.0f)
+        .brightness(0x00F000F0)
+        .build();
+
+    displays.createBlockAttached(block, "bunny-ear-left", leftEar);
+    displays.createBlockAttached(block, "bunny-ear-right", rightEar);
+}
+```
+
+Use stable keys such as `bunny-ear-left` and `bunny-ear-right` so calling the method again replaces the existing ear displays instead of piling up duplicates.
+
+  </TabItem>
+</Tabs>
 
 ## Persistence modes
 
