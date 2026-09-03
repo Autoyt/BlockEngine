@@ -4,6 +4,7 @@ import dev.auto.blockengine.Main;
 import dev.auto.blockengine.chat.BlockEngineChat;
 import dev.auto.blockengine.items.ItemManager;
 import dev.auto.blockengine.registry.BlockRegistry;
+import dev.auto.blockengine.structure.SudoBlockManager;
 import dev.auto.blockengine.types.BlockDefinition;
 import io.papermc.paper.event.player.PlayerStonecutterRecipeSelectEvent;
 import net.kyori.adventure.text.Component;
@@ -41,9 +42,10 @@ public final class CatalogListeners implements Listener {
     private static final int INPUT_SLOT = 0;
     private static final int OUTPUT_SLOT = 1;
     private static final @NotNull Component TITLE = Component.text("BlockEngine catalog");
+    private static final @NotNull Component SUDO_TITLE = Component.text("BlockEngine structure catalog");
 
     private static final Map<UUID, Session> sessions = new HashMap<>();
-    private static final Map<NamespacedKey, BlockDefinition> recipes = new LinkedHashMap<>();
+    private static final Map<NamespacedKey, RecipeEntry> recipes = new LinkedHashMap<>();
 
     public CatalogListeners() {
         Main.getInstance().getServer().getPluginManager().registerEvents(this, Main.getInstance());
@@ -54,28 +56,48 @@ public final class CatalogListeners implements Listener {
     }
 
     public static void open(@NotNull Player player, @Nullable String namespace) {
-        registerRecipes();
+        registerRecipes(false);
         List<BlockDefinition> blocks = filteredBlocks(namespace);
+        open(player, namespace, blocks, false);
+    }
+
+    public static void openSudo(@NotNull Player player) {
+        if (!player.hasPermission(SudoBlockManager.PERMISSION)) {
+            BlockEngineChat.error(player, "You don't have permission to open the BlockEngine structure catalog.");
+            return;
+        }
+        registerRecipes(true);
+        open(player, null, allBlocks(), true);
+    }
+
+    private static void open(
+            @NotNull Player player,
+            @Nullable String namespace,
+            @NotNull List<BlockDefinition> blocks,
+            boolean sudo
+    ) {
         if (blocks.isEmpty()) {
-            BlockEngineChat.warn(player, namespace == null
+            BlockEngineChat.warn(player, sudo
+                    ? "No BlockEngine custom blocks are registered for structure building."
+                    : namespace == null
                     ? "No BlockEngine custom blocks are registered."
                     : "No BlockEngine custom blocks are registered for namespace '" + namespace + "'.");
             return;
         }
 
         Collection<NamespacedKey> keys = blocks.stream()
-                .map(block -> new NamespacedKey(Main.getInstance(), "catalog/" + safe(block.id())))
+                .map(block -> recipeKey(block, sudo))
                 .toList();
         player.discoverRecipes(keys);
         BlockDefinition first = blocks.getFirst();
-        CatalogHolder holder = new CatalogHolder(namespace, keys);
-        sessions.put(player.getUniqueId(), new Session(first, keys, holder));
+        CatalogHolder holder = new CatalogHolder(namespace, keys, sudo);
+        sessions.put(player.getUniqueId(), new Session(first, keys, holder, sudo));
 
-        InventoryView view = MenuType.STONECUTTER.create(player, TITLE);
+        InventoryView view = MenuType.STONECUTTER.create(player, sudo ? SUDO_TITLE : TITLE);
         player.openInventory(view);
         holder.inventory(view.getTopInventory());
-        view.getTopInventory().setItem(INPUT_SLOT, inputItem());
-        view.getTopInventory().setItem(OUTPUT_SLOT, output(first));
+        view.getTopInventory().setItem(INPUT_SLOT, inputItem(sudo));
+        view.getTopInventory().setItem(OUTPUT_SLOT, output(first, sudo));
     }
 
     public static void cleanup() {
@@ -92,13 +114,13 @@ public final class CatalogListeners implements Listener {
     @EventHandler
     public void onSelect(PlayerStonecutterRecipeSelectEvent event) {
         NamespacedKey key = event.getStonecuttingRecipe().getKey();
-        BlockDefinition block = recipes.get(key);
-        if (block == null) {
+        RecipeEntry entry = recipes.get(key);
+        if (entry == null) {
             return;
         }
 
         Session session = sessions.get(event.getPlayer().getUniqueId());
-        if (session == null || !isCatalog(event.getPlayer().getOpenInventory())) {
+        if (session == null || !isCatalog(event.getPlayer().getOpenInventory()) || session.sudo() != entry.sudo()) {
             event.setCancelled(true);
             return;
         }
@@ -107,9 +129,9 @@ public final class CatalogListeners implements Listener {
             event.setCancelled(true);
             return;
         }
-        session.selected(block);
-        event.getStonecutterInventory().setInputItem(inputItem());
-        event.getStonecutterInventory().setResult(output(block));
+        session.selected(entry.block());
+        event.getStonecutterInventory().setInputItem(inputItem(session.sudo()));
+        event.getStonecutterInventory().setResult(output(entry.block(), session.sudo()));
     }
 
     @EventHandler
@@ -127,15 +149,15 @@ public final class CatalogListeners implements Listener {
         int rawSlot = event.getRawSlot();
         if (rawSlot == INPUT_SLOT) {
             event.setCancelled(true);
-            event.getView().getTopInventory().setItem(INPUT_SLOT, inputItem());
+            event.getView().getTopInventory().setItem(INPUT_SLOT, inputItem(session.sudo()));
             return;
         }
 
         if (rawSlot == OUTPUT_SLOT) {
             event.setCancelled(true);
-            give(player, session.selected());
-            event.getView().getTopInventory().setItem(INPUT_SLOT, inputItem());
-            event.getView().getTopInventory().setItem(OUTPUT_SLOT, output(session.selected()));
+            give(player, session.selected(), session.sudo());
+            event.getView().getTopInventory().setItem(INPUT_SLOT, inputItem(session.sudo()));
+            event.getView().getTopInventory().setItem(OUTPUT_SLOT, output(session.selected(), session.sudo()));
             return;
         }
 
@@ -183,23 +205,26 @@ public final class CatalogListeners implements Listener {
                 .toList();
     }
 
-    private static void registerRecipes() {
-        clearRecipes();
-        List<BlockDefinition> blocks = BlockRegistry.getBlocks().stream()
-                .filter(block -> block.apiDefinition().catalog())
+    private static @NotNull List<BlockDefinition> allBlocks() {
+        return BlockRegistry.getBlocks().stream()
                 .sorted(Comparator.comparing(BlockDefinition::id))
                 .toList();
+    }
+
+    private static void registerRecipes(boolean sudo) {
+        clearRecipes();
+        List<BlockDefinition> blocks = sudo ? allBlocks() : filteredBlocks(null);
 
         for (BlockDefinition block : blocks) {
-            NamespacedKey key = new NamespacedKey(Main.getInstance(), "catalog/" + safe(block.id()));
+            NamespacedKey key = recipeKey(block, sudo);
             StonecuttingRecipe recipe = new StonecuttingRecipe(
                     key,
-                    ItemManager.create(block),
-                    new RecipeChoice.MaterialChoice(Main.getBackingBlock())
+                    sudo ? ItemManager.createSudo(block) : ItemManager.create(block),
+                    new RecipeChoice.MaterialChoice(sudo ? Material.CHEST : Main.getBackingBlock())
             );
-            recipe.setGroup("BlockEngine_catalog");
+            recipe.setGroup(sudo ? "BlockEngine_structure_catalog" : "BlockEngine_catalog");
             Bukkit.addRecipe(recipe);
-            recipes.put(key, block);
+            recipes.put(key, new RecipeEntry(block, sudo));
         }
     }
 
@@ -219,8 +244,8 @@ public final class CatalogListeners implements Listener {
         }
     }
 
-    private static void give(@NotNull Player player, @NotNull BlockDefinition block) {
-        ItemStack stack = ItemManager.create(block);
+    private static void give(@NotNull Player player, @NotNull BlockDefinition block, boolean sudo) {
+        ItemStack stack = sudo ? ItemManager.createSudo(block) : ItemManager.create(block);
         stack.setAmount(64);
         Map<Integer, ItemStack> leftover = player.getInventory().addItem(stack);
         for (ItemStack item : leftover.values()) {
@@ -230,25 +255,27 @@ public final class CatalogListeners implements Listener {
                 .append(Component.space())
                 .append(BlockEngineChat.value("64x"))
                 .append(Component.space())
+                .append(sudo ? Component.text("sudo ", BlockEngineChat.WARNING) : Component.empty())
                 .append(BlockEngineChat.blockName(block)));
     }
 
-    private static @NotNull ItemStack inputItem() {
-        ItemStack item = new ItemStack(Main.getBackingBlock());
+    private static @NotNull ItemStack inputItem(boolean sudo) {
+        ItemStack item = new ItemStack(sudo ? Material.CHEST : Main.getBackingBlock());
         ItemMeta meta = item.getItemMeta();
-        meta.displayName(Component.text("BlockEngine catalog"));
+        meta.displayName(Component.text(sudo ? "Structure Building" : "BlockEngine catalog"));
         item.setItemMeta(meta);
         return item;
     }
 
-    private static @NotNull ItemStack output(@NotNull BlockDefinition block) {
-        ItemStack item = ItemManager.create(block);
+    private static @NotNull ItemStack output(@NotNull BlockDefinition block, boolean sudo) {
+        ItemStack item = sudo ? ItemManager.createSudo(block) : ItemManager.create(block);
         item.setAmount(64);
         return item;
     }
 
     private static boolean isCatalog(@NotNull InventoryView view) {
-        return view.getType() == InventoryType.STONECUTTER && view.title().equals(TITLE);
+        return view.getType() == InventoryType.STONECUTTER
+                && (view.title().equals(TITLE) || view.title().equals(SUDO_TITLE));
     }
 
     private static void clearCatalogItems(@NotNull InventoryView view) {
@@ -263,19 +290,29 @@ public final class CatalogListeners implements Listener {
         return id.replace(':', '/').replaceAll("[^a-z0-9._/-]", "_");
     }
 
+    private static @NotNull NamespacedKey recipeKey(@NotNull BlockDefinition block, boolean sudo) {
+        return new NamespacedKey(Main.getInstance(), sudo ? "catalog/sudo/" + safe(block.id()) : "catalog/" + safe(block.id()));
+    }
+
+    private record RecipeEntry(@NotNull BlockDefinition block, boolean sudo) {
+    }
+
     private static final class Session {
         private @NotNull BlockDefinition selected;
         private final @NotNull Collection<NamespacedKey> recipes;
         private final @NotNull CatalogHolder holder;
+        private final boolean sudo;
 
         private Session(
                 @NotNull BlockDefinition selected,
                 @NotNull Collection<NamespacedKey> recipes,
-                @NotNull CatalogHolder holder
+                @NotNull CatalogHolder holder,
+                boolean sudo
         ) {
             this.selected = selected;
             this.recipes = List.copyOf(recipes);
             this.holder = holder;
+            this.sudo = sudo;
         }
 
         private @NotNull BlockDefinition selected() {
@@ -290,6 +327,10 @@ public final class CatalogListeners implements Listener {
             return holder;
         }
 
+        private boolean sudo() {
+            return sudo;
+        }
+
         private void selected(@NotNull BlockDefinition selected) {
             this.selected = selected;
         }
@@ -298,11 +339,13 @@ public final class CatalogListeners implements Listener {
     private static final class CatalogHolder implements InventoryHolder {
         private final @Nullable String namespace;
         private final @NotNull Collection<NamespacedKey> recipes;
+        private final boolean sudo;
         private @Nullable Inventory inventory;
 
-        private CatalogHolder(@Nullable String namespace, @NotNull Collection<NamespacedKey> recipes) {
+        private CatalogHolder(@Nullable String namespace, @NotNull Collection<NamespacedKey> recipes, boolean sudo) {
             this.namespace = namespace;
             this.recipes = List.copyOf(recipes);
+            this.sudo = sudo;
         }
 
         private @Nullable String namespace() {
@@ -311,6 +354,10 @@ public final class CatalogListeners implements Listener {
 
         private @NotNull Collection<NamespacedKey> recipes() {
             return recipes;
+        }
+
+        private boolean sudo() {
+            return sudo;
         }
 
         private void inventory(@NotNull Inventory inventory) {

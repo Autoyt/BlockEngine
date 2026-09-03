@@ -13,3 +13,6 @@ permissions:
   blockengine.debug:
     description: Allows access to BlockEngine debug commands.
     default: op
+  blockengine.structure:
+    description: Allows BlockEngine sudo structure-building items, wand actions, and sudo pick-block.
+    default: op

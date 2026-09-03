@@ -1,0 +1,72 @@
+---
+title: Structure Building
+description: Use sudo blocks and the Block Engine Wand to put custom blocks inside vanilla structures.
+---
+
+BlockEngine can create editor-only sudo blocks for vanilla structure authoring. A sudo block is a chest marker that carries the real custom block id in persistent data and renders a BlockEngine-style preview display while you build.
+
+## Permissions
+
+Structure tools are gated by:
+
+```text
+blockengine.structure
+```
+
+Players must be in creative mode for sudo pick-block and wand editing actions. Server operators receive the permission by default.
+
+## Sudo Catalog
+
+Open the structure-building catalog with:
+
+```text
+/catalog sudo
+```
+
+The catalog generates one sudo item for every registered custom block. Each item uses the custom block model, places as a chest marker, and includes red warning lore so it is not mistaken for the real block item.
+
+## Building Workflow
+
+Place a sudo item while building a vanilla structure. The placed block becomes a chest with BlockEngine marker PDC:
+
+```text
+blockengine:sudo_marker = true
+blockengine:sudo_marker_block_id = namespace:block_name
+blockengine:sudo_marker_state_id = state
+```
+
+BlockEngine also spawns a persistent preview display at the chest so the structure still looks like the target custom block while editing.
+
+## Block Engine Wand
+
+Give yourself the wand with:
+
+```text
+/blockengine debug wand
+```
+
+Wand actions:
+
+- Click a sudo marker chest to remove its preview display.
+- Click a real BlockEngine custom block to convert it into a sudo marker chest and preview.
+
+The wand does not create a real custom block record for a sudo marker. It is an authoring tool for structure files.
+
+## Pick Block
+
+Middle-clicking a real custom block or a sudo marker selects the matching sudo item instead of the normal custom block item. This requires creative mode and `blockengine.structure`.
+
+## Structure Generation
+
+During `AsyncStructureGenerateEvent`, BlockEngine installs a block transformer that checks generated block states for sudo marker chests. When a marker is found:
+
+1. The transformer reads the marker block id and state id from the chest PDC.
+2. The transformer records the generated location.
+3. The generated chest is replaced with a barrier.
+4. BlockEngine schedules a server-thread conversion that places the real custom block through the normal placement system.
+
+The conversion intentionally uses the existing placement and chunk persistence APIs directly. There is no separate chunk transaction or batch-storage abstraction in this workflow yet.
+
+## Shutdown Safety
+
+Pending structure conversions are flushed when BlockEngine disables. If a generated marker has already become a barrier, shutdown flushing attempts to register the real custom block before chunk data is saved, preventing a generated structure from being left as plain barriers without BlockEngine records.

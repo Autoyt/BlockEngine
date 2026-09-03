@@ -5,7 +5,7 @@ description: Common BlockEngine commands for development, testing, resource pack
 
 import { CardGrid, LinkCard } from '@astrojs/starlight/components';
 
-Most operational commands require `blockengine.debug`, which defaults to server operators.
+Most operational commands require `blockengine.debug`, which defaults to server operators. Structure-building editor tools also require `blockengine.structure`.
 
 <CardGrid>
   <LinkCard title="Main command" href="/BlockEngine/reference/commands/#main-command" description="Entry points for /blockengine and /be." />
@@ -30,9 +30,10 @@ Use `/blockengine info` to see plugin state, registered block count, namespace c
 ```text
 /blockengine catalog <namespace>
 /be catalog <namespace>
+/catalog sudo
 ```
 
-Opens the BlockEngine catalog for a namespace.
+Opens the BlockEngine catalog for a namespace. `/catalog sudo` opens the Structure Building category with sudo chest markers for every registered custom block.
 
 ## Resource packs
 
@@ -55,9 +56,12 @@ Use `reload` after changing generated assets or pack configuration. Use `downloa
 /blockengine debug blocks looking
 /blockengine debug blocks give <blockId> [stateId]
 /blockengine debug give <blockId> [stateId]
+/blockengine debug wand
 ```
 
 Use these when validating registration, item creation, state ids, and placement behavior.
+
+`/blockengine debug wand` gives the Block Engine Wand used to hide sudo previews and convert real custom blocks into sudo structure markers.
 
 ## Plugins and namespaces
 

@@ -23,6 +23,8 @@ import dev.auto.blockengine.runtime.BlockDataManager;
 import dev.auto.blockengine.runtime.BlockRemover;
 import dev.auto.blockengine.runtime.ChunkEngine;
 import dev.auto.blockengine.runtime.GravityManager;
+import dev.auto.blockengine.structure.SudoBlockListeners;
+import dev.auto.blockengine.structure.SudoBlockManager;
 import dev.auto.blockengine.types.BlockDefinition;
 import dev.auto.blockengine.types.BlockLocationKey;
 import dev.auto.blockengine.visibility.VisibilityManager;
@@ -140,6 +142,10 @@ public class GameListener implements Listener {
 
     @EventHandler
     public void onDamage(BlockDamageEvent event) {
+        if (ItemManager.wand(event.getItemInHand())) {
+            event.setCancelled(true);
+            return;
+        }
         if (BlockIntegrityManager.getInstance().verifyInteraction(event.getBlock())) {
             return;
         }
@@ -159,6 +165,10 @@ public class GameListener implements Listener {
 
     @EventHandler
     public void onBreak(BlockBreakEvent event) {
+        if (ItemManager.wand(event.getPlayer().getInventory().getItemInMainHand())) {
+            event.setCancelled(true);
+            return;
+        }
         if (BlockIntegrityManager.getInstance().verifyInteraction(event.getBlock())) {
             return;
         }
@@ -282,6 +292,20 @@ public class GameListener implements Listener {
 
     @EventHandler
     public void onPickBlock(PlayerPickBlockEvent event) {
+        String sudoBlockId = SudoBlockManager.getInstance().markerBlockId(event.getBlock());
+        if (sudoBlockId != null) {
+            event.setCancelled(true);
+            if (!SudoBlockListeners.allowed(event.getPlayer())) {
+                return;
+            }
+            BlockDefinition definition = BlockRegistry.getBlock(sudoBlockId);
+            if (definition == null) {
+                return;
+            }
+            pick(event.getPlayer(), ItemManager.createSudo(definition, SudoBlockManager.getInstance().markerStateId(event.getBlock())), event.getTargetSlot());
+            return;
+        }
+
         if (BlockIntegrityManager.getInstance().verifyInteraction(event.getBlock())) {
             return;
         }
@@ -291,7 +315,7 @@ public class GameListener implements Listener {
         }
 
         event.setCancelled(true);
-        if (event.getPlayer().getGameMode() != GameMode.CREATIVE) {
+        if (!SudoBlockListeners.allowed(event.getPlayer())) {
             return;
         }
 
@@ -300,7 +324,7 @@ public class GameListener implements Listener {
             return;
         }
 
-        ItemStack stack = ItemManager.create(definition, customBlock.storedBlock().stateId());
+        ItemStack stack = ItemManager.createSudo(definition, customBlock.storedBlock().stateId());
         pick(event.getPlayer(), stack, event.getTargetSlot());
     }
 
@@ -326,6 +350,9 @@ public class GameListener implements Listener {
 
     @EventHandler
     public void onInteract(PlayerInteractEvent event) {
+        if (ItemManager.wand(event.getItem())) {
+            return;
+        }
         if (event.getClickedBlock() == null) {
             return;
         }

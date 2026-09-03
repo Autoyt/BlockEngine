@@ -20,11 +20,23 @@ public final class CatalogCommand implements BasicCommand {
             return;
         }
 
+        if (args.length >= 1 && (args[0].equalsIgnoreCase("sudo") || args[0].equalsIgnoreCase("structure"))) {
+            if (!sender.hasPermission("blockengine.structure")) {
+                BlockEngineChat.error(sender, "You don't have permission to open the BlockEngine structure catalog.");
+                return;
+            }
+            CatalogListeners.openSudo(player);
+            return;
+        }
+        if (!sender.hasPermission("blockengine.debug")) {
+            BlockEngineChat.error(sender, "You don't have permission to use this command!");
+            return;
+        }
         CatalogListeners.open(player);
     }
 
     @Override
     public @Nullable String permission() {
-        return "blockengine.debug";
+        return null;
     }
 }

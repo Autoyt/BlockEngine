@@ -113,6 +113,53 @@ public final class ItemModelGenerator {
         breakOverlays(root);
     }
 
+    public static void generateWand(@NotNull Path root) throws IOException {
+        String namespace = Main.getInstance().getName().toLowerCase(Locale.ROOT);
+        Path texture = root.resolve("assets")
+                .resolve(namespace)
+                .resolve("textures")
+                .resolve("item")
+                .resolve("block_engine_wand.png");
+        Files.createDirectories(texture.getParent());
+        try (var input = Main.getInstance().getResource("resource/wand.png")) {
+            if (input != null) {
+                Files.copy(input, texture, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            } else {
+                BufferedImage image = new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB);
+                for (int x = 0; x < image.getWidth(); x++) {
+                    for (int y = 0; y < image.getHeight(); y++) {
+                        image.setRGB(x, y, x == y || x == image.getWidth() - y - 1 ? 0xFFFFD54F : 0x00000000);
+                    }
+                }
+                ImageIO.write(image, "png", texture.toFile());
+            }
+        }
+
+        Path modelPath = root.resolve("assets")
+                .resolve(namespace)
+                .resolve("models")
+                .resolve("item")
+                .resolve("block_engine_wand.json");
+        Files.createDirectories(modelPath.getParent());
+
+        ObjectNode model = Main.getJsonMapper().createObjectNode();
+        model.put("parent", "minecraft:item/handheld");
+        model.putObject("textures").put("layer0", namespace + ":item/block_engine_wand");
+        Main.getJsonMapper().writeValue(modelPath.toFile(), model);
+
+        Path itemPath = root.resolve("assets")
+                .resolve(namespace)
+                .resolve("items")
+                .resolve("block_engine_wand.json");
+        Files.createDirectories(itemPath.getParent());
+
+        ObjectNode item = Main.getJsonMapper().createObjectNode();
+        ObjectNode itemModel = item.putObject("model");
+        itemModel.put("type", "minecraft:model");
+        itemModel.put("model", namespace + ":item/block_engine_wand");
+        Main.getJsonMapper().writeValue(itemPath.toFile(), item);
+    }
+
     public static void breakOverlays(@NotNull Path root) throws IOException {
         String namespace = Main.getInstance().getName().toLowerCase(Locale.ROOT);
         for (int stage = 0; stage <= 9; stage++) {

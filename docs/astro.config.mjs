@@ -61,6 +61,7 @@ export default defineConfig({
           items: [
             { label: 'Creative Inventory', slug: 'guides/creative-inventory' },
             { label: 'Client Displays', slug: 'guides/client-displays' },
+            { label: 'Structure Building', slug: 'guides/structure-building' },
           ],
         },
         {

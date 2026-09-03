@@ -22,6 +22,8 @@ import dev.auto.blockengine.registry.DiscoverySystem;
 import dev.auto.blockengine.resourcepack.ResourcePackManager;
 import dev.auto.blockengine.runtime.BlockTicker;
 import dev.auto.blockengine.runtime.ChunkEngine;
+import dev.auto.blockengine.structure.SudoBlockListeners;
+import dev.auto.blockengine.structure.SudoBlockManager;
 import dev.auto.blockengine.visibility.VisibilityManager;
 import dev.auto.blockengine.world.ManagedWorld;
 import io.github.retrooper.packetevents.factory.spigot.SpigotPacketEventsBuilder;
@@ -72,6 +74,7 @@ public final class Main extends JavaPlugin {
         new CatalogListeners();
         new CreativeInventoryListeners();
         new OverideFillCommand();
+        new SudoBlockListeners();
         new GameListener();
 
         for (org.bukkit.World world : Bukkit.getWorlds()) {
@@ -97,6 +100,7 @@ public final class Main extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        SudoBlockManager.getInstance().flushPendingNow();
         ChunkEngine.flushNow();
         for (Player player : Bukkit.getOnlinePlayers()) {
             VisibilityManager.getInstance().cleanup(player);
