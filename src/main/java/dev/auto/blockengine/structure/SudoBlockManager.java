@@ -219,13 +219,13 @@ public final class SudoBlockManager {
                 0.0,
                 new Particle.DustOptions(Color.fromRGB(176, 72, 255), 1.25f)
         );
-        player.playSound(
-                center,
-                sudoConversion ? Sound.BLOCK_AMETHYST_BLOCK_CHIME : Sound.BLOCK_NOTE_BLOCK_CHIME,
-                SoundCategory.BLOCKS,
-                0.8f,
-                sudoConversion ? 1.55f : 0.65f
-        );
+        if (sudoConversion) {
+            player.playSound(center, Sound.BLOCK_AMETHYST_BLOCK_CHIME, SoundCategory.BLOCKS, 1.0f, 1.7f);
+            player.playSound(center, Sound.BLOCK_NOTE_BLOCK_BELL, SoundCategory.BLOCKS, 0.75f, 1.45f);
+            player.playSound(center, Sound.ENTITY_EXPERIENCE_ORB_PICKUP, SoundCategory.BLOCKS, 0.45f, 1.25f);
+        } else {
+            player.playSound(center, Sound.BLOCK_NOTE_BLOCK_CHIME, SoundCategory.BLOCKS, 0.8f, 0.65f);
+        }
     }
 
     public void recordStructureMarker(@NotNull World world, int x, int y, int z, @NotNull String blockId, @Nullable String stateId) {
