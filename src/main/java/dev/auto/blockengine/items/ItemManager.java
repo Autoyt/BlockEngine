@@ -99,11 +99,21 @@ public final class ItemManager {
         ItemMeta meta = stack.getItemMeta();
         meta.getPersistentDataContainer().set(WAND_KEY, PersistentDataType.BOOLEAN, true);
         itemModel(meta, wandModelKey());
-        meta.displayName(Component.text("Block Engine Wand", NamedTextColor.GOLD, TextDecoration.BOLD));
+        meta.displayName(Component.text("Block Engine Wand", NamedTextColor.LIGHT_PURPLE, TextDecoration.BOLD));
         meta.lore(java.util.List.of(
-                Component.text("Structure building tool", NamedTextColor.YELLOW),
-                Component.text("Click full blocks to toggle placeholder mode.", NamedTextColor.GRAY),
-                Component.text("Sneak-click placeholder blocks to toggle previews.", NamedTextColor.GRAY)
+                Component.text("Structure authoring tool", NamedTextColor.DARK_PURPLE),
+                Component.text()
+                        .append(Component.text("Click ", NamedTextColor.LIGHT_PURPLE))
+                        .append(Component.text("full blocks to make placeholders.", NamedTextColor.GRAY))
+                        .build(),
+                Component.text()
+                        .append(Component.text("Click ", NamedTextColor.LIGHT_PURPLE))
+                        .append(Component.text("placeholders to restore full blocks.", NamedTextColor.GRAY))
+                        .build(),
+                Component.text()
+                        .append(Component.text("Sneak-click ", NamedTextColor.LIGHT_PURPLE))
+                        .append(Component.text("placeholders to toggle previews.", NamedTextColor.GRAY))
+                        .build()
         ));
         meta.setEnchantmentGlintOverride(true);
         meta.setMaxStackSize(1);
