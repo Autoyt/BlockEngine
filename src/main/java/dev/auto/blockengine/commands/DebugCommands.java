@@ -58,7 +58,7 @@ import java.util.UUID;
 public final class DebugCommands implements BasicCommand, Listener {
     private static final List<String> ROOT_SUBCOMMANDS = List.of(
             "perf", "blocks", "plugins", "give", "chunks", "validate", "events", "reload", "profile", "block", "plugin",
-            "chunk", "visibility", "displays", "sample-pack", "wand"
+            "chunk", "visibility", "displays", "sample-pack"
     );
     private static final List<String> PROFILE_TARGETS = List.of(
             "overall", "placement", "validation", "chunk-save", "flush", "events", "visibility", "displays", "commands"
@@ -102,7 +102,6 @@ public final class DebugCommands implements BasicCommand, Listener {
             case "chunk", "chunks" -> chunk(sender, args);
             case "validate" -> validate(sender, args);
             case "events" -> events(sender, args);
-            case "wand" -> giveWand(sender);
             case "sample-pack", "samplepack" -> samplePack(sender);
             case "reload" -> {
                 ResourcePackManager.getInstance().reload();
@@ -588,17 +587,6 @@ public final class DebugCommands implements BasicCommand, Listener {
                 .append(DebugStyle.dim("[" + stateId + "]")));
     }
 
-    private void giveWand(@NotNull CommandSender sender) {
-        if (!(sender instanceof Player player)) {
-            DebugStyle.error(sender, "Only players can receive the Block Engine Wand.");
-            return;
-        }
-        ItemStack stack = ItemManager.createWand();
-        player.getInventory().addItem(stack).values()
-                .forEach(leftover -> player.getWorld().dropItemNaturally(player.getLocation(), leftover));
-        DebugStyle.success(sender, "Gave Block Engine Wand.");
-    }
-
     private void blockLooking(@NotNull CommandSender sender) {
         if (!(sender instanceof Player player)) {
             DebugStyle.error(sender, "Only players can inspect a targeted block.");
@@ -688,8 +676,6 @@ public final class DebugCommands implements BasicCommand, Listener {
         }
         if (args.length < 2) {
             CatalogListeners.open(player);
-        } else if (args[1].equalsIgnoreCase("sudo") || args[1].equalsIgnoreCase("structure")) {
-            CatalogListeners.openSudo(player);
         } else {
             CatalogListeners.open(player, args[1]);
         }
@@ -1039,8 +1025,6 @@ public final class DebugCommands implements BasicCommand, Listener {
 
     private @NotNull List<String> catalogTargets() {
         List<String> targets = new ArrayList<>();
-        targets.add("sudo");
-        targets.add("structure");
         targets.addAll(namespaces());
         return targets;
     }

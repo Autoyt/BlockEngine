@@ -9,8 +9,8 @@ Add editor-only placeholder blocks that let builders place BlockEngine full bloc
 - Generate one placeholder structure-building item for every registered full block.
 - Mark placeholder items with BlockEngine PDC and add prominent red warning lore so they are not confused with full block items.
 - Place placeholder items as chests carrying the full block id in tile PDC.
-- Spawn a persistent BlockEngine-style preview display above the sudo chest.
-- Add a Block Engine Wand for structure-authoring actions.
+- Spawn a persistent BlockEngine-style preview display on the placeholder chest.
+- Add `/blockengine wand` as the structure-authoring entry point.
 - Let the wand hide placeholder previews and convert full blocks into placeholder marker chests.
 - Let creative middle-click/pick-block select the matching placeholder item for full blocks and placeholder chests, gated by permission.
 - Add an `AsyncStructureGenerateEvent` transformer that detects placeholder marker chests, records their block ids, replaces them with barriers, and schedules server-thread BlockEngine placement after generation.

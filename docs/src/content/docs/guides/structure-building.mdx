@@ -15,19 +15,11 @@ blockengine.structure
 
 Players must be in creative mode for placeholder pick-block and wand editing actions. Server operators receive the permission by default.
 
-## Placeholder Catalog
-
-Open the structure-building catalog with:
-
-```text
-/catalog sudo
-```
-
-The first catalog item is the Block Engine Wand. After that, the catalog generates one placeholder item for every registered full block. Each placeholder item uses the full block model, places as a chest marker, and includes red warning lore so it is not mistaken for the real block item.
-
 ## Building Workflow
 
-Place a placeholder item while building a vanilla structure. The placed block becomes a chest with BlockEngine marker PDC:
+Use `/blockengine wand` to get the Block Engine Wand, then click full blocks to turn them into placeholder blocks for structure authoring. Middle-click can also copy the matching placeholder item while you are in creative mode with `blockengine.structure`.
+
+When a placeholder item is placed, the placed block becomes a chest with BlockEngine marker PDC:
 
 ```text
 blockengine:sudo_marker = true
@@ -42,7 +34,7 @@ BlockEngine also spawns a persistent preview display at the chest so the structu
 Give yourself the wand with:
 
 ```text
-/blockengine debug wand
+/blockengine wand
 ```
 
 Wand actions:

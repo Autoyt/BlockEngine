@@ -2,9 +2,11 @@ package dev.auto.blockengine.commands;
 
 import dev.auto.blockengine.Main;
 import dev.auto.blockengine.chat.BlockEngineChat;
+import dev.auto.blockengine.items.ItemManager;
 import dev.auto.blockengine.registry.BlockRegistry;
 import dev.auto.blockengine.registry.NamespaceRegistry;
 import dev.auto.blockengine.resourcepack.ResourcePackManager;
+import dev.auto.blockengine.structure.SudoBlockManager;
 import io.papermc.paper.command.brigadier.BasicCommand;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.dialog.Dialog;
@@ -15,6 +17,7 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -26,7 +29,7 @@ import java.util.Locale;
 
 public final class BlockEngineCommand implements BasicCommand {
     private static final List<String> ROOT = List.of(
-            "info", "catalog", "packs", "debug"
+            "info", "catalog", "packs", "debug", "wand"
     );
 
     private final Main plugin;
@@ -50,6 +53,10 @@ public final class BlockEngineCommand implements BasicCommand {
         }
         if (args[0].equalsIgnoreCase("debug")) {
             debug.execute(source, Arrays.copyOfRange(args, 1, args.length));
+            return;
+        }
+        if (args[0].equalsIgnoreCase("wand")) {
+            giveWand(sender);
             return;
         }
         usage(sender);
@@ -79,8 +86,24 @@ public final class BlockEngineCommand implements BasicCommand {
 
     private void usage(@NotNull CommandSender sender) {
         BlockEngineChat.send(sender, BlockEngineChat.header("blockengine"));
-        BlockEngineChat.send(sender, BlockEngineChat.row("usage", "/blockengine <info|catalog|packs|debug>"));
-        BlockEngineChat.send(sender, BlockEngineChat.row("short", "/be <info|catalog|packs|debug>"));
+        BlockEngineChat.send(sender, BlockEngineChat.row("usage", "/blockengine <info|catalog|packs|debug|wand>"));
+        BlockEngineChat.send(sender, BlockEngineChat.row("short", "/be <info|catalog|packs|debug|wand>"));
+    }
+
+    private void giveWand(@NotNull CommandSender sender) {
+        if (!(sender instanceof Player player)) {
+            BlockEngineChat.error(sender, "Only players can receive the Block Engine Wand.");
+            return;
+        }
+        if (!sender.hasPermission(SudoBlockManager.PERMISSION)) {
+            BlockEngineChat.error(sender, "You don't have permission to use BlockEngine structure tools.");
+            return;
+        }
+
+        ItemStack stack = ItemManager.createWand();
+        player.getInventory().addItem(stack).values()
+                .forEach(leftover -> player.getWorld().dropItemNaturally(player.getLocation(), leftover));
+        BlockEngineChat.success(sender, "Gave Block Engine Wand.");
     }
 
     private void info(@NotNull CommandSender sender) {
