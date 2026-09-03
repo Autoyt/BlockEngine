@@ -72,10 +72,20 @@ public final class ItemManager {
                 .append(BlockDisplayNames.itemName(block.apiDefinition().item().name(), block)
                         .decoration(TextDecoration.BOLD, false)));
         meta.lore(java.util.List.of(
-                Component.text("STRUCTURE BUILDING BLOCK", NamedTextColor.RED, TextDecoration.BOLD),
-                Component.text("NOT a real BlockEngine block.", NamedTextColor.RED),
-                Component.text("Use only inside vanilla structures.", NamedTextColor.YELLOW),
-                Component.text("Block: " + block.id(), NamedTextColor.GRAY),
+                Component.text("[!] SUDO BLOCK", NamedTextColor.RED, TextDecoration.BOLD),
+                Component.text()
+                        .append(Component.text("! ", NamedTextColor.RED, TextDecoration.BOLD))
+                        .append(Component.text("Structure-building placeholder only.", NamedTextColor.GRAY))
+                        .build(),
+                Component.text()
+                        .append(Component.text("! ", NamedTextColor.RED, TextDecoration.BOLD))
+                        .append(Component.text("Not a real BlockEngine block.", NamedTextColor.GRAY))
+                        .build(),
+                Component.text()
+                        .append(Component.text("! ", NamedTextColor.RED, TextDecoration.BOLD))
+                        .append(Component.text("Saved structures convert it during generation.", NamedTextColor.GRAY))
+                        .build(),
+                Component.text("Block: " + block.id(), NamedTextColor.DARK_GRAY),
                 Component.text("State: " + resolvedState, NamedTextColor.DARK_GRAY)
         ));
         meta.setEnchantmentGlintOverride(true);
@@ -92,7 +102,7 @@ public final class ItemManager {
         meta.displayName(Component.text("Block Engine Wand", NamedTextColor.GOLD, TextDecoration.BOLD));
         meta.lore(java.util.List.of(
                 Component.text("Structure building tool", NamedTextColor.YELLOW),
-                Component.text("Click sudo blocks to hide previews.", NamedTextColor.GRAY),
+                Component.text("Click sudo blocks to toggle previews.", NamedTextColor.GRAY),
                 Component.text("Click custom blocks to convert them to sudo blocks.", NamedTextColor.GRAY)
         ));
         meta.setEnchantmentGlintOverride(true);
