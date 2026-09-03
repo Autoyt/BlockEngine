@@ -57,6 +57,7 @@ public final class SudoBlockManager {
     private static final SudoBlockManager instance = new SudoBlockManager();
     private final @NotNull Queue<PendingConversion> pendingConversions = new ConcurrentLinkedQueue<>();
     private final @NotNull ConcurrentMap<BlockLocationKey, UUID> previewIds = new ConcurrentHashMap<>();
+    private final @NotNull ConcurrentMap<BlockLocationKey, UUID> feedbackIds = new ConcurrentHashMap<>();
     private final @NotNull AtomicBoolean applyScheduled = new AtomicBoolean();
 
     private SudoBlockManager() {
@@ -182,6 +183,12 @@ public final class SudoBlockManager {
     }
 
     public void playWandFeedback(@NotNull Player player, @NotNull Block block, boolean sudoConversion) {
+        BlockLocationKey blockKey = location(block);
+        UUID previousId = feedbackIds.remove(blockKey);
+        if (previousId != null) {
+            ManagedDisplayManager.getInstance().remove(previousId);
+        }
+
         Location center = block.getLocation().add(0.5, 0.5, 0.5);
         DisplaySpec spec = DisplaySpec.builder(center)
                 .itemStack(ItemManager.wandFeedback(sudoConversion))
@@ -193,7 +200,13 @@ public final class SudoBlockManager {
                 .shadowStrength(0.0f)
                 .build();
         var handle = ManagedDisplayManager.getInstance().create(spec, DisplayPersistence.TRANSIENT);
-        Bukkit.getScheduler().runTaskLater(Main.getInstance(), handle::remove, 20L);
+        UUID feedbackId = handle.id();
+        feedbackIds.put(blockKey, feedbackId);
+        Bukkit.getScheduler().runTaskLater(Main.getInstance(), () -> {
+            if (feedbackIds.remove(blockKey, feedbackId)) {
+                handle.remove();
+            }
+        }, 20L);
 
         World world = block.getWorld();
         world.spawnParticle(
