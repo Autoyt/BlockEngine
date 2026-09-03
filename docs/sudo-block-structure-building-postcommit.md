@@ -7,9 +7,10 @@
 - Added sudo marker chests with tile PDC for block id, state id, and optional preview display id.
 - Added persistent BlockEngine-style preview displays for placed sudo markers.
 - Added the Block Engine Wand item, resource-pack model generation, and debug give command.
-- Added wand actions for hiding sudo previews and converting real custom blocks into sudo markers.
+- Added wand actions for toggling sudo previews and converting real custom blocks into sudo markers.
 - Changed creative pick-block for real custom blocks and sudo markers to give/select the corresponding sudo item behind creative-mode and permission checks.
-- Added an `AsyncStructureGenerateEvent` block transformer that records sudo marker chests, replaces them with barriers, and schedules server-thread custom block placement.
+- Added a shared sudo marker transformer that records sudo marker chests, replaces them with barriers, and schedules server-thread custom block placement from `AsyncStructureGenerateEvent` or plugin-driven `Structure#place(...)` calls.
+- Added a bounded vanilla structure-block fallback scan for creative structure builders after structure-block interaction or redstone activation.
 - Added shutdown flushing for pending structure conversions.
 - Added `/catalog sudo` and `/blockengine catalog sudo` structure catalog support.
 - Documented the workflow, permissions, wand behavior, structure-generation pipeline, and shutdown safety.

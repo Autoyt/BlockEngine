@@ -10,9 +10,7 @@ import dev.auto.blockengine.types.BlockDefinition;
 import dev.auto.blockengine.types.BlockLocationKey;
 import org.bukkit.GameMode;
 import org.bukkit.Material;
-import org.bukkit.World;
 import org.bukkit.block.Block;
-import org.bukkit.block.BlockState;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -20,10 +18,12 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
+import org.bukkit.event.block.BlockRedstoneEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.world.AsyncStructureGenerateEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.util.BoundingBox;
 import org.jetbrains.annotations.NotNull;
 
 public final class SudoBlockListeners implements Listener {
@@ -103,18 +103,27 @@ public final class SudoBlockListeners implements Listener {
 
     @EventHandler
     public void onStructureGenerate(@NotNull AsyncStructureGenerateEvent event) {
-        event.setBlockTransformer(SudoBlockManager.transformerKey(), (region, x, y, z, blockState, transformationState) -> {
-            String blockId = manager.markerBlockId(blockState);
-            if (blockId == null || BlockRegistry.getBlock(blockId) == null) {
-                return blockState;
-            }
+        event.setBlockTransformer(SudoBlockManager.transformerKey(), manager.structureBlockTransformer());
+    }
 
-            World world = region.getWorld();
-            manager.recordStructureMarker(world, x, y, z, blockId, manager.markerStateId(blockState));
-            BlockState barrier = blockState.copy();
-            barrier.setType(Material.BARRIER);
-            return barrier;
-        });
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onStructureBlockInteract(@NotNull PlayerInteractEvent event) {
+        if (event.getHand() != EquipmentSlot.HAND || event.getAction() != Action.RIGHT_CLICK_BLOCK) {
+            return;
+        }
+        Block clicked = event.getClickedBlock();
+        if (clicked == null || clicked.getType() != Material.STRUCTURE_BLOCK || !allowed(event.getPlayer())) {
+            return;
+        }
+        scheduleStructureBlockScans(clicked);
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onStructureBlockPower(@NotNull BlockRedstoneEvent event) {
+        if (event.getNewCurrent() <= 0 || event.getBlock().getType() != Material.STRUCTURE_BLOCK) {
+            return;
+        }
+        scheduleStructureBlockScans(event.getBlock());
     }
 
     public static boolean allowed(@NotNull Player player) {
@@ -135,5 +144,20 @@ public final class SudoBlockListeners implements Listener {
         player.getInventory().setItem(slot, stack);
         player.getInventory().setHeldItemSlot(slot);
         player.updateInventory();
+    }
+
+    private void scheduleStructureBlockScans(@NotNull Block structureBlock) {
+        long[] delays = {1L, 10L, 40L, 100L, 200L};
+        for (long delay : delays) {
+            Main.getInstance().getServer().getScheduler().runTaskLater(Main.getInstance(), () -> {
+                if (structureBlock.getType() != Material.STRUCTURE_BLOCK) {
+                    return;
+                }
+                BoundingBox area = manager.structureLoadArea(structureBlock);
+                if (area != null) {
+                    manager.convertLoadedMarkers(structureBlock.getWorld(), area);
+                }
+            }, delay);
+        }
     }
 }

@@ -58,12 +58,18 @@ Middle-clicking a real custom block or a sudo marker selects the matching sudo i
 
 ## Structure Generation
 
-During `AsyncStructureGenerateEvent`, BlockEngine installs a block transformer that checks generated block states for sudo marker chests. When a marker is found:
+During Paper's `AsyncStructureGenerateEvent`, BlockEngine installs a shared block transformer that checks generated block states for sudo marker chests. Paper documents this event for naturally generated structures and `/place structure`; vanilla structure-block GUI loads are not exposed through the same reliable event path.
+
+When a marker is found:
 
 1. The transformer reads the marker block id and state id from the chest PDC.
 2. The transformer records the generated location.
 3. The generated chest is replaced with a barrier.
 4. BlockEngine schedules a server-thread conversion that places the real custom block through the normal placement system.
+
+Plugin-driven structure placement should reuse `SudoBlockManager.getInstance().structureBlockTransformer()` when calling Bukkit's `Structure#place(...)` overloads that accept block transformers. That keeps custom structure placement behavior identical to the Paper event path.
+
+BlockEngine also performs a bounded fallback scan for sudo markers inside a vanilla structure block's configured LOAD area after a creative player with `blockengine.structure` interacts with a structure block, and after a structure block receives redstone power. This exists because Paper does not currently provide a precise "structure block just loaded a structure" event. If a player opens the structure-block GUI and waits longer than the fallback scan window before clicking Load, use `/place structure` or plugin/API placement for deterministic conversion.
 
 The conversion intentionally uses the existing placement and chunk persistence APIs directly. There is no separate chunk transaction or batch-storage abstraction in this workflow yet.
 

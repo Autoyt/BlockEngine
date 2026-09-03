@@ -19,9 +19,14 @@ import org.bukkit.NamespacedKey;
 import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockState;
+import org.bukkit.block.Structure;
 import org.bukkit.block.TileState;
+import org.bukkit.block.structure.UsageMode;
 import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
+import org.bukkit.util.BlockTransformer;
+import org.bukkit.util.BoundingBox;
+import org.bukkit.util.BlockVector;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -164,6 +169,99 @@ public final class SudoBlockManager {
         }
         pendingConversions.add(new PendingConversion(world.getUID(), x, y, z, blockId, stateId, 0));
         scheduleApply();
+    }
+
+    public @NotNull BlockTransformer structureBlockTransformer() {
+        return (region, x, y, z, blockState, transformationState) ->
+                transformGeneratedMarker(region.getWorld(), x, y, z, blockState);
+    }
+
+    public @NotNull BlockState transformGeneratedMarker(
+            @NotNull World world,
+            int x,
+            int y,
+            int z,
+            @NotNull BlockState blockState
+    ) {
+        String blockId = markerBlockId(blockState);
+        if (blockId == null || BlockRegistry.getBlock(blockId) == null) {
+            return blockState;
+        }
+
+        recordStructureMarker(world, x, y, z, blockId, markerStateId(blockState));
+        BlockState barrier = blockState.copy();
+        barrier.setType(Material.BARRIER);
+        return barrier;
+    }
+
+    public int convertLoadedMarkers(@NotNull World world, @NotNull BoundingBox area) {
+        Main.serverThread();
+        int minX = (int) Math.floor(area.getMinX());
+        int minY = Math.max(world.getMinHeight(), (int) Math.floor(area.getMinY()));
+        int minZ = (int) Math.floor(area.getMinZ());
+        int maxX = (int) Math.floor(area.getMaxX());
+        int maxY = Math.min(world.getMaxHeight() - 1, (int) Math.floor(area.getMaxY()));
+        int maxZ = (int) Math.floor(area.getMaxZ());
+        int converted = 0;
+        for (int x = minX; x <= maxX; x++) {
+            for (int z = minZ; z <= maxZ; z++) {
+                if (!world.isChunkLoaded(x >> 4, z >> 4)) {
+                    continue;
+                }
+                for (int y = minY; y <= maxY; y++) {
+                    if (convertMarkerNow(world.getBlockAt(x, y, z))) {
+                        converted++;
+                    }
+                }
+            }
+        }
+        return converted;
+    }
+
+    public boolean convertMarkerNow(@NotNull Block block) {
+        Main.serverThread();
+        TileState state = tileState(block);
+        if (state == null) {
+            return false;
+        }
+        String blockId = markerBlockId(state);
+        BlockDefinition definition = blockId == null ? null : BlockRegistry.getBlock(blockId);
+        if (definition == null) {
+            return false;
+        }
+
+        String stateId = resolveState(definition, markerStateId(state));
+        removePreviewIfMarker(block);
+        block.setType(Material.BARRIER, false);
+        return PlacementManager.getInstance().place(block, definition, null, null, stateId);
+    }
+
+    public @Nullable BoundingBox structureLoadArea(@NotNull Block structureBlock) {
+        BlockState state = structureBlock.getState(false);
+        if (!(state instanceof Structure structure) || structure.getUsageMode() != UsageMode.LOAD) {
+            return null;
+        }
+
+        BlockVector offset = structure.getRelativePosition();
+        BlockVector size = structure.getStructureSize();
+        if (size.getBlockX() <= 0 || size.getBlockY() <= 0 || size.getBlockZ() <= 0) {
+            return null;
+        }
+
+        int startX = structureBlock.getX() + offset.getBlockX();
+        int startY = structureBlock.getY() + offset.getBlockY();
+        int startZ = structureBlock.getZ() + offset.getBlockZ();
+        int endX = startX + size.getBlockX() - 1;
+        int endY = startY + size.getBlockY() - 1;
+        int endZ = startZ + size.getBlockZ() - 1;
+        return new BoundingBox(
+                Math.min(startX, endX),
+                Math.min(startY, endY),
+                Math.min(startZ, endZ),
+                Math.max(startX, endX),
+                Math.max(startY, endY),
+                Math.max(startZ, endZ)
+        );
     }
 
     public void flushPendingNow() {
