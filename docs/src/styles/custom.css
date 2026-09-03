@@ -5,11 +5,6 @@
   --sl-color-orange-light: #ffc46b;
   --sl-color-orange-hot: #ff6a2e;
   --be-code-inline: #c44e00;
-  --be-code-string: #0f766e;
-  --be-code-method: #0369a1;
-  --be-code-type: #f8fafc;
-  --be-code-keyword: #c44e00;
-  --be-code-muted: #64748b;
 }
 
 :root[data-theme='dark'] {
@@ -21,11 +16,6 @@
   --sl-color-bg-nav: #100d09;
   --sl-color-hairline-light: #3a2a18;
   --be-code-inline: #ffb454;
-  --be-code-string: #67e8f9;
-  --be-code-method: #7dd3fc;
-  --be-code-type: #fff7ed;
-  --be-code-keyword: #ffb454;
-  --be-code-muted: #b48a5a;
 }
 
 .expressive-code {
@@ -78,59 +68,6 @@
   --ec-frm-tooltipSuccessBg: #ff9f2e;
 }
 
-:root[data-theme='dark'] .expressive-code .ec-line span[style*='--0:#82AAFF'],
-:root[data-theme='dark'] .expressive-code .ec-line span[style*='--0:#C792EA'] {
-  --0: var(--be-code-method) !important;
-}
-
-:root[data-theme='dark'] .expressive-code .ec-line span[style*='--0:#ECC48D'],
-:root[data-theme='dark'] .expressive-code .ec-line span[style*='--0:#C3E88D'],
-:root[data-theme='dark'] .expressive-code .ec-line span[style*='--0:#C5E478'] {
-  --0: var(--be-code-string) !important;
-}
-
-:root[data-theme='dark'] .expressive-code .ec-line span[style*='--0:#F78C6C'],
-:root[data-theme='dark'] .expressive-code .ec-line span[style*='--0:#FFCB6B'] {
-  --0: var(--be-code-keyword) !important;
-}
-
-:root[data-theme='dark'] .expressive-code .ec-line span[style*='--0:#FF5370'],
-:root[data-theme='dark'] .expressive-code .ec-line span[style*='--0:#FF6A83'] {
-  --0: #ff6a2e !important;
-}
-
-:root:not([data-theme='dark']) .expressive-code .ec-line span[style*='--1:#3B61B0'],
-:root:not([data-theme='dark']) .expressive-code .ec-line span[style*='--1:#0C969B'] {
-  --1: var(--be-code-method) !important;
-}
-
-:root:not([data-theme='dark']) .expressive-code .ec-line span[style*='--1:#984E4D'],
-:root:not([data-theme='dark']) .expressive-code .ec-line span[style*='--1:#8F2165'],
-:root:not([data-theme='dark']) .expressive-code .ec-line span[style*='--1:#AA0982'] {
-  --1: var(--be-code-keyword) !important;
-}
-
-:root:not([data-theme='dark']) .expressive-code .ec-line span[style*='--1:#487A1E'],
-:root:not([data-theme='dark']) .expressive-code .ec-line span[style*='--1:#54790D'],
-:root:not([data-theme='dark']) .expressive-code .ec-line span[style*='--1:#4A7D1C'] {
-  --1: var(--be-code-string) !important;
-}
-
-:root[data-theme='dark'] .expressive-code .ec-line span[style*='--0:#89DDFF'],
-:root[data-theme='dark'] .expressive-code .ec-line span[style*='--0:#ADD7FF'] {
-  --0: var(--be-code-type) !important;
-}
-
-:root:not([data-theme='dark']) .expressive-code .ec-line span[style*='--1:#005CC5'],
-:root:not([data-theme='dark']) .expressive-code .ec-line span[style*='--1:#0550AE'] {
-  --1: var(--be-code-type) !important;
-}
-
-:root[data-theme='dark'] .expressive-code .ec-line span[style*='--0:#676E95'],
-:root:not([data-theme='dark']) .expressive-code .ec-line span[style*='--1:#6A737D'] {
-  color: var(--be-code-muted) !important;
-}
-
 .site-title img {
   image-rendering: pixelated;
 }
@@ -147,7 +84,43 @@
 }
 
 .sl-markdown-content a:not(:where(.not-content *)) {
+  color: var(--sl-color-accent-high);
   text-decoration-color: var(--sl-color-orange-light);
+  text-underline-offset: 0.18em;
+}
+
+:root[data-theme='dark'] .sl-markdown-content a:not(:where(.not-content *)) {
+  color: var(--sl-color-accent);
+}
+
+.sl-markdown-content a:not(:where(.not-content *)):hover {
+  color: var(--sl-color-orange-hot);
+}
+
+.sl-markdown-content .starlight-aside {
+  border-color: color-mix(in srgb, var(--sl-color-accent) 55%, transparent);
+  background: color-mix(in srgb, var(--sl-color-accent) 12%, var(--sl-color-bg));
+}
+
+.sl-markdown-content .starlight-aside__title {
+  color: var(--sl-color-accent-high);
+}
+
+:root[data-theme='dark'] .sl-markdown-content .starlight-aside__title {
+  color: var(--sl-color-accent);
+}
+
+.sl-markdown-content .sl-link-card {
+  border-color: color-mix(in srgb, var(--sl-color-accent) 22%, var(--sl-color-hairline-light));
+}
+
+.sl-markdown-content .sl-link-card:hover {
+  background: color-mix(in srgb, var(--sl-color-accent) 10%, var(--sl-color-bg));
+  border-color: color-mix(in srgb, var(--sl-color-accent) 60%, var(--sl-color-hairline-light));
+}
+
+.sl-markdown-content .sl-link-card:hover .icon {
+  color: var(--sl-color-accent);
 }
 
 .version-pill {
