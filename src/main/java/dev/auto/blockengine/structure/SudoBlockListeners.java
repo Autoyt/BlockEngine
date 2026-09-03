@@ -96,6 +96,19 @@ public final class SudoBlockListeners implements Listener {
         }
     }
 
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onMarkerInteract(@NotNull PlayerInteractEvent event) {
+        if (event.getHand() != EquipmentSlot.HAND || event.getAction() != Action.RIGHT_CLICK_BLOCK) {
+            return;
+        }
+        Block clicked = event.getClickedBlock();
+        if (clicked == null || !manager.isSudoMarker(clicked)) {
+            return;
+        }
+
+        event.setUseInteractedBlock(org.bukkit.event.Event.Result.DENY);
+    }
+
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onBreak(@NotNull BlockBreakEvent event) {
         manager.removePreviewIfMarker(event.getBlock());
