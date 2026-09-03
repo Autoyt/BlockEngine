@@ -18,7 +18,7 @@ public record ResourcePackConfig(
     private static final boolean SEND_ON_JOIN = true;
     private static final @NotNull String DEFAULT_HOST = "0.0.0.0";
     private static final @NotNull String DEFAULT_FILE_NAME = "blockengine-resource-pack.zip";
-    private static final @NotNull String DEFAULT_PROMPT = "This server uses BlockEngine custom block resources.";
+    private static final @NotNull String DEFAULT_PROMPT = "This server uses BlockEngine full block resources.";
 
     public static @NotNull ResourcePackConfig load(@NotNull JavaPlugin plugin) {
         FileConfiguration config = plugin.getConfig();

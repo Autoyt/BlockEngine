@@ -1,9 +1,9 @@
 ---
 title: Structure Building
-description: Use sudo blocks and the Block Engine Wand to put custom blocks inside vanilla structures.
+description: Use placeholder blocks and the Block Engine Wand to put full blocks inside vanilla structures.
 ---
 
-BlockEngine can create editor-only sudo blocks for vanilla structure authoring. A sudo block is a chest marker that carries the real custom block id in persistent data and renders a BlockEngine-style preview display while you build.
+BlockEngine can create editor-only placeholder blocks for vanilla structure authoring. A placeholder block is a chest marker that carries the full block id in persistent data and renders a BlockEngine-style preview display while you build.
 
 ## Permissions
 
@@ -13,9 +13,9 @@ Structure tools are gated by:
 blockengine.structure
 ```
 
-Players must be in creative mode for sudo pick-block and wand editing actions. Server operators receive the permission by default.
+Players must be in creative mode for placeholder pick-block and wand editing actions. Server operators receive the permission by default.
 
-## Sudo Catalog
+## Placeholder Catalog
 
 Open the structure-building catalog with:
 
@@ -23,11 +23,11 @@ Open the structure-building catalog with:
 /catalog sudo
 ```
 
-The first catalog item is the Block Engine Wand. After that, the catalog generates one sudo item for every registered custom block. Each sudo item uses the custom block model, places as a chest marker, and includes red warning lore so it is not mistaken for the real block item.
+The first catalog item is the Block Engine Wand. After that, the catalog generates one placeholder item for every registered full block. Each placeholder item uses the full block model, places as a chest marker, and includes red warning lore so it is not mistaken for the real block item.
 
 ## Building Workflow
 
-Place a sudo item while building a vanilla structure. The placed block becomes a chest with BlockEngine marker PDC:
+Place a placeholder item while building a vanilla structure. The placed block becomes a chest with BlockEngine marker PDC:
 
 ```text
 blockengine:sudo_marker = true
@@ -35,7 +35,7 @@ blockengine:sudo_marker_block_id = namespace:block_name
 blockengine:sudo_marker_state_id = state
 ```
 
-BlockEngine also spawns a persistent preview display at the chest so the structure still looks like the target custom block while editing.
+BlockEngine also spawns a persistent preview display at the chest so the structure still looks like the target full block while editing.
 
 ## Block Engine Wand
 
@@ -47,35 +47,35 @@ Give yourself the wand with:
 
 Wand actions:
 
-- Click a real BlockEngine custom block to convert it into a sudo marker chest and preview.
-- Click a sudo marker chest to convert it back into the real BlockEngine custom block.
-- Sneak-click a sudo marker chest to toggle only its preview display.
+- Click a BlockEngine full block to convert it into a placeholder block and preview.
+- Click a placeholder block to convert it back into the BlockEngine full block.
+- Sneak-click a placeholder block to toggle only its preview display.
 
-The wand does not create a real custom block record for a sudo marker. It is an authoring tool for structure files.
+The wand does not create a full block record for a placeholder block. It is an authoring tool for structure files.
 
-Wand transitions flash a one-second centered overlay on every face of the selected block, play a chime, and emit purple particles so builders can tell immediately whether the clicked block changed modes. The check overlay means a real custom block became a sudo marker; the X overlay means a sudo marker became a solid custom block.
+Wand transitions flash a one-second centered overlay on every face of the selected block, play a chime, and emit purple particles so builders can tell immediately whether the clicked block changed modes. The check overlay means a full block became a placeholder block; the X overlay means a placeholder block became a solid full block.
 
 ## Pick Block
 
-Middle-clicking a real custom block or a sudo marker selects the matching sudo item instead of the normal custom block item. This requires creative mode and `blockengine.structure`.
+Middle-clicking a full block or a placeholder block selects the matching placeholder item instead of the normal full block item. This requires creative mode and `blockengine.structure`.
 
 ## Structure Generation
 
-During Paper's `AsyncStructureGenerateEvent`, BlockEngine installs a shared block transformer that checks generated block states for sudo marker chests. Paper documents this event for naturally generated structures and `/place structure`; vanilla structure-block GUI loads are not exposed through the same reliable event path.
+During Paper's `AsyncStructureGenerateEvent`, BlockEngine installs a shared block transformer that checks generated block states for placeholder marker chests. Paper documents this event for naturally generated structures and `/place structure`; vanilla structure-block GUI loads are not exposed through the same reliable event path.
 
 When a marker is found:
 
 1. The transformer reads the marker block id and state id from the chest PDC.
 2. The transformer records the generated location.
 3. The generated chest is replaced with a barrier.
-4. BlockEngine schedules a server-thread conversion that places the real custom block through the normal placement system.
+4. BlockEngine schedules a server-thread conversion that places the full block through the normal placement system.
 
 Plugin-driven structure placement should reuse `SudoBlockManager.getInstance().structureBlockTransformer()` when calling Bukkit's `Structure#place(...)` overloads that accept block transformers. That keeps custom structure placement behavior identical to the Paper event path.
 
-BlockEngine also performs a bounded fallback scan for sudo markers inside a vanilla structure block's configured LOAD area after a creative player with `blockengine.structure` interacts with a structure block, and after a structure block receives redstone power. This exists because Paper does not currently provide a precise "structure block just loaded a structure" event. If a player opens the structure-block GUI and waits longer than the fallback scan window before clicking Load, use `/place structure` or plugin/API placement for deterministic conversion.
+BlockEngine also performs a bounded fallback scan for placeholder markers inside a vanilla structure block's configured LOAD area after a creative player with `blockengine.structure` interacts with a structure block, and after a structure block receives redstone power. This exists because Paper does not currently provide a precise "structure block just loaded a structure" event. If a player opens the structure-block GUI and waits longer than the fallback scan window before clicking Load, use `/place structure` or plugin/API placement for deterministic conversion.
 
 The conversion intentionally uses the existing placement and chunk persistence APIs directly. There is no separate chunk transaction or batch-storage abstraction in this workflow yet.
 
 ## Shutdown Safety
 
-Pending structure conversions are flushed when BlockEngine disables. If a generated marker has already become a barrier, shutdown flushing attempts to register the real custom block before chunk data is saved, preventing a generated structure from being left as plain barriers without BlockEngine records.
+Pending structure conversions are flushed when BlockEngine disables. If a generated marker has already become a barrier, shutdown flushing attempts to register the full block before chunk data is saved, preventing a generated structure from being left as plain barriers without BlockEngine records.

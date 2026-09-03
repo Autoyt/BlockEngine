@@ -120,7 +120,7 @@ public final class ResourcePackManager {
             Files.createDirectories(root);
 
             Component title = Component.text("BlockEngine");
-            Component description = Component.text("Generated BlockEngine custom block assets");
+            Component description = Component.text("Generated BlockEngine full block assets");
             packMeta(root, title, description);
             copyIcon(root, null);
             ItemModelGenerator.generateBackingBlock(root);
@@ -170,7 +170,7 @@ public final class ResourcePackManager {
                     new byte[0],
                     url(config),
                     Component.text("BlockEngine"),
-                    Component.text("Generated BlockEngine custom block assets"),
+                    Component.text("Generated BlockEngine full block assets"),
                     rich(config.prompt()),
                     config.required()
             );

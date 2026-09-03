@@ -79,8 +79,8 @@ public final class CatalogListeners implements Listener {
     ) {
         if (blocks.isEmpty() && !sudo) {
             BlockEngineChat.warn(player, namespace == null
-                    ? "No BlockEngine custom blocks are registered."
-                    : "No BlockEngine custom blocks are registered for namespace '" + namespace + "'.");
+                    ? "No BlockEngine full blocks are registered."
+                    : "No BlockEngine full blocks are registered for namespace '" + namespace + "'.");
             return;
         }
 

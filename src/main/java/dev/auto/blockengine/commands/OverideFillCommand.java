@@ -62,7 +62,7 @@ public final class OverideFillCommand implements Listener {
             case "fill" -> {
                 Source source = Source.from(sender);
                 if (source == null) {
-                    BlockEngineChat.send(sender, "BlockEngine custom block commands need a world-bound source.");
+                    BlockEngineChat.send(sender, "BlockEngine full block commands need a world-bound source.");
                     yield true;
                 }
                 yield fill(sender, source, command.args());
@@ -70,7 +70,7 @@ public final class OverideFillCommand implements Listener {
             case "setblock" -> {
                 Source source = Source.from(sender);
                 if (source == null) {
-                    BlockEngineChat.send(sender, "BlockEngine custom block commands need a world-bound source.");
+                    BlockEngineChat.send(sender, "BlockEngine full block commands need a world-bound source.");
                     yield true;
                 }
                 yield setBlock(sender, source, command.args());
@@ -113,7 +113,7 @@ public final class OverideFillCommand implements Listener {
             try {
                 amount = Math.clamp(Integer.parseInt(args[2]), 1, 6400);
             } catch (NumberFormatException ignored) {
-                BlockEngineChat.send(sender, "BlockEngine custom block give amount must be a number.");
+                BlockEngineChat.send(sender, "BlockEngine full block give amount must be a number.");
                 return true;
             }
         }
@@ -157,13 +157,13 @@ public final class OverideFillCommand implements Listener {
         Position from = Position.parse(args[0], args[1], args[2], source.location());
         Position to = Position.parse(args[3], args[4], args[5], source.location());
         if (from == null || to == null) {
-            BlockEngineChat.send(sender, "BlockEngine only supports absolute and ~ relative block coordinates for custom block fill.");
+            BlockEngineChat.send(sender, "BlockEngine only supports absolute and ~ relative block coordinates for full block fill.");
             return true;
         }
 
         String mode = args.length >= 8 ? args[7].toLowerCase(Locale.ROOT) : "replace";
         if (!mode.equals("replace") && !mode.equals("destroy") && !mode.equals("keep")) {
-            BlockEngineChat.send(sender, "BlockEngine custom block fill currently supports replace, destroy, and keep.");
+            BlockEngineChat.send(sender, "BlockEngine full block fill currently supports replace, destroy, and keep.");
             return true;
         }
 
@@ -221,13 +221,13 @@ public final class OverideFillCommand implements Listener {
 
         Position position = Position.parse(args[0], args[1], args[2], source.location());
         if (position == null) {
-            BlockEngineChat.send(sender, "BlockEngine only supports absolute and ~ relative block coordinates for custom block setblock.");
+            BlockEngineChat.send(sender, "BlockEngine only supports absolute and ~ relative block coordinates for full block setblock.");
             return true;
         }
 
         String mode = args.length >= 5 ? args[4].toLowerCase(Locale.ROOT) : "replace";
         if (!mode.equals("replace") && !mode.equals("destroy") && !mode.equals("keep")) {
-            BlockEngineChat.send(sender, "BlockEngine custom block setblock currently supports replace, destroy, and keep.");
+            BlockEngineChat.send(sender, "BlockEngine full block setblock currently supports replace, destroy, and keep.");
             return true;
         }
 

@@ -68,18 +68,18 @@ public final class ItemManager {
         meta.getPersistentDataContainer().set(SUDO_BLOCK_ID_KEY, PersistentDataType.STRING, block.id());
         meta.getPersistentDataContainer().set(SUDO_STATE_ID_KEY, PersistentDataType.STRING, resolvedState);
         itemModel(meta, modelKey(block, resolvedState));
-        meta.displayName(Component.text("Sudo: ", NamedTextColor.RED, TextDecoration.BOLD)
+        meta.displayName(Component.text("Placeholder: ", NamedTextColor.RED, TextDecoration.BOLD)
                 .append(BlockDisplayNames.itemName(block.apiDefinition().item().name(), block)
                         .decoration(TextDecoration.BOLD, false)));
         meta.lore(java.util.List.of(
-                Component.text("[!] SUDO BLOCK", NamedTextColor.RED, TextDecoration.BOLD),
+                Component.text("[!] PLACEHOLDER BLOCK", NamedTextColor.RED, TextDecoration.BOLD),
                 Component.text()
                         .append(Component.text("! ", NamedTextColor.RED, TextDecoration.BOLD))
                         .append(Component.text("Structure-building placeholder only.", NamedTextColor.GRAY))
                         .build(),
                 Component.text()
                         .append(Component.text("! ", NamedTextColor.RED, TextDecoration.BOLD))
-                        .append(Component.text("Not a real BlockEngine block.", NamedTextColor.GRAY))
+                        .append(Component.text("Not a full BlockEngine block.", NamedTextColor.GRAY))
                         .build(),
                 Component.text()
                         .append(Component.text("! ", NamedTextColor.RED, TextDecoration.BOLD))
@@ -102,8 +102,8 @@ public final class ItemManager {
         meta.displayName(Component.text("Block Engine Wand", NamedTextColor.GOLD, TextDecoration.BOLD));
         meta.lore(java.util.List.of(
                 Component.text("Structure building tool", NamedTextColor.YELLOW),
-                Component.text("Click custom blocks to toggle sudo mode.", NamedTextColor.GRAY),
-                Component.text("Sneak-click sudo blocks to toggle previews.", NamedTextColor.GRAY)
+                Component.text("Click full blocks to toggle placeholder mode.", NamedTextColor.GRAY),
+                Component.text("Sneak-click placeholder blocks to toggle previews.", NamedTextColor.GRAY)
         ));
         meta.setEnchantmentGlintOverride(true);
         meta.setMaxStackSize(1);

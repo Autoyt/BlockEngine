@@ -98,7 +98,7 @@ public final class BlockEngineCommand implements BasicCommand {
     private @NotNull Dialog infoDialog() {
         Component title = Component.text("BlockEngine", BlockEngineChat.ORANGE).decorate(TextDecoration.BOLD);
         Component summary = Component.text()
-                .append(Component.text("Custom block runtime by ", BlockEngineChat.GRAY))
+                .append(Component.text("Full block runtime by ", BlockEngineChat.GRAY))
                 .append(Component.text("AutoYT", BlockEngineChat.ORANGE_LIGHT).decorate(TextDecoration.BOLD))
                 .append(Component.newline())
                 .append(Component.text("Version: ", BlockEngineChat.GRAY))

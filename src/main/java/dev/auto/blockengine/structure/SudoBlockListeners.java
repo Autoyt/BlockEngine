@@ -43,13 +43,13 @@ public final class SudoBlockListeners implements Listener {
         Player player = event.getPlayer();
         if (!allowed(player)) {
             event.setCancelled(true);
-            BlockEngineChat.error(player, "You do not have permission to place BlockEngine sudo blocks.");
+            BlockEngineChat.error(player, "You do not have permission to place BlockEngine placeholder blocks.");
             return;
         }
         BlockDefinition definition = BlockRegistry.getBlock(blockId);
         if (definition == null) {
             event.setCancelled(true);
-            BlockEngineChat.error(player, "Unknown sudo block '" + blockId + "'.");
+            BlockEngineChat.error(player, "Unknown placeholder block '" + blockId + "'.");
             return;
         }
 
@@ -81,9 +81,9 @@ public final class SudoBlockListeners implements Listener {
         if (manager.isSudoMarker(clicked) && player.isSneaking()) {
             SudoBlockManager.PreviewToggle result = manager.togglePreview(clicked);
             if (result == SudoBlockManager.PreviewToggle.VISIBLE) {
-                BlockEngineChat.success(player, "Sudo block preview shown.");
+                BlockEngineChat.success(player, "Placeholder block preview shown.");
             } else if (result == SudoBlockManager.PreviewToggle.HIDDEN) {
-                BlockEngineChat.success(player, "Sudo block preview hidden.");
+                BlockEngineChat.success(player, "Placeholder block preview hidden.");
             }
             manager.playWandFeedback(player, clicked, result != SudoBlockManager.PreviewToggle.NOT_A_MARKER);
             return;
@@ -91,10 +91,10 @@ public final class SudoBlockListeners implements Listener {
 
         if (manager.isSudoMarker(clicked)) {
             if (manager.convertMarkerToCustomBlock(clicked)) {
-                BlockEngineChat.success(player, "Converted sudo marker to a real custom block.");
+                BlockEngineChat.success(player, "Converted placeholder block to a full block.");
                 manager.playWandFeedback(player, clicked, false);
             } else {
-                BlockEngineChat.error(player, "That sudo marker no longer points at a registered custom block.");
+                BlockEngineChat.error(player, "That placeholder block no longer points at a registered full block.");
                 manager.playWandFeedback(player, clicked, false);
             }
             return;
@@ -102,15 +102,15 @@ public final class SudoBlockListeners implements Listener {
 
         RuntimeBlockView customBlock = customBlock(clicked);
         if (customBlock == null) {
-            BlockEngineChat.error(player, "That is not a BlockEngine custom block or sudo marker.");
+            BlockEngineChat.error(player, "That is not a BlockEngine full block or placeholder block.");
             manager.playWandFeedback(player, clicked, false);
             return;
         }
         if (manager.convertCustomBlockToMarker(clicked, customBlock)) {
-            BlockEngineChat.success(player, "Converted custom block to a sudo structure marker.");
+            BlockEngineChat.success(player, "Converted full block to a placeholder block.");
             manager.playWandFeedback(player, clicked, true);
         } else {
-            BlockEngineChat.error(player, "Could not convert that custom block to a sudo marker.");
+            BlockEngineChat.error(player, "Could not convert that full block to a placeholder block.");
             manager.playWandFeedback(player, clicked, false);
         }
     }
