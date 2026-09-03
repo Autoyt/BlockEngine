@@ -43,6 +43,7 @@ public final class CatalogListeners implements Listener {
     private static final int OUTPUT_SLOT = 1;
     private static final @NotNull Component TITLE = Component.text("BlockEngine catalog");
     private static final @NotNull Component SUDO_TITLE = Component.text("BlockEngine structure catalog");
+    private static final @NotNull NamespacedKey WAND_RECIPE_KEY = new NamespacedKey(Main.getInstance(), "catalog/sudo/_wand");
 
     private static final Map<UUID, Session> sessions = new HashMap<>();
     private static final Map<NamespacedKey, RecipeEntry> recipes = new LinkedHashMap<>();
@@ -76,20 +77,16 @@ public final class CatalogListeners implements Listener {
             @NotNull List<BlockDefinition> blocks,
             boolean sudo
     ) {
-        if (blocks.isEmpty()) {
-            BlockEngineChat.warn(player, sudo
-                    ? "No BlockEngine custom blocks are registered for structure building."
-                    : namespace == null
+        if (blocks.isEmpty() && !sudo) {
+            BlockEngineChat.warn(player, namespace == null
                     ? "No BlockEngine custom blocks are registered."
                     : "No BlockEngine custom blocks are registered for namespace '" + namespace + "'.");
             return;
         }
 
-        Collection<NamespacedKey> keys = blocks.stream()
-                .map(block -> recipeKey(block, sudo))
-                .toList();
+        Collection<NamespacedKey> keys = recipeKeys(blocks, sudo);
         player.discoverRecipes(keys);
-        BlockDefinition first = blocks.getFirst();
+        BlockDefinition first = sudo ? null : blocks.getFirst();
         CatalogHolder holder = new CatalogHolder(namespace, keys, sudo);
         sessions.put(player.getUniqueId(), new Session(first, keys, holder, sudo));
 
@@ -215,6 +212,17 @@ public final class CatalogListeners implements Listener {
         clearRecipes();
         List<BlockDefinition> blocks = sudo ? allBlocks() : filteredBlocks(null);
 
+        if (sudo) {
+            StonecuttingRecipe wandRecipe = new StonecuttingRecipe(
+                    WAND_RECIPE_KEY,
+                    ItemManager.createWand(),
+                    new RecipeChoice.MaterialChoice(Material.CHEST)
+            );
+            wandRecipe.setGroup("BlockEngine_structure_catalog");
+            Bukkit.addRecipe(wandRecipe);
+            recipes.put(WAND_RECIPE_KEY, new RecipeEntry(null, sudo));
+        }
+
         for (BlockDefinition block : blocks) {
             NamespacedKey key = recipeKey(block, sudo);
             StonecuttingRecipe recipe = new StonecuttingRecipe(
@@ -244,19 +252,25 @@ public final class CatalogListeners implements Listener {
         }
     }
 
-    private static void give(@NotNull Player player, @NotNull BlockDefinition block, boolean sudo) {
-        ItemStack stack = sudo ? ItemManager.createSudo(block) : ItemManager.create(block);
+    private static void give(@NotNull Player player, @Nullable BlockDefinition block, boolean sudo) {
+        ItemStack stack = block == null ? ItemManager.createWand() : sudo ? ItemManager.createSudo(block) : ItemManager.create(block);
         stack.setAmount(64);
+        if (block == null) {
+            stack.setAmount(1);
+        }
         Map<Integer, ItemStack> leftover = player.getInventory().addItem(stack);
         for (ItemStack item : leftover.values()) {
             player.getWorld().dropItemNaturally(player.getLocation(), item);
         }
         BlockEngineChat.send(player, BlockEngineChat.status("gave", true)
                 .append(Component.space())
-                .append(BlockEngineChat.value("64x"))
+                .append(BlockEngineChat.value(block == null ? "1x" : "64x"))
                 .append(Component.space())
-                .append(sudo ? Component.text("sudo ", BlockEngineChat.WARNING) : Component.empty())
-                .append(BlockEngineChat.blockName(block)));
+                .append(block == null
+                        ? Component.text("Block Engine Wand", BlockEngineChat.ORANGE_LIGHT)
+                        : sudo
+                        ? Component.text("sudo ", BlockEngineChat.WARNING).append(BlockEngineChat.blockName(block))
+                        : BlockEngineChat.blockName(block)));
     }
 
     private static @NotNull ItemStack inputItem(boolean sudo) {
@@ -267,9 +281,12 @@ public final class CatalogListeners implements Listener {
         return item;
     }
 
-    private static @NotNull ItemStack output(@NotNull BlockDefinition block, boolean sudo) {
-        ItemStack item = sudo ? ItemManager.createSudo(block) : ItemManager.create(block);
+    private static @NotNull ItemStack output(@Nullable BlockDefinition block, boolean sudo) {
+        ItemStack item = block == null ? ItemManager.createWand() : sudo ? ItemManager.createSudo(block) : ItemManager.create(block);
         item.setAmount(64);
+        if (block == null) {
+            item.setAmount(1);
+        }
         return item;
     }
 
@@ -294,17 +311,27 @@ public final class CatalogListeners implements Listener {
         return new NamespacedKey(Main.getInstance(), sudo ? "catalog/sudo/" + safe(block.id()) : "catalog/" + safe(block.id()));
     }
 
-    private record RecipeEntry(@NotNull BlockDefinition block, boolean sudo) {
+    private static @NotNull Collection<NamespacedKey> recipeKeys(@NotNull List<BlockDefinition> blocks, boolean sudo) {
+        if (!sudo) {
+            return blocks.stream().map(block -> recipeKey(block, false)).toList();
+        }
+        java.util.ArrayList<NamespacedKey> keys = new java.util.ArrayList<>();
+        keys.add(WAND_RECIPE_KEY);
+        keys.addAll(blocks.stream().map(block -> recipeKey(block, true)).toList());
+        return keys;
+    }
+
+    private record RecipeEntry(@Nullable BlockDefinition block, boolean sudo) {
     }
 
     private static final class Session {
-        private @NotNull BlockDefinition selected;
+        private @Nullable BlockDefinition selected;
         private final @NotNull Collection<NamespacedKey> recipes;
         private final @NotNull CatalogHolder holder;
         private final boolean sudo;
 
         private Session(
-                @NotNull BlockDefinition selected,
+                @Nullable BlockDefinition selected,
                 @NotNull Collection<NamespacedKey> recipes,
                 @NotNull CatalogHolder holder,
                 boolean sudo
@@ -315,7 +342,7 @@ public final class CatalogListeners implements Listener {
             this.sudo = sudo;
         }
 
-        private @NotNull BlockDefinition selected() {
+        private @Nullable BlockDefinition selected() {
             return selected;
         }
 
@@ -331,7 +358,7 @@ public final class CatalogListeners implements Listener {
             return sudo;
         }
 
-        private void selected(@NotNull BlockDefinition selected) {
+        private void selected(@Nullable BlockDefinition selected) {
             this.selected = selected;
         }
     }

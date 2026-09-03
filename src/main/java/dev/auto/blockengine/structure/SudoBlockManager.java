@@ -106,6 +106,32 @@ public final class SudoBlockManager {
         return removed;
     }
 
+    public @NotNull PreviewToggle togglePreview(@NotNull Block block) {
+        TileState state = tileState(block);
+        if (state == null) {
+            return PreviewToggle.NOT_A_MARKER;
+        }
+
+        String blockId = markerBlockId(state);
+        if (blockId == null) {
+            return PreviewToggle.NOT_A_MARKER;
+        }
+        UUID previewId = previewId(state);
+        if (previewId != null && ManagedDisplayManager.getInstance().get(previewId) != null) {
+            ManagedDisplayManager.getInstance().remove(previewId);
+            state.getPersistentDataContainer().remove(MARKER_PREVIEW_ID_KEY);
+            state.update(true, false);
+            return PreviewToggle.HIDDEN;
+        }
+
+        BlockDefinition definition = BlockRegistry.getBlock(blockId);
+        if (definition == null) {
+            return PreviewToggle.NOT_A_MARKER;
+        }
+        spawnPreview(block, definition, resolveState(definition, markerStateId(state)));
+        return PreviewToggle.VISIBLE;
+    }
+
     public void removePreviewIfMarker(@NotNull Block block) {
         TileState state = tileState(block);
         if (state == null || markerBlockId(state) == null) {
@@ -276,5 +302,11 @@ public final class SudoBlockManager {
         private @NotNull PendingConversion nextAttempt() {
             return new PendingConversion(worldId, x, y, z, blockId, stateId, attempts + 1);
         }
+    }
+
+    public enum PreviewToggle {
+        VISIBLE,
+        HIDDEN,
+        NOT_A_MARKER
     }
 }

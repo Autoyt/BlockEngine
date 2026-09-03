@@ -78,8 +78,12 @@ public final class SudoBlockListeners implements Listener {
         }
 
         if (manager.isSudoMarker(clicked)) {
-            manager.hidePreview(clicked);
-            BlockEngineChat.success(event.getPlayer(), "Sudo block preview hidden.");
+            SudoBlockManager.PreviewToggle result = manager.togglePreview(clicked);
+            if (result == SudoBlockManager.PreviewToggle.VISIBLE) {
+                BlockEngineChat.success(event.getPlayer(), "Sudo block preview shown.");
+            } else if (result == SudoBlockManager.PreviewToggle.HIDDEN) {
+                BlockEngineChat.success(event.getPlayer(), "Sudo block preview hidden.");
+            }
             return;
         }
 
