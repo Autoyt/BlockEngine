@@ -103,7 +103,6 @@ public final class SudoBlockListeners implements Listener {
         RuntimeBlockView customBlock = customBlock(clicked);
         if (customBlock == null) {
             BlockEngineChat.error(player, "That is not a BlockEngine full block or placeholder block.");
-            manager.playWandFeedback(player, clicked, false);
             return;
         }
         if (manager.convertCustomBlockToMarker(clicked, customBlock)) {
