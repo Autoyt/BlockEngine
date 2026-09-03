@@ -22,6 +22,7 @@ import org.bukkit.block.BlockState;
 import org.bukkit.block.Structure;
 import org.bukkit.block.TileState;
 import org.bukkit.block.structure.UsageMode;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.util.BlockTransformer;
@@ -34,6 +35,8 @@ import java.util.Queue;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 public final class SudoBlockManager {
     public static final String PERMISSION = "blockengine.structure";
@@ -48,6 +51,7 @@ public final class SudoBlockManager {
 
     private static final SudoBlockManager instance = new SudoBlockManager();
     private final @NotNull Queue<PendingConversion> pendingConversions = new ConcurrentLinkedQueue<>();
+    private final @NotNull ConcurrentMap<BlockLocationKey, UUID> previewIds = new ConcurrentHashMap<>();
     private final @NotNull AtomicBoolean applyScheduled = new AtomicBoolean();
 
     private SudoBlockManager() {
@@ -94,7 +98,7 @@ public final class SudoBlockManager {
         }
         String resolvedState = resolveState(definition, stateId);
         block.setType(Material.CHEST, false);
-        writeMarker(block, definition.id(), resolvedState, null);
+        writeMarker(block, definition.id(), resolvedState);
         spawnPreview(block, definition, resolvedState);
     }
 
@@ -104,8 +108,9 @@ public final class SudoBlockManager {
             return false;
         }
 
-        UUID previewId = previewId(state);
+        UUID previewId = previewId(block, state);
         boolean removed = previewId != null && ManagedDisplayManager.getInstance().remove(previewId);
+        previewIds.remove(location(block));
         state.getPersistentDataContainer().remove(MARKER_PREVIEW_ID_KEY);
         state.update(true, false);
         return removed;
@@ -121,9 +126,10 @@ public final class SudoBlockManager {
         if (blockId == null) {
             return PreviewToggle.NOT_A_MARKER;
         }
-        UUID previewId = previewId(state);
+        UUID previewId = previewId(block, state);
         if (previewId != null && ManagedDisplayManager.getInstance().get(previewId) != null) {
             ManagedDisplayManager.getInstance().remove(previewId);
+            previewIds.remove(location(block));
             state.getPersistentDataContainer().remove(MARKER_PREVIEW_ID_KEY);
             state.update(true, false);
             return PreviewToggle.HIDDEN;
@@ -142,10 +148,13 @@ public final class SudoBlockManager {
         if (state == null || markerBlockId(state) == null) {
             return;
         }
-        UUID previewId = previewId(state);
+        UUID previewId = previewId(block, state);
         if (previewId != null) {
             ManagedDisplayManager.getInstance().remove(previewId);
         }
+        previewIds.remove(location(block));
+        state.getPersistentDataContainer().remove(MARKER_PREVIEW_ID_KEY);
+        state.update(true, false);
     }
 
     public boolean convertCustomBlockToMarker(@NotNull Block block, @NotNull RuntimeBlockView customBlock) {
@@ -282,14 +291,14 @@ public final class SudoBlockManager {
                 .shadowStrength(0.0f)
                 .build();
         var handle = ManagedDisplayManager.getInstance().create(spec, DisplayPersistence.PERSISTENT_WORLD);
-        writeMarker(block, definition.id(), stateId, handle.id());
+        previewIds.put(location(block), handle.id());
+        writeMarker(block, definition.id(), stateId);
     }
 
     private void writeMarker(
             @NotNull Block block,
             @NotNull String blockId,
-            @NotNull String stateId,
-            @Nullable UUID previewId
+            @NotNull String stateId
     ) {
         TileState state = tileState(block);
         if (state == null) {
@@ -299,11 +308,7 @@ public final class SudoBlockManager {
         pdc.set(SUDO_MARKER_KEY, PersistentDataType.BOOLEAN, true);
         pdc.set(MARKER_BLOCK_ID_KEY, PersistentDataType.STRING, blockId);
         pdc.set(MARKER_STATE_ID_KEY, PersistentDataType.STRING, stateId);
-        if (previewId == null) {
-            pdc.remove(MARKER_PREVIEW_ID_KEY);
-        } else {
-            pdc.set(MARKER_PREVIEW_ID_KEY, PersistentDataType.STRING, previewId.toString());
-        }
+        pdc.remove(MARKER_PREVIEW_ID_KEY);
         state.update(true, false);
     }
 
@@ -369,16 +374,66 @@ public final class SudoBlockManager {
         return state.getPersistentDataContainer().get(MARKER_STATE_ID_KEY, PersistentDataType.STRING);
     }
 
-    private @Nullable UUID previewId(@NotNull TileState state) {
+    private @NotNull BlockLocationKey location(@NotNull Block block) {
+        return new BlockLocationKey(block.getWorld().getUID(), block.getX(), block.getY(), block.getZ());
+    }
+
+    private @Nullable UUID previewId(@NotNull Block block, @NotNull TileState state) {
+        UUID runtimeId = previewIds.get(location(block));
+        if (runtimeId != null && previewBelongsToBlock(block, runtimeId)) {
+            return runtimeId;
+        }
+        if (runtimeId != null) {
+            previewIds.remove(location(block), runtimeId);
+        }
+
         String id = state.getPersistentDataContainer().get(MARKER_PREVIEW_ID_KEY, PersistentDataType.STRING);
         if (id == null) {
             return null;
         }
         try {
-            return UUID.fromString(id);
+            UUID legacyId = UUID.fromString(id);
+            if (previewBelongsToBlock(block, legacyId)) {
+                previewIds.put(location(block), legacyId);
+                return legacyId;
+            }
         } catch (IllegalArgumentException ignored) {
+        }
+        state.getPersistentDataContainer().remove(MARKER_PREVIEW_ID_KEY);
+        state.update(true, false);
+        UUID nearbyId = nearbyPreviewId(block, state);
+        if (nearbyId != null) {
+            previewIds.put(location(block), nearbyId);
+            return nearbyId;
+        }
+        return null;
+    }
+
+    private @Nullable UUID nearbyPreviewId(@NotNull Block block, @NotNull TileState state) {
+        String blockId = markerBlockId(state);
+        BlockDefinition definition = blockId == null ? null : BlockRegistry.getBlock(blockId);
+        if (definition == null) {
             return null;
         }
+        ItemStack expected = ItemManager.display(definition, resolveState(definition, markerStateId(state)));
+        Location location = block.getLocation().add(0.5, 0.5, 0.5);
+        return ManagedDisplayManager.getInstance().displaysNear(location, 0.001).stream()
+                .filter(handle -> handle.spec().itemStack().isSimilar(expected))
+                .map(handle -> handle.id())
+                .findFirst()
+                .orElse(null);
+    }
+
+    private boolean previewBelongsToBlock(@NotNull Block block, @NotNull UUID previewId) {
+        var handle = ManagedDisplayManager.getInstance().get(previewId);
+        if (handle == null) {
+            return false;
+        }
+        DisplaySpec spec = handle.spec();
+        return spec.worldId().equals(block.getWorld().getUID())
+                && Math.abs(spec.x() - (block.getX() + 0.5)) < 0.001
+                && Math.abs(spec.y() - (block.getY() + 0.5)) < 0.001
+                && Math.abs(spec.z() - (block.getZ() + 0.5)) < 0.001;
     }
 
     private @NotNull String resolveState(@NotNull BlockDefinition definition, @Nullable String stateId) {
