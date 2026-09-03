@@ -20,7 +20,6 @@ public final class DemoBreakBlockAdapter implements BlockAdapter {
     @Override
     public void define(@NotNull BlockDefinition.Builder builder) {
         builder
-                .setDefaultBlock(Material.ORANGE_CONCRETE)
                 .defaultState("default")
                 .item(item -> item
                         .name("<#ff8c1a>Demo: On Break")

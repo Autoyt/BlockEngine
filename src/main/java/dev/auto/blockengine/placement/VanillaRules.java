@@ -28,7 +28,7 @@ public final class VanillaRules {
             @Nullable Player player,
             @Nullable BlockFace placedAgainst
     ) {
-        BlockData data = definition.apiDefinition().vanillaBlock().createBlockData();
+        BlockData data = definition.apiDefinition().defaultBlock().createBlockData();
         applyPlacement(definition.apiDefinition().placement(), data, player, placedAgainst);
         return data;
     }

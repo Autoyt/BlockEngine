@@ -162,4 +162,34 @@ class BlockPackLoaderTest {
         assertEquals(1, result.packs().size());
         assertTrue(result.packs().getFirst().blocks().getFirst().creativeMenu());
     }
+
+    @Test
+    void rejectsVanillaBlockOverride() throws IOException {
+        Path pack = tempDir.resolve("vanilla_override");
+        Files.createDirectories(pack.resolve("blocks"));
+        Files.writeString(pack.resolve("pack.json"), """
+                {
+                  "format": 1,
+                  "namespace": "vanilla_override"
+                }
+                """);
+        Files.writeString(pack.resolve("blocks").resolve("block.json"), """
+                {
+                  "vanilla-block": "stone",
+                  "states": {
+                    "default": {
+                      "textures": {
+                        "all": "block"
+                      }
+                    }
+                  }
+                }
+                """);
+
+        BlockPackLoader.Result result = BlockPackLoader.load(tempDir);
+
+        assertEquals(0, result.packs().size());
+        assertEquals(1, result.errors().size());
+        assertTrue(result.errors().getFirst().contains("'vanilla-block' is no longer supported"));
+    }
 }

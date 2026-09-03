@@ -22,7 +22,6 @@ public final class DemoInventoryBlockAdapter implements BlockAdapter {
     @Override
     public void define(@NotNull BlockDefinition.Builder builder) {
         builder
-                .setDefaultBlock(Material.BLUE_CONCRETE)
                 .defaultState("default")
                 .item(item -> item
                         .name("<#2f6bff>Demo: Inventory")

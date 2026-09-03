@@ -4,7 +4,6 @@ import dev.auto.blockengine.api.blocks.BlockAdapter;
 import dev.auto.blockengine.api.blocks.BlockCreateContext;
 import dev.auto.blockengine.api.blocks.BlockData;
 import dev.auto.blockengine.api.blocks.BlockDefinition;
-import org.bukkit.Material;
 import org.jetbrains.annotations.NotNull;
 
 public final class DemoMovementBlockAdapter implements BlockAdapter {
@@ -16,7 +15,6 @@ public final class DemoMovementBlockAdapter implements BlockAdapter {
     @Override
     public void define(@NotNull BlockDefinition.Builder builder) {
         builder
-                .setDefaultBlock(Material.CYAN_CONCRETE)
                 .defaultState("default")
                 .item(item -> item
                         .name("<aqua>Demo: Movement Block")

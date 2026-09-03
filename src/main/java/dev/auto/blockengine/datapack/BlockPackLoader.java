@@ -254,8 +254,10 @@ public final class BlockPackLoader {
         if (!NAME_PATTERN.matcher(name).matches()) {
             throw new IllegalArgumentException("Invalid block name '" + name + "'.");
         }
+        if (root.has("vanilla-block")) {
+            throw new IllegalArgumentException("'vanilla-block' is no longer supported; BlockEngine uses a fixed base block.");
+        }
 
-        Material vanillaBlock = material(root, "vanilla-block", Material.BARRIER, true, file);
         BlockDefinition.Placement placement = enumValue(
                 BlockDefinition.Placement.class,
                 textValue(root, "placement", "none"),
@@ -264,14 +266,13 @@ public final class BlockPackLoader {
         );
         BlockPackBlock.Item item = item(root.path("item"), file);
         String defaultState = textValue(root, "default-state", "default");
-        Map<String, BlockPackBlock.State> states = states(root.path("states"), vanillaBlock, file);
+        Map<String, BlockPackBlock.State> states = states(root.path("states"), file);
         if (!states.containsKey(defaultState)) {
             throw new IllegalArgumentException("Default state '" + defaultState + "' is not defined.");
         }
 
         return new BlockPackBlock(
                 name,
-                vanillaBlock,
                 boolValue(root, "catalog", packCatalog),
                 boolValue(root, "creative-menu", packCreativeMenu),
                 placement,
@@ -301,7 +302,6 @@ public final class BlockPackLoader {
 
     private static @NotNull Map<String, BlockPackBlock.State> states(
             @NotNull JsonNode node,
-            @NotNull Material vanillaBlock,
             @NotNull Path file
     ) {
         if (!node.isObject() || node.isEmpty()) {
@@ -314,14 +314,13 @@ public final class BlockPackLoader {
             if (!NAME_PATTERN.matcher(stateId).matches()) {
                 throw new IllegalArgumentException("Invalid state id '" + stateId + "'.");
             }
-            states.put(stateId, state(entry.getValue(), vanillaBlock, file));
+            states.put(stateId, state(entry.getValue(), file));
         });
         return states;
     }
 
     private static @NotNull BlockPackBlock.State state(
             @NotNull JsonNode node,
-            @NotNull Material vanillaBlock,
             @NotNull Path file
     ) {
         BlockDefinition.Textures textures = textures(node.path("textures"));
@@ -333,7 +332,7 @@ public final class BlockPackLoader {
         return new BlockPackBlock.State(
                 floatValue(node, "hardness", 0.5f),
                 floatValue(node, "mining-speed", 1.0f),
-                material(node, "mining-profile", vanillaBlock, true, file),
+                material(node, "mining-profile", Material.STONE, true, file),
                 preferredTools(node.path("preferred-tools"), file),
                 boolValue(node, "require-preferred-tool-for-drops", false),
                 boolValue(node, "require-silk-touch-for-drops", false),

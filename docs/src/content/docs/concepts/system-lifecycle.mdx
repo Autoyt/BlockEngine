@@ -51,7 +51,7 @@ BlockEngine validates dependencies and refuses duplicate block ids. A block id s
 A `BlockDefinition` tells BlockEngine what the block is allowed to do:
 
 <CardGrid>
-  <LinkCard title="vanillaBlock" href="/BlockEngine/code-driven/#item-and-block" description="The fallback Bukkit block material used in-world." />
+  <LinkCard title="fixed base block" href="/BlockEngine/code-driven/#item-and-block" description="The engine-owned Bukkit block material used in-world." />
   <LinkCard title="item" href="/BlockEngine/code-driven/#item-and-block" description="The inventory representation, including title, lore, glint, and placeability." />
   <LinkCard title="creativeMenu and catalog" href="/BlockEngine/guides/creative-inventory/" description="Visibility switches for vanilla creative inventory and BlockEngine catalog flows." />
   <LinkCard title="placement" href="/BlockEngine/code-driven/#definition" description="Orientation behavior for none, horizontal-facing, axis, and directional placement." />
@@ -93,7 +93,7 @@ The converted item contains BlockEngine metadata, uses the configured item model
 
 ## 8. Placement creates persisted block data
 
-When the player places the item, BlockEngine validates the placement rules, creates `BlockData`, sets the world fallback block, and records the custom block id and state.
+When the player places the item, BlockEngine validates the placement rules, creates `BlockData`, sets the engine-owned base block, and records the custom block id and state.
 
 For Java adapters, `createDefaultData()` creates the initial data object and `onPlace()` can react after placement. Data-driven blocks use the default adapter and normal configured state behavior.
 
@@ -105,6 +105,6 @@ Use events for observing or coordinating with other plugins. Use adapters when t
 
 ## 10. Save and load restore the world
 
-BlockEngine persists placed custom blocks separately from vanilla block state. The world stores a vanilla fallback material, while BlockEngine stores the custom id, state id, and public data maps.
+BlockEngine persists placed custom blocks separately from vanilla block state. The world stores BlockEngine's fixed base material, while BlockEngine stores the custom id, state id, and public data maps.
 
 Adapters can also save private payload bytes when they need data that does not fit the public map structure. If private payload recovery fails, the adapter can decide whether the block should remain with fallback data or be treated as unloadable.

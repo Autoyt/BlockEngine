@@ -6,7 +6,6 @@ import dev.auto.blockengine.api.blocks.BlockCreateContext;
 import dev.auto.blockengine.api.blocks.BlockData;
 import dev.auto.blockengine.api.blocks.BlockDefinition;
 import dev.auto.blockengine.chat.BlockEngineChat;
-import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 
@@ -21,7 +20,6 @@ public final class DemoStateBlockAdapter implements BlockAdapter {
     @Override
     public void define(@NotNull BlockDefinition.Builder builder) {
         builder
-                .setDefaultBlock(Material.PURPLE_CONCRETE)
                 .defaultState("red")
                 .item(item -> item
                         .name("<#b84dff>Demo: State Cycle")

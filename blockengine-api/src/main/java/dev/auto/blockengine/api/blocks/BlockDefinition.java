@@ -19,7 +19,7 @@ import java.util.regex.Pattern;
  * Server-side definition of a BlockEngine custom block.
  *
  * <p>A definition is the static contract for one block type. It describes the
- * backing vanilla block, creative-menu visibility, placed item, placement
+ * fixed engine backing block, creative-menu visibility, placed item, placement
  * behavior, block states, mining behavior, textures, sounds, and movement
  * rules. Runtime behavior belongs in the owning {@link BlockAdapter}.</p>
  */
@@ -29,6 +29,9 @@ public final class BlockDefinition {
 
     private @Nullable String namespace;
     private final @NotNull String name;
+    private static final @NotNull Material BASE_BLOCK = Material.BARRIER;
+    private static final @NotNull Material DEFAULT_MINING_PROFILE = Material.STONE;
+
     private final @NotNull Material defaultBlock;
     private final boolean catalog;
     private final boolean creativeMenu;
@@ -113,20 +116,11 @@ public final class BlockDefinition {
     }
 
     /**
-     * Returns the vanilla block used as the physical backing block.
+     * Returns the fixed engine block used as the physical backing block.
      *
-     * @return backing block material
+     * @return fixed backing block material
      */
     public @NotNull Material defaultBlock() {
-        return defaultBlock;
-    }
-
-    /**
-     * Returns the vanilla block used as the physical backing block.
-     *
-     * @return backing block material
-     */
-    public @NotNull Material vanillaBlock() {
         return defaultBlock;
     }
 
@@ -456,7 +450,7 @@ public final class BlockDefinition {
      */
     public static final class Builder {
         private final @NotNull String name;
-        private @NotNull Material defaultBlock = Material.STONE;
+        private final @NotNull Material defaultBlock = BASE_BLOCK;
         private boolean catalog = true;
         private boolean creativeMenu = true;
         private @NotNull Item item = new Item(Material.KNOWLEDGE_BOOK, null, List.of(), false, true);
@@ -466,36 +460,6 @@ public final class BlockDefinition {
 
         private Builder(@NotNull String name) {
             this.name = Objects.requireNonNull(name, "name");
-        }
-
-        /**
-         * Sets the vanilla block used as the physical backing block.
-         *
-         * <p>This controls the real Bukkit block placed in the world. Avoid
-         * changing it after worlds contain this custom block unless you are
-         * deliberately migrating old data.</p>
-         *
-         * @param defaultBlock backing block material
-         * @return this builder
-         * @throws IllegalArgumentException if the material is not a block
-         */
-        public @NotNull Builder setDefaultBlock(@NotNull Material defaultBlock) {
-            Objects.requireNonNull(defaultBlock, "defaultBlock");
-            if (!defaultBlock.isBlock()) {
-                throw new IllegalArgumentException("Default block fallback must be a block material: " + defaultBlock);
-            }
-            this.defaultBlock = defaultBlock;
-            return this;
-        }
-
-        /**
-         * Sets the vanilla block used as the physical backing block.
-         *
-         * @param vanillaBlock backing block material
-         * @return this builder
-         */
-        public @NotNull Builder vanillaBlock(@NotNull Material vanillaBlock) {
-            return setDefaultBlock(vanillaBlock);
         }
 
         /**
@@ -572,7 +536,7 @@ public final class BlockDefinition {
 
             StateBuilder builder = new StateBuilder();
             configure.accept(builder);
-            states.put(id, builder.build(defaultBlock));
+            states.put(id, builder.build());
             return this;
         }
 
@@ -906,11 +870,11 @@ public final class BlockDefinition {
             return this;
         }
 
-        private @NotNull State build(@NotNull Material defaultBlock) {
+        private @NotNull State build() {
             return new State(
                     hardness,
                     miningSpeed,
-                    miningProfile == null ? defaultBlock : miningProfile,
+                    miningProfile == null ? DEFAULT_MINING_PROFILE : miningProfile,
                     preferredTools,
                     requirePreferredToolForDrops,
                     requireSilkTouchForDrops,

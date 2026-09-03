@@ -12,7 +12,6 @@ import java.util.Set;
 
 public record BlockPackBlock(
         @NotNull String name,
-        @NotNull Material vanillaBlock,
         boolean catalog,
         boolean creativeMenu,
         @NotNull BlockDefinition.Placement placement,
@@ -22,7 +21,6 @@ public record BlockPackBlock(
 ) {
     public BlockPackBlock {
         Objects.requireNonNull(name, "name");
-        Objects.requireNonNull(vanillaBlock, "vanillaBlock");
         Objects.requireNonNull(placement, "placement");
         Objects.requireNonNull(item, "item");
         Objects.requireNonNull(defaultState, "defaultState");

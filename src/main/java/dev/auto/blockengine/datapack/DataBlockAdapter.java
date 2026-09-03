@@ -23,7 +23,6 @@ public final class DataBlockAdapter implements BlockAdapter {
     @Override
     public void define(@NotNull BlockDefinition.Builder builder) {
         builder
-                .setDefaultBlock(block.vanillaBlock())
                 .catalog(block.catalog())
                 .creativeMenu(block.creativeMenu())
                 .placement(block.placement())

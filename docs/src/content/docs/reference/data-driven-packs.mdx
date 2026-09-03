@@ -59,7 +59,6 @@ Each file in `blocks/**/*.json` defines one block. If `name` is omitted, the pat
 ```json
 {
   "name": "polished_basalt",
-  "vanilla-block": "barrier",
   "catalog": true,
   "creative-menu": true,
   "placement": "directional",
@@ -123,7 +122,7 @@ The loader validates before registration:
   <LinkCard title="Namespace shape" href="/BlockEngine/concepts/system-lifecycle/#3-namespaces-protect-ownership" description="namespace must match lowercase resource-key rules." />
   <LinkCard title="Dependencies" href="/BlockEngine/concepts/system-lifecycle/#3-namespaces-protect-ownership" description="dependencies must be valid namespaces provided by another loaded pack or system." />
   <LinkCard title="Block and state ids" href="/BlockEngine/reference/data-driven-packs/#block-file" description="Names and state ids must use lowercase path segments." />
-  <LinkCard title="Materials" href="/BlockEngine/reference/data-driven-packs/#block-file" description="Materials resolve against Bukkit Material, with block fields requiring blocks and item fields requiring items." />
+  <LinkCard title="Materials" href="/BlockEngine/reference/data-driven-packs/#block-file" description="Materials resolve against Bukkit Material, with mining profiles requiring blocks and item materials requiring items." />
   <LinkCard title="Required states" href="/BlockEngine/code-driven/#states" description="Every block needs at least one state, a valid default-state, and at least one texture per state." />
   <LinkCard title="Creative defaults" href="/BlockEngine/guides/creative-inventory/" description="creative-menu defaults to true at pack and block level." />
   <LinkCard title="JSON Schema" href="/BlockEngine/schemas/data-driven-block-pack.schema.json" description="Use the schema for editor validation and tooling support." />

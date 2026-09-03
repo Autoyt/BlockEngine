@@ -87,10 +87,6 @@
         "name": {
           "$ref": "#/$defs/blockName"
         },
-        "vanilla-block": {
-          "$ref": "#/$defs/materialName",
-          "default": "barrier"
-        },
         "catalog": {
           "type": "boolean"
         },

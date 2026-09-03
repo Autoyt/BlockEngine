@@ -215,9 +215,9 @@ builder.catalog(true)
 `placement(...)` tells BlockEngine how to choose initial orientation. Use `NONE` for simple blocks, `HORIZONTAL_FACING` for player-facing blocks, `AXIS` for pillar-style blocks, and `DIRECTIONAL` when every face matters.
 
   </TabItem>
-  <TabItem label="Item and block">
+  <TabItem label="Item">
 
-Most blocks should not override `item(...)` or `vanillaBlock(...)`.
+Most blocks should not override `item(...)`.
 
 The default item is a BlockEngine-managed `KNOWLEDGE_BOOK`. The runtime gives it the correct metadata and generated item model, and the creative-menu placeholder converts into this real item when it reaches a player inventory.
 
@@ -229,13 +229,7 @@ builder.item(item -> item
 
 Use `item(...)` for display name, lore, glint, or rare cases where the base item material matters. Avoid changing `placeable(false)` unless the item should exist only as a token or UI object.
 
-The default vanilla backing block is `STONE`. Override `vanillaBlock(...)` only when you intentionally need a different fallback block for server-side behavior:
-
-```java
-builder.vanillaBlock(Material.BARRIER);
-```
-
-The resource pack controls how the block looks. The fallback block is not the texture.
+BlockEngine uses one fixed, engine-owned base block in the world. Resource-pack models control how custom blocks look, and `miningProfile(...)` controls vanilla-like mining behavior.
 
   </TabItem>
 </Tabs>

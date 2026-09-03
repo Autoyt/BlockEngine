@@ -49,8 +49,7 @@ public final class ExampleBlocks extends JavaPlugin implements CustomBlockSystem
 
         @Override
         public void define(BlockDefinition.Builder builder) {
-            builder.vanillaBlock(Material.BARRIER)
-                    .creativeMenu(true)
+            builder.creativeMenu(true)
                     .item(item -> item
                             .material(Material.KNOWLEDGE_BOOK)
                             .name("<red>Ruby Block")
