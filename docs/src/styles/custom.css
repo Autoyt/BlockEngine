@@ -4,9 +4,10 @@
   --sl-color-accent-high: #643000;
   --sl-color-orange-light: #ffc46b;
   --sl-color-orange-hot: #ff6a2e;
-  --be-code-string: #1d8a4a;
+  --be-code-inline: #c44e00;
+  --be-code-string: #0f766e;
   --be-code-method: #0369a1;
-  --be-code-type: #7c3aed;
+  --be-code-type: #f8fafc;
   --be-code-keyword: #c44e00;
   --be-code-muted: #64748b;
 }
@@ -19,9 +20,10 @@
   --sl-color-bg-sidebar: #100d09;
   --sl-color-bg-nav: #100d09;
   --sl-color-hairline-light: #3a2a18;
-  --be-code-string: #7ee787;
+  --be-code-inline: #ffb454;
+  --be-code-string: #67e8f9;
   --be-code-method: #7dd3fc;
-  --be-code-type: #c4b5fd;
+  --be-code-type: #fff7ed;
   --be-code-keyword: #ffb454;
   --be-code-muted: #b48a5a;
 }
@@ -140,8 +142,8 @@
 
 .sl-markdown-content code:not(:where(.expressive-code code)) {
   border: 1px solid color-mix(in srgb, var(--sl-color-accent) 24%, transparent);
-  color: var(--be-code-string);
-  background: color-mix(in srgb, var(--be-code-string) 10%, transparent);
+  color: var(--be-code-inline);
+  background: color-mix(in srgb, var(--sl-color-accent) 10%, transparent);
 }
 
 .sl-markdown-content a:not(:where(.not-content *)) {
