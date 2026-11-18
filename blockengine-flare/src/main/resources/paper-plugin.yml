@@ -1,0 +1,22 @@
+name: blockengine-flare
+version: '${version}'
+main: dev.auto.blockengine.flare.BlockEngineInspectorPlugin
+api-version: '26.3'
+load: POSTWORLD
+authors: [ AutoYT ]
+
+dependencies:
+  server:
+    blockengine:
+      load: BEFORE
+      required: true
+      join-classpath: true
+    flare:
+      load: BEFORE
+      required: true
+      join-classpath: true
+
+permissions:
+  blockengine.inspector:
+    description: Use the Flare shader inspector while holding the BlockEngine wand
+    default: op

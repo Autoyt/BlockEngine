@@ -31,7 +31,7 @@ import java.util.Locale;
 
 public final class BlockEngineCommand implements BasicCommand {
     private static final List<String> ROOT = List.of(
-            "info", "catalog", "packs", "debug", "wand"
+            "info", "catalog", "packs", "debug", "wand", "inspector"
     );
     private static final String DOCS_URL = "https://autoyt.github.io/BlockEngine/";
     private static final String HOW_IT_WORKS_URL = DOCS_URL + "concepts/how-it-works/";
@@ -68,6 +68,14 @@ public final class BlockEngineCommand implements BasicCommand {
             giveWand(sender);
             return;
         }
+        if (args[0].equalsIgnoreCase("inspector")) {
+            if (!plugin.getServer().getPluginManager().isPluginEnabled("blockengine-flare")) {
+                BlockEngineChat.error(sender, "The optional blockengine-flare inspector add-on is not installed.");
+                return;
+            }
+            plugin.getServer().dispatchCommand(sender, "beinspector " + String.join(" ", Arrays.copyOfRange(args, 1, args.length)));
+            return;
+        }
         usage(sender);
     }
 
@@ -90,13 +98,16 @@ public final class BlockEngineCommand implements BasicCommand {
         if (args[0].equalsIgnoreCase("catalog") || args[0].equalsIgnoreCase("packs")) {
             return debug.suggest(source, args);
         }
+        if (args[0].equalsIgnoreCase("inspector") && args.length == 2) {
+            return matching(List.of("info", "on", "off", "resend"), args[1]);
+        }
         return List.of();
     }
 
     private void usage(@NotNull CommandSender sender) {
         BlockEngineChat.send(sender, BlockEngineChat.header("blockengine"));
-        BlockEngineChat.send(sender, BlockEngineChat.row("usage", "/blockengine <info|catalog|packs|debug|wand>"));
-        BlockEngineChat.send(sender, BlockEngineChat.row("short", "/be <info|catalog|packs|debug|wand>"));
+        BlockEngineChat.send(sender, BlockEngineChat.row("usage", "/blockengine <info|catalog|packs|debug|wand|inspector>"));
+        BlockEngineChat.send(sender, BlockEngineChat.row("short", "/be <info|catalog|packs|debug|wand|inspector>"));
     }
 
     private void giveWand(@NotNull CommandSender sender) {
@@ -138,13 +149,17 @@ public final class BlockEngineCommand implements BasicCommand {
                 NamespaceRegistry.loaded().size(),
                 ResourcePackManager.getInstance().packIds().size()
         );
+        if (plugin.getServer().getPluginManager().isPluginEnabled("blockengine-flare")) {
+            summary = summary.append(command("/be inspector", "Open Flare wand inspector controls and debug information"));
+        }
+        Component body = summary;
 
         return Dialog.create(factory -> factory.empty()
                 .base(DialogBase.builder(title)
                         .externalTitle(Component.text("BlockEngine", BlockEngineChat.ORANGE))
                         .canCloseWithEscape(true)
                         .pause(false)
-                        .body(List.of(DialogBody.plainMessage(summary, 360)))
+                        .body(List.of(DialogBody.plainMessage(body, 360)))
                         .build())
                 .type(DialogType.notice()));
     }

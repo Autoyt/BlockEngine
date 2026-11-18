@@ -5,9 +5,16 @@ version: '${version}'
 main: dev.auto.blockengine.Main
 bootstrapper: dev.auto.blockengine.PluginBootDriver
 api-version: '1.21.11'
-load: STARTUP
+load: POSTWORLD
 
 authors: [ AutoYT, Codex ]
+
+dependencies:
+  server:
+    packetevents:
+      load: BEFORE
+      required: true
+      join-classpath: true
 
 permissions:
   blockengine.debug:

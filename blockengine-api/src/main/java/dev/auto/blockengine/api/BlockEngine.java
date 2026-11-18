@@ -1,6 +1,7 @@
 package dev.auto.blockengine.api;
 
 import dev.auto.blockengine.api.display.ManagedDisplayService;
+import dev.auto.blockengine.api.inspection.BlockInspectionService;
 import dev.auto.blockengine.api.world.BlockEngineManagedWorld;
 import org.bukkit.World;
 import org.jetbrains.annotations.NotNull;
@@ -20,8 +21,27 @@ import java.util.function.Function;
 public final class BlockEngine {
     private static @Nullable ManagedDisplayService managedDisplayService;
     private static @Nullable Function<World, BlockEngineManagedWorld> managedWorldFactory;
+    private static @Nullable BlockInspectionService inspectionService;
 
     private BlockEngine() {
+    }
+
+    /** Returns the read-only block and structure-wand inspection service. */
+    public static @NotNull BlockInspectionService inspection() {
+        if (inspectionService == null) {
+            throw new IllegalStateException("BlockEngine inspection service is not available yet.");
+        }
+        return inspectionService;
+    }
+
+    /** Installs the runtime inspection service during BlockEngine startup. */
+    public static void setInspectionService(@NotNull BlockInspectionService service) {
+        inspectionService = Objects.requireNonNull(service, "service");
+    }
+
+    /** Clears the inspection service during BlockEngine shutdown. */
+    public static void clearInspectionService() {
+        inspectionService = null;
     }
 
     /**

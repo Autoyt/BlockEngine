@@ -432,6 +432,10 @@ public final class ChunkEngine {
             return payload.clone();
         }
 
+        public int payloadBytes() {
+            return payload.length;
+        }
+
         public @NotNull StoredBlock withDisplay(@NotNull StoredDisplay display) {
             List<StoredDisplay> updated = new ArrayList<>();
             boolean replaced = false;

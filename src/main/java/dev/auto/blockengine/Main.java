@@ -2,8 +2,6 @@ package dev.auto.blockengine;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
-import com.github.retrooper.packetevents.PacketEvents;
-import com.github.retrooper.packetevents.settings.PacketEventsSettings;
 import dev.auto.blockengine.api.BlockEngine;
 import dev.auto.blockengine.catalog.CatalogListeners;
 import dev.auto.blockengine.commands.BlockEngineCommand;
@@ -16,6 +14,7 @@ import dev.auto.blockengine.creative.CreativeInventoryManager;
 import dev.auto.blockengine.defaultadapters.DebugBlocks;
 import dev.auto.blockengine.entity.ManagedDisplayManager;
 import dev.auto.blockengine.integrity.BlockIntegrityManager;
+import dev.auto.blockengine.inspection.RuntimeInspectionService;
 import dev.auto.blockengine.listeners.GameListener;
 import dev.auto.blockengine.registry.BlockRegistry;
 import dev.auto.blockengine.registry.DiscoverySystem;
@@ -26,7 +25,6 @@ import dev.auto.blockengine.structure.SudoBlockListeners;
 import dev.auto.blockengine.structure.SudoBlockManager;
 import dev.auto.blockengine.visibility.VisibilityManager;
 import dev.auto.blockengine.world.ManagedWorld;
-import io.github.retrooper.packetevents.factory.spigot.SpigotPacketEventsBuilder;
 import lombok.Getter;
 import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
@@ -48,20 +46,13 @@ public final class Main extends JavaPlugin {
     @Override
     public void onLoad() {
         instance = this;
-        PacketEvents.setAPI(SpigotPacketEventsBuilder.build(
-                this,
-                new PacketEventsSettings()
-                        .checkForUpdates(false)
-                        .bStats(false)
-        ));
-        PacketEvents.getAPI().load();
     }
 
     @Override
     public void onEnable() {
-        PacketEvents.getAPI().init();
         BlockEngine.setManagedDisplayService(ManagedDisplayManager.getInstance());
         BlockEngine.setManagedWorldFactory(ManagedWorld::new);
+        BlockEngine.setInspectionService(new RuntimeInspectionService());
 
         configSave(false);
         VisibilityManager.getInstance().register(this);
@@ -119,8 +110,8 @@ public final class Main extends JavaPlugin {
         ManagedDisplayManager.getInstance().clear();
         BlockEngine.clearManagedDisplayService();
         BlockEngine.clearManagedWorldFactory();
+        BlockEngine.clearInspectionService();
         ChunkEngine.clear();
-        PacketEvents.getAPI().terminate();
     }
 
     public void configSave(boolean overwriteFromJar) {

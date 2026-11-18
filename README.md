@@ -47,6 +47,8 @@ The API module is also set up for GitHub Packages publishing from `api-v*` tags.
 
 ## Building
 
+BlockEngine uses the separately installed **PacketEvents 2.14.0** plugin. It no longer embeds or owns a second PacketEvents runtime, so it can safely share packet handling with Flare and other plugins. Install PacketEvents alongside BlockEngine, including on existing installations upgrading to this build. The runtime enables in the post-world phase after PacketEvents; its bootstrapper still registers creative enchantments during bootstrap.
+
 ```bash
 ./gradlew build
 ```
@@ -56,6 +58,8 @@ Build the plugin jar:
 ```bash
 ./gradlew shadowJar
 ```
+
+The optional [BlockEngine Flare inspector](blockengine-flare/README.md) adds a post-effect debug panel to the existing structure wand. It runs on Flare's Paper 26.3 target, is enabled by default for operators, and owns its visual resource pack. The base BlockEngine plugin continues to compile against Paper 1.21.11 and does not require Flare.
 
 Build the documentation site locally:
 

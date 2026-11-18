@@ -1,0 +1,40 @@
+{
+  "targets": {
+    "bus": { "width": 32, "height": 32 },
+    "status": { "width": 1, "height": 1 },
+    "scene": {}
+  },
+  "passes": [
+    {
+      "vertex_shader": "minecraft:core/screenquad",
+      "fragment_shader": "flare:post/capture_view",
+      "inputs": [{ "sampler_name": "In", "target": "minecraft:main", "bilinear": false }],
+      "output": "bus"
+    },
+    {
+      "vertex_shader": "minecraft:core/screenquad",
+      "fragment_shader": "flare:post/validate_view",
+      "inputs": [{ "sampler_name": "In", "target": "bus", "bilinear": false }],
+      "output": "status"
+    },
+    {
+      "vertex_shader": "minecraft:core/screenquad",
+      "fragment_shader": "blockengine_inspector:post/hud",
+      "inputs": [
+        { "sampler_name": "Scene", "target": "minecraft:main", "bilinear": false },
+        { "sampler_name": "FlareBus", "target": "bus", "bilinear": false },
+        { "sampler_name": "FlareStatus", "target": "status", "bilinear": false }
+      ],
+      "output": "scene"
+    },
+    {
+      "vertex_shader": "minecraft:core/screenquad",
+      "fragment_shader": "flare:post/present_view",
+      "inputs": [
+        { "sampler_name": "Scene", "target": "scene", "bilinear": false },
+        { "sampler_name": "FlareBus", "target": "bus", "bilinear": false }
+      ],
+      "output": "minecraft:main"
+    }
+  ]
+}

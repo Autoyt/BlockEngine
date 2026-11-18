@@ -1,0 +1,8 @@
+# This add-on owns and hosts its visual pack. Flare separately hosts transport/getters.
+listen-address: '0.0.0.0'
+port: 8128
+public-url: 'http://127.0.0.1:8128'
+
+# Applied at plugin startup. Shader text uses signed block coordinates.
+target-range: 8
+update-interval-ticks: 2
