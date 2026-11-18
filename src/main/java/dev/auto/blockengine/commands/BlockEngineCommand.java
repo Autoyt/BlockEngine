@@ -132,7 +132,31 @@ public final class BlockEngineCommand implements BasicCommand {
 
     private @NotNull Dialog infoDialog() {
         Component title = Component.text("BlockEngine", BlockEngineChat.ORANGE).decorate(TextDecoration.BOLD);
-        Component summary = Component.text()
+        Component summary = infoSummary(
+                plugin.getPluginMeta().getVersion(),
+                BlockRegistry.getBlocks().size(),
+                NamespaceRegistry.loaded().size(),
+                ResourcePackManager.getInstance().packIds().size()
+        );
+
+        return Dialog.create(factory -> factory.empty()
+                .base(DialogBase.builder(title)
+                        .externalTitle(Component.text("BlockEngine", BlockEngineChat.ORANGE))
+                        .canCloseWithEscape(true)
+                        .pause(false)
+                        .body(List.of(DialogBody.plainMessage(summary, 360)))
+                        .build())
+                .type(DialogType.notice()));
+    }
+
+    static @NotNull Component infoSummary(
+            @NotNull String version,
+            int registeredBlocks,
+            int loadedNamespaces,
+            int generatedPacks
+    ) {
+        // Use immutable components so this path also links against Adventure 4 on Paper 1.21.11.
+        return Component.empty()
                 .append(Component.text("✦ ", BlockEngineChat.ORANGE_LIGHT))
                 .append(Component.text("Custom blocks that behave on the server and render through generated resource packs.", BlockEngineChat.WHITE))
                 .append(Component.newline())
@@ -143,10 +167,10 @@ public final class BlockEngineCommand implements BasicCommand {
                 .append(Component.newline())
                 .append(Component.newline())
                 .append(section("Runtime"))
-                .append(stat("Version", plugin.getPluginMeta().getVersion()))
-                .append(stat("Registered blocks", BlockRegistry.getBlocks().size()))
-                .append(stat("Loaded namespaces", NamespaceRegistry.loaded().size()))
-                .append(stat("Generated resource packs", ResourcePackManager.getInstance().packIds().size()))
+                .append(stat("Version", version))
+                .append(stat("Registered blocks", registeredBlocks))
+                .append(stat("Loaded namespaces", loadedNamespaces))
+                .append(stat("Generated resource packs", generatedPacks))
                 .append(Component.newline())
                 .append(section("Start Here"))
                 .append(linkLine("Documentation", DOCS_URL, "Browse the BlockEngine docs"))
@@ -163,19 +187,7 @@ public final class BlockEngineCommand implements BasicCommand {
                 .append(command("/be catalog", "Browse registered custom blocks"))
                 .append(command("/be packs", "Inspect loaded data packs"))
                 .append(command("/be wand", "Receive the structure-building wand"))
-                .append(command("/be debug", "Open diagnostics and maintenance tools"))
-                .build();
-
-        return Dialog.create(factory -> factory.empty()
-                .base(DialogBase.builder(title)
-                        .externalTitle(Component.text("BlockEngine", BlockEngineChat.ORANGE))
-                        .canCloseWithEscape(true)
-                        .pause(false)
-                        .body(List.of(
-                                DialogBody.plainMessage(summary, 360)
-                        ))
-                        .build())
-                .type(DialogType.notice()));
+                .append(command("/be debug", "Open diagnostics and maintenance tools"));
     }
 
     private static @NotNull Component section(@NotNull String label) {

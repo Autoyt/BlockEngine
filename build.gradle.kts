@@ -16,7 +16,7 @@ repositories {
 }
 
 dependencies {
-    compileOnly("io.papermc.paper:paper-api:26.2.build.121-stable")
+    compileOnly("io.papermc.paper:paper-api:1.21.11-R0.1-SNAPSHOT")
     implementation("com.fasterxml.jackson.core:jackson-databind:2.19.2")
     implementation("com.github.retrooper:packetevents-spigot:2.13.0")
     implementation(project(":blockengine-api"))
@@ -24,7 +24,7 @@ dependencies {
     annotationProcessor("org.projectlombok:lombok:1.18.38")
     testCompileOnly("org.projectlombok:lombok:1.18.38")
     testAnnotationProcessor("org.projectlombok:lombok:1.18.38")
-    testImplementation("io.papermc.paper:paper-api:26.2.build.121-stable")
+    testImplementation("io.papermc.paper:paper-api:1.21.11-R0.1-SNAPSHOT")
     testImplementation("org.junit.jupiter:junit-jupiter:5.14.3")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher:1.14.3")
 }
@@ -50,12 +50,14 @@ tasks {
         // Configure the Minecraft version for our task.
         // This is the only required configuration besides applying the plugin.
         // Your plugin's jar (or shadowJar if present) will be used automatically.
-        minecraftVersion("26.2")
+        minecraftVersion("1.21.11")
         jvmArgs("-Xms2G", "-Xmx2G")
     }
 
     processResources {
         val props = mapOf("version" to version)
+        inputs.properties(props)
+
         filesMatching("paper-plugin.yml") {
             expand(props)
         }
