@@ -324,7 +324,7 @@ public class GameListener implements Listener {
             return;
         }
 
-        ItemStack stack = ItemManager.createSudo(definition, customBlock.storedBlock().stateId());
+        ItemStack stack = ItemManager.create(definition, customBlock.storedBlock().stateId());
         pick(event.getPlayer(), stack, event.getTargetSlot());
     }
 
