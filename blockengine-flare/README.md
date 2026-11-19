@@ -29,7 +29,7 @@ The optional plugin is `blockengine-flare/build/libs/blockengine-flare-1.0.0.jar
 - `/be inspector` or `/beinspector` opens the full diagnostic dialog.
 - `/be inspector on` and `off` change the player's selection.
 - `/be inspector resend` resends the selected Flare transport and add-on packs.
-- Administrators can use `/flare addons add blockengine_inspector [player]`, `remove`, and `/flare addons resend [player]`.
+- From the console, use `flare admin addons add blockengine_inspector <player>`, `flare admin addons remove blockengine_inspector <player>`, or `flare admin addons resend <player>`.
 
 Configure `plugins/blockengine-flare/config.yml` before restarting: `public-url` must be reachable by players, `port` defaults to 8128, `target-range` defaults to 8 blocks, and `update-interval-ticks` defaults to 2. Flare independently owns its transport host and refresh cadence.
 
@@ -39,7 +39,7 @@ The dialog also reports both resource-pack states, current offer UUID, hosting U
 
 ## API and pack boundaries
 
-The add-on registers namespace `blockengine_inspector` and schema `target` v1: **124 bytes** only in profiles where it is enabled. Every target update is an atomic publication unit. Names use fixed ASCII buffers (block 32, state 24, material 24, world 16 bytes); unsupported characters become `?`, uppercase is used for the pixel font, and a final `~` marks truncation. These bytes are display text, not string-based shader property access.
+Flare discovers the inspector's plugin main class through `FlareAddonProvider` at startup. The registration callback declares `blockengine_inspector` and its `target` v1 schema, which uses **124 bytes** in profiles where the add-on is enabled. Every target update is an atomic publication unit. Names use fixed ASCII buffers (block 32, state 24, material 24, world 16 bytes); unsupported characters become `?`, uppercase is used for the pixel font, and a final `~` marks truncation. These bytes are display text, not string-based shader property access.
 
 The consumer shader imports `flare:schemas/blockengine_inspector/target.glsl` and reads generated methods such as `getBlockId(index)`, `getX()`, `getHardness()`, and `getVisible()`. It captures/validates the Flare bus and restores the carrier using public Flare post passes. Its 32×32 capture target works with all supported compact bus sizes. No core shader is replaced, and no Flare assets are bundled in this pack.
 

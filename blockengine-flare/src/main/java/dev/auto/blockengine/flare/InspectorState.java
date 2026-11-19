@@ -9,6 +9,8 @@ import java.util.UUID;
 
 /** The add-on owns this schema; offsets are compiled by Flare for each player's enabled add-ons. */
 final class InspectorState {
+    static final String SCHEMA = "target";
+
     static final int BLOCK_LENGTH = 32;
     static final int STATE_LENGTH = 24;
     static final int MATERIAL_LENGTH = 24;
@@ -23,7 +25,7 @@ final class InspectorState {
 
     InspectorState(FlareRegistration registration) {
         this.registration = registration;
-        var schema = registration.schema("target", 1);
+        var schema = registration.schema(SCHEMA, 1);
         blockId = schema.reserveBytes("block_id", BLOCK_LENGTH);
         stateId = schema.reserveBytes("state_id", STATE_LENGTH);
         material = schema.reserveBytes("material", MATERIAL_LENGTH);

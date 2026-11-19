@@ -3,6 +3,8 @@ package dev.auto.blockengine.flare;
 import dev.auto.blockengine.api.BlockEngine;
 import dev.auto.blockengine.api.inspection.BlockInspection;
 import dev.auto.flare.api.AddonDescriptor;
+import dev.auto.flare.api.FlareAddonProvider;
+import dev.auto.flare.api.FlareAddonRegistrar;
 import dev.auto.flare.api.FlareApi;
 import dev.auto.flare.api.event.FlareAddonsChangedEvent;
 import dev.auto.flare.api.event.FlarePackStatusEvent;
@@ -37,7 +39,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletionStage;
 
 /** Independently hosted visual consumer. It depends exclusively on BlockEngine and Flare public APIs. */
-public final class BlockEngineInspectorPlugin extends JavaPlugin implements Listener {
+public final class BlockEngineInspectorPlugin extends JavaPlugin implements Listener, FlareAddonProvider {
     public static final String ADDON = "blockengine_inspector";
     private static final String PERMISSION = "blockengine.inspector";
     private static final Key HUD = Key.key("blockengine_inspector:hud");
@@ -67,10 +69,6 @@ public final class BlockEngineInspectorPlugin extends JavaPlugin implements List
         flare = getServer().getServicesManager().load(FlareApi.class);
         if (flare == null) throw new IllegalStateException("Flare's service is unavailable");
 
-        state = new InspectorState(flare.registerAddon(this, new AddonDescriptor(ADDON,
-                "BlockEngine wand inspector", "Live target identity, coordinates and stored runtime diagnostics.",
-                true, PERMISSION, PERMISSION)));
-
         try (var resource = getResource("blockengine-inspector.zip")) {
             if (resource == null) throw new IOException("Bundled inspector pack is missing");
             host = new ConsumerPackHost(new InetSocketAddress(getConfig().getString("listen-address", "0.0.0.0"),
@@ -87,9 +85,31 @@ public final class BlockEngineInspectorPlugin extends JavaPlugin implements List
         getLogger().info("Inspector pack: " + packUrl + "; default enabled for blockengine.inspector (operators).");
     }
 
+    @Override
+    public void registerFlareAddons(FlareAddonRegistrar registrar) {
+        state = new InspectorState(registrar.registerAddon(new AddonDescriptor(ADDON,
+                "BlockEngine wand inspector", "Live target identity, coordinates and stored runtime diagnostics.",
+                true, PERMISSION, PERMISSION)));
+    }
+
     @EventHandler(priority = EventPriority.MONITOR)
     public void ready(ServerLoadEvent event) {
-        if (started) return;
+        if (started || state == null) return;
+
+        boolean schemaRegistered;
+        try {
+            String schemaKey = ADDON + ":" + InspectorState.SCHEMA;
+            schemaRegistered = flare.layout().schemas().stream().anyMatch(schema ->
+                    schema.owner().equals(getName()) && schema.key().equals(schemaKey));
+        } catch (IllegalStateException failure) {
+            getLogger().warning("The inspector cannot start without a frozen Flare catalog: " + failure.getMessage());
+            return;
+        }
+        if (!schemaRegistered) {
+            getLogger().warning("The inspector target schema is missing from Flare's startup catalog.");
+            return;
+        }
+
         started = true;
         getServer().getScheduler().runTaskTimer(this, this::tick, 1, interval);
     }
@@ -123,6 +143,8 @@ public final class BlockEngineInspectorPlugin extends JavaPlugin implements List
 
     @EventHandler
     public void changed(FlareAddonsChangedEvent event) {
+        if (!started) return;
+
         Player player = event.getPlayer();
         if (!event.enabledAddons().contains(ADDON) || !player.hasPermission(PERMISSION)) {
             remove(player);
@@ -135,6 +157,8 @@ public final class BlockEngineInspectorPlugin extends JavaPlugin implements List
 
     @EventHandler
     public void transport(FlarePackStatusEvent event) {
+        if (!started) return;
+
         Player player = event.getPlayer();
         if (!event.isLoaded() || !enabled(player)) {
             player.postEffects().remove(HUD);
@@ -194,7 +218,9 @@ public final class BlockEngineInspectorPlugin extends JavaPlugin implements List
     @Override
     public void onDisable() {
         getServer().getScheduler().cancelTasks(this);
-        if (flare != null) for (Player player : getServer().getOnlinePlayers()) remove(player);
+        if (started) for (Player player : getServer().getOnlinePlayers()) remove(player);
+        started = false;
+        state = null;
         sessions.clear();
         if (host != null) host.close();
     }
@@ -255,11 +281,16 @@ public final class BlockEngineInspectorPlugin extends JavaPlugin implements List
         @Override
         public void execute(CommandSourceStack source, String[] args) {
             if (!(source.getSender() instanceof Player player)) {
-                source.getSender().sendMessage("Use /flare addons add|remove blockengine_inspector <player> or /flare addons resend <player>.");
+                source.getSender().sendMessage("Use /flare admin addons add|remove " + ADDON
+                        + " <player> or /flare admin addons resend <player>.");
                 return;
             }
             if (!player.hasPermission(PERMISSION)) {
                 player.sendMessage(Component.text("Missing permission: " + PERMISSION, ROSE));
+                return;
+            }
+            if (!started) {
+                player.sendMessage(Component.text("The inspector's Flare add-on is unavailable.", ROSE));
                 return;
             }
 
