@@ -30,10 +30,13 @@ import java.io.InputStream;
 import java.lang.reflect.Method;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -45,6 +48,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletionStage;
 import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
@@ -87,6 +91,7 @@ public final class ResourcePackManager {
     private static final ResourcePackManager instance = new ResourcePackManager();
     private ResourcePackConfig config;
     private GeneratedPack pack;
+    private SharedResourcePacks shared;
     private final List<GeneratedPack> hostedPacks = new ArrayList<>();
 
     private ResourcePackManager() {
@@ -96,18 +101,77 @@ public final class ResourcePackManager {
         return instance;
     }
 
-    public void reload() {
+    public void prepare() {
         config = ResourcePackConfig.load(Main.getInstance());
+        selectBackend();
+    }
+
+    public void reload() {
+        prepare();
         if (!config.enabled()) {
-            ResourcePackHost.stop();
+            stop();
             return;
         }
-        if (config.generateOnStartup()) {
-            generate();
+
+        try {
+            if (config.generateOnStartup()) {
+                generate();
+            }
+            if (shared != null && validPack()) {
+                publishSharedPack();
+            }
+        } finally {
+            if (shared != null && !shared.ready()) {
+                closeSharedBackend();
+            }
         }
-        if (!hostedPacks.isEmpty()) {
+
+        if (shared == null && validPack()) {
             ResourcePackHost.start(config, hostedPacks);
+        } else {
+            ResourcePackHost.stop();
         }
+    }
+
+    private void selectBackend() {
+        Main plugin = Main.getInstance();
+        if (!config.enabled() || !config.preferAutoLib()
+                || !plugin.getServer().getPluginManager().isPluginEnabled("AutoLib")) {
+            closeSharedBackend();
+            return;
+        }
+
+        try {
+            if (shared != null && shared.available()) {
+                return;
+            }
+            closeSharedBackend();
+            shared = AutoLibPackBridge.connect(plugin);
+            if (shared != null) {
+                plugin.getLogger().info("Using AutoLib for BlockEngine resource packs.");
+            }
+        } catch (LinkageError | RuntimeException exception) {
+            closeSharedBackend();
+            plugin.getLogger().log(java.util.logging.Level.WARNING,
+                    "AutoLib resource pack service is unavailable. Using BlockEngine's internal delivery.", exception);
+        }
+    }
+
+    private void publishSharedPack() {
+        try {
+            shared.publish(List.copyOf(hostedPacks));
+        } catch (IOException exception) {
+            Main.getInstance().getLogger().log(java.util.logging.Level.WARNING,
+                    "Failed to prepare BlockEngine's AutoLib resource pack", exception);
+        } catch (LinkageError | RuntimeException exception) {
+            closeSharedBackend();
+            Main.getInstance().getLogger().log(java.util.logging.Level.WARNING,
+                    "AutoLib failed to update BlockEngine's resource pack. Using internal delivery.", exception);
+        }
+    }
+
+    private boolean validPack() {
+        return pack != null && pack.sha1().length != 0;
     }
 
     public GeneratedPack generate() {
@@ -182,7 +246,7 @@ public final class ResourcePackManager {
 
     public void send(@NotNull Player player) {
         ResourcePackConfig loadedConfig = config == null ? ResourcePackConfig.load(Main.getInstance()) : config;
-        if (!loadedConfig.enabled() || !loadedConfig.sendOnJoin() || pack == null || pack.sha1().length == 0) {
+        if (shared != null || !loadedConfig.enabled() || !loadedConfig.sendOnJoin() || !validPack()) {
             return;
         }
 
@@ -191,6 +255,17 @@ public final class ResourcePackManager {
 
     public @NotNull Collection<String> packIds() {
         return packsById().keySet();
+    }
+
+    public boolean isUsingSharedBackend() {
+        return shared != null;
+    }
+
+    public @NotNull CompletionStage<?> resendShared(@NotNull Player player) {
+        if (shared == null) {
+            throw new IllegalStateException("BlockEngine is using internal resource pack delivery");
+        }
+        return shared.resend(player);
     }
 
     public @Nullable ResourcePackDownload download(@NotNull String packId) {
@@ -202,11 +277,11 @@ public final class ResourcePackManager {
             }
 
             GeneratedPack generated = packsById().get(normalized);
-            if (generated == null || !Files.isRegularFile(generated.zip())) {
+            if (generated == null || generated.sha1().length == 0 || !Files.isRegularFile(generated.zip())) {
                 return null;
             }
-            ResourcePackHost.publish(generated.url(), generated.zip());
-            return new ResourcePackDownload(normalized, generated.url(), generated.zip(), Files.size(generated.zip()));
+            String url = publishDownload("pack-" + normalized, generated.url(), generated.zip());
+            return new ResourcePackDownload(normalized, url, generated.zip(), Files.size(generated.zip()));
         } catch (IOException exception) {
             Main.getInstance().getLogger().warning("Failed to prepare BlockEngine pack download '" + packId + "': "
                     + exception.getMessage());
@@ -225,8 +300,8 @@ public final class ResourcePackManager {
             }
             Files.createDirectories(zip.getParent());
             Files.copy(input, zip, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-            String url = packUrl(loadedConfig, "/downloads/sample-expansion-pack.zip");
-            ResourcePackHost.publish(url, zip);
+            String url = publishDownload("sample-expansion-pack",
+                    packUrl(loadedConfig, "/downloads/sample-expansion-pack.zip"), zip);
             return new ResourcePackDownload("sample-expansion-pack", url, zip, Files.size(zip));
         } catch (IOException exception) {
             Main.getInstance().getLogger().warning("Failed to prepare BlockEngine sample expansion pack: "
@@ -240,11 +315,20 @@ public final class ResourcePackManager {
         if (generated == null || generated.sha1().length == 0) {
             return false;
         }
-        sendSingle(player, generated);
+        if (shared == null) {
+            sendSingle(player, generated);
+        } else {
+            resendShared(player);
+        }
         return true;
     }
 
     public int sendAll(@NotNull Player player) {
+        if (shared != null) {
+            resendShared(player);
+            return 1;
+        }
+
         int sent = 0;
         for (GeneratedPack generated : hostedPacks) {
             if (generated.sha1().length == 0) {
@@ -268,29 +352,48 @@ public final class ResourcePackManager {
     }
 
     private @Nullable ResourcePackDownload combinedDownload(@NotNull ResourcePackConfig config) throws IOException {
-        if (hostedPacks.isEmpty()) {
+        if (!validPack()) {
             return null;
         }
 
-        Path root = Main.getInstance().getDataFolder().toPath()
-                .resolve("generated-resource-pack")
-                .resolve("downloads")
-                .resolve("all");
         Path zip = Main.getInstance().getDataFolder().toPath()
                 .resolve("generated-packs")
                 .resolve("blockengine-all.zip");
-        delete(root);
-        Files.createDirectories(root);
-        for (GeneratedPack generated : hostedPacks) {
-            copyPackFolder(generated.folder(), root);
+        Map<String, byte[]> entries = BlockEnginePackSnapshot.capture(hostedPacks).readEntries();
+        entries.put("pack.mcmeta", Files.readAllBytes(pack.folder().resolve("pack.mcmeta")));
+        Path icon = pack.folder().resolve("pack.png");
+        if (Files.isRegularFile(icon)) {
+            entries.put("pack.png", Files.readAllBytes(icon));
         }
-        if (!Files.isRegularFile(root.resolve("pack.png"))) {
-            copyIcon(root, null);
+        Files.createDirectories(zip.getParent());
+        Path temporaryZip = Files.createTempFile(zip.getParent(), "blockengine-all-", ".zip");
+        try {
+            try (ZipOutputStream output = new ZipOutputStream(Files.newOutputStream(temporaryZip))) {
+                for (String name : entries.keySet().stream().sorted().toList()) {
+                    output.putNextEntry(packEntry(name));
+                    output.write(entries.get(name));
+                    output.closeEntry();
+                }
+            }
+            try {
+                Files.move(temporaryZip, zip, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+            } catch (AtomicMoveNotSupportedException exception) {
+                Files.move(temporaryZip, zip, StandardCopyOption.REPLACE_EXISTING);
+            }
+        } finally {
+            Files.deleteIfExists(temporaryZip);
         }
-        zip(root, zip);
-        String url = packUrl(config, "/downloads/blockengine-all.zip");
-        ResourcePackHost.publish(url, zip);
+
+        String url = publishDownload("blockengine-all", packUrl(config, "/downloads/blockengine-all.zip"), zip);
         return new ResourcePackDownload("*", url, zip, Files.size(zip));
+    }
+
+    private @NotNull String publishDownload(String id, String url, Path zip) throws IOException {
+        if (shared != null) {
+            return shared.hostDownload(id, zip);
+        }
+        ResourcePackHost.publish(url, zip);
+        return url;
     }
 
     private void sendSingle(@NotNull Player player, @NotNull GeneratedPack generated) {
@@ -393,7 +496,23 @@ public final class ResourcePackManager {
     }
 
     public void stop() {
+        closeSharedBackend();
         ResourcePackHost.stop();
+        hostedPacks.clear();
+        pack = null;
+    }
+
+    private void closeSharedBackend() {
+        SharedResourcePacks previous = shared;
+        shared = null;
+        if (previous != null) {
+            try {
+                previous.close();
+            } catch (LinkageError | RuntimeException exception) {
+                Main.getInstance().getLogger().log(java.util.logging.Level.WARNING,
+                        "Failed to close BlockEngine's AutoLib resource pack registration", exception);
+            }
+        }
     }
 
     private static void demoTextures(@NotNull Path root) throws IOException {
@@ -416,6 +535,7 @@ public final class ResourcePackManager {
             }
 
             String namespace = system.getNamespace();
+            String outputKey = "namespace-" + safeUrlEnding(namespace).replace('/', '_');
             CustomBlockSystem.PackDetails details = new CustomBlockSystem.PackDetails();
             details.urlEnding(namespace);
             system.setPackDetails(details);
@@ -424,7 +544,7 @@ public final class ResourcePackManager {
             Path root = Main.getInstance().getDataFolder().toPath()
                     .resolve("generated-resource-pack")
                     .resolve("packs")
-                    .resolve(ending);
+                    .resolve(outputKey);
 
             delete(root);
             Files.createDirectories(root);
@@ -437,6 +557,8 @@ public final class ResourcePackManager {
             String fileName = safeFileName(blank(title) ? ending : legacy(title));
             Path zip = Main.getInstance().getDataFolder().toPath()
                     .resolve("generated-packs")
+                    .resolve("systems")
+                    .resolve(outputKey)
                     .resolve(fileName);
             packMeta(root, title, description);
             copyIcon(root, details.icon());
@@ -483,11 +605,12 @@ public final class ResourcePackManager {
     private static @NotNull Collection<GeneratedPack> generateDataPacks(@NotNull ResourcePackConfig config) throws IOException {
         List<GeneratedPack> packs = new ArrayList<>();
         for (BlockPack blockPack : DataBlockPacks.loadedPacks()) {
+            String outputKey = "namespace-" + safeUrlEnding(blockPack.namespace()).replace('/', '_');
             String ending = safeUrlEnding(blockPack.urlEnding().isBlank() ? blockPack.namespace() : blockPack.urlEnding());
             Path root = Main.getInstance().getDataFolder().toPath()
                     .resolve("generated-resource-pack")
                     .resolve("data-packs")
-                    .resolve(ending);
+                    .resolve(outputKey);
 
             delete(root);
             Files.createDirectories(root);
@@ -500,6 +623,8 @@ public final class ResourcePackManager {
             String fileName = safeFileName(blank(title) ? ending : legacy(title));
             Path zip = Main.getInstance().getDataFolder().toPath()
                     .resolve("generated-packs")
+                    .resolve("data-packs")
+                    .resolve(outputKey)
                     .resolve(fileName);
             packMeta(root, title, description);
             copyIcon(root, blockPack.icon());
@@ -649,12 +774,18 @@ public final class ResourcePackManager {
                     .filter(Files::isRegularFile)
                     .sorted()
                     .toList()) {
-                ZipEntry entry = new ZipEntry(root.relativize(file).toString().replace('\\', '/'));
+                ZipEntry entry = packEntry(root.relativize(file).toString().replace('\\', '/'));
                 zip.putNextEntry(entry);
                 Files.copy(file, zip);
                 zip.closeEntry();
             }
         }
+    }
+
+    private static @NotNull ZipEntry packEntry(String name) {
+        ZipEntry entry = new ZipEntry(name);
+        entry.setTimeLocal(LocalDateTime.of(1980, 1, 1, 0, 0));
+        return entry;
     }
 
     private static byte @NotNull [] sha1(@NotNull Path file) throws IOException {
@@ -800,26 +931,6 @@ public final class ResourcePackManager {
                         .toList()) {
                     copyAssetFile(normalizedRoot, file, packRoot);
                 }
-            }
-        }
-    }
-
-    private static void copyPackFolder(@NotNull Path sourceRoot, @NotNull Path outputRoot) throws IOException {
-        if (!Files.exists(sourceRoot)) {
-            return;
-        }
-        try (Stream<Path> files = Files.walk(sourceRoot)) {
-            for (Path file : files
-                    .filter(Files::isRegularFile)
-                    .sorted()
-                    .toList()) {
-                Path relative = sourceRoot.relativize(file);
-                Path output = outputRoot.resolve(relative.toString()).normalize();
-                if (!output.startsWith(outputRoot.normalize())) {
-                    continue;
-                }
-                Files.createDirectories(output.getParent());
-                Files.copy(file, output, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
             }
         }
     }

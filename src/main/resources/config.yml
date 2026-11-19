@@ -4,6 +4,7 @@ visibility:
 
 resource-pack:
   enabled: true
+  backend: auto # Use internal to keep BlockEngine's own host and delivery.
   port: 8123
   public-url: ""
   required: false

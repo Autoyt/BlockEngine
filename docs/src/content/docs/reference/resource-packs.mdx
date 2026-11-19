@@ -14,12 +14,13 @@ The default config shape is:
 ```yaml
 resource-pack:
   enabled: true
+  backend: auto
   port: 8123
   public-url: ""
   required: false
 ```
 
-`public-url` can be left blank for local testing. Set it when players need to download packs through a public domain, reverse proxy, or hosted file endpoint.
+`backend: auto` uses AutoLib's central resource-pack service when available and falls back to BlockEngine's host. Set `backend: internal` and restart to always use BlockEngine's host. In internal mode, `public-url` can be left blank for local testing. Set it when players need to download packs through a public domain, reverse proxy, or hosted file endpoint. AutoLib mode uses AutoLib's hosting settings and sends the shared prompt.
 
 ## Generated plugin pack
 
@@ -49,7 +50,7 @@ public void setPackDetails(PackDetails details) {
 }
 ```
 
-Each system pack can be resent or downloaded independently. This is useful when one plugin owns a large set of textures, or when server owners want to debug a single integration without rebuilding every other pack.
+In internal mode, each system pack can be resent or downloaded independently. In AutoLib mode, a resend offers the player's shared pack. Individual downloads remain available for debugging.
 
 ## Generated data packs
 
@@ -91,7 +92,7 @@ Use:
 /blockengine packs download *
 ```
 
-`*` merges generated packs into one combined download for testing or manual distribution.
+`download *` merges BlockEngine's generated packs into one download for testing or manual distribution. In AutoLib mode, the shared pack becomes required if any included resource contribution requires it.
 
 ## Creative inventory model routing
 

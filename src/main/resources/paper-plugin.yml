@@ -11,6 +11,10 @@ authors: [ AutoYT, Codex ]
 
 dependencies:
   server:
+    AutoLib:
+      load: BEFORE
+      required: false
+      join-classpath: true
     packetevents:
       load: BEFORE
       required: true

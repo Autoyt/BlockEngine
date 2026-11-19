@@ -49,6 +49,8 @@ The API module is also set up for GitHub Packages publishing from `api-v*` tags.
 
 BlockEngine uses the separately installed **PacketEvents 2.14.0** plugin. It no longer embeds or owns a second PacketEvents runtime, so it can safely share packet handling with Flare and other plugins. Install PacketEvents alongside BlockEngine, including on existing installations upgrading to this build. The runtime enables in the post-world phase after PacketEvents; its bootstrapper still registers creative enchantments during bootstrap.
 
+BlockEngine builds against the versioned AutoLib pack API snapshot in `gradle/lib`. To develop against AutoLib changes, build `:AutoLib:packApiJar` in a sibling `Trims` checkout or pass `-PautolibApiJar=/path/to/autolib-pack-api-1.0.0.jar`. The API snapshot is a compile-time dependency. The server needs the separate `AutoLib.jar` plugin to use central hosting.
+
 ```bash
 ./gradlew build
 ```

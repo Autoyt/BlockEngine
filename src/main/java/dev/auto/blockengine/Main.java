@@ -55,6 +55,7 @@ public final class Main extends JavaPlugin {
         BlockEngine.setInspectionService(new RuntimeInspectionService());
 
         configSave(false);
+        ResourcePackManager.getInstance().prepare();
         VisibilityManager.getInstance().register(this);
         BlockIntegrityManager.getInstance().register(this);
         BlockTicker.getInstance().register(this);

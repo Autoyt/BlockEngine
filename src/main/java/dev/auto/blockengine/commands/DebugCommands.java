@@ -54,6 +54,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Queue;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 
 public final class DebugCommands implements BasicCommand, Listener {
     private static final List<String> ROOT_SUBCOMMANDS = List.of(
@@ -216,11 +217,13 @@ public final class DebugCommands implements BasicCommand, Listener {
             return;
         }
         if (action.equals("list")) {
+            ResourcePackManager packs = ResourcePackManager.getInstance();
+            String resendHint = packs.isUsingSharedBackend() ? "Resend the shared pack" : "Resend this pack";
             BlockEngineChat.send(sender, DebugStyle.header("resource packs"));
-            for (String packId : ResourcePackManager.getInstance().packIds()) {
+            for (String packId : packs.packIds()) {
                 BlockEngineChat.send(sender, DebugStyle.bullet(DebugStyle.pluginName(packId)
                         .append(Component.space())
-                        .append(DebugStyle.action("resend", "/blockengine packs resend " + packId, "Resend this pack"))
+                        .append(DebugStyle.action("resend", "/blockengine packs resend " + packId, resendHint))
                         .append(Component.space())
                         .append(DebugStyle.action("download", "/blockengine packs download " + packId, "Create a download link"))));
             }
@@ -245,23 +248,46 @@ public final class DebugCommands implements BasicCommand, Listener {
             return;
         }
 
+        ResourcePackManager packs = ResourcePackManager.getInstance();
+        if (!packId.equals("*") && !packs.packIds().contains(packId)) {
+            DebugStyle.error(sender, "Unknown pack '" + packId + "'. Try: " + String.join(", ", packs.packIds()) + ", *");
+            return;
+        }
+        if (packs.isUsingSharedBackend()) {
+            resendShared(sender, targets, packs);
+            return;
+        }
+
         int packSends = 0;
         if (packId.equals("*")) {
             for (Player player : targets) {
-                packSends += ResourcePackManager.getInstance().sendAll(player);
+                packSends += packs.sendAll(player);
             }
-        } else if (!ResourcePackManager.getInstance().packIds().contains(packId)) {
-            DebugStyle.error(sender, "Unknown pack '" + packId + "'. Try: "
-                    + String.join(", ", ResourcePackManager.getInstance().packIds()) + ", *");
-            return;
         } else {
             for (Player player : targets) {
-                if (ResourcePackManager.getInstance().send(player, packId)) {
+                if (packs.send(player, packId)) {
                     packSends++;
                 }
             }
         }
         DebugStyle.success(sender, "Resent " + packSends + " pack(s) to " + targets.size() + " player(s).");
+    }
+
+    private void resendShared(CommandSender sender, List<Player> targets, ResourcePackManager packs) {
+        List<CompletableFuture<Boolean>> requests = new ArrayList<>(targets.size());
+        for (Player player : targets) {
+            requests.add(packs.resendShared(player).handle((offer, failure) -> offer != null && failure == null)
+                    .toCompletableFuture());
+        }
+
+        CompletableFuture.allOf(requests.toArray(CompletableFuture<?>[]::new)).thenRun(() -> {
+            long sent = requests.stream().filter(CompletableFuture::join).count();
+            if (sent == 0) {
+                DebugStyle.error(sender, "The shared resource pack could not be offered.");
+                return;
+            }
+            DebugStyle.success(sender, "Offered the shared resource pack to " + sent + " of " + targets.size() + " player(s).");
+        });
     }
 
     private void packDownload(@NotNull CommandSender sender, String[] args) {

@@ -15,7 +15,14 @@ repositories {
     maven("https://repo.codemc.io/repository/maven-snapshots/")
 }
 
+val localAutoLibApi = providers.gradleProperty("autolibApiJar").orNull?.let { path ->
+    rootProject.file(path).also { require(it.isFile) { "AutoLib pack API JAR does not exist: $it" } }
+}
+    ?: rootProject.file("../Trims/AutoLib/build/libs/autolib-pack-api-1.0.0.jar").takeIf { it.isFile }
+    ?: rootProject.file("gradle/lib/autolib-pack-api-1.0.0.jar")
+
 dependencies {
+    compileOnly(files(localAutoLibApi))
     compileOnly("io.papermc.paper:paper-api:1.21.11-R0.1-SNAPSHOT")
     implementation("com.fasterxml.jackson.core:jackson-databind:2.19.2")
     compileOnly("com.github.retrooper:packetevents-spigot:2.14.0")

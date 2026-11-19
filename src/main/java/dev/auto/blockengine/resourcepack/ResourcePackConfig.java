@@ -6,6 +6,7 @@ import org.jetbrains.annotations.NotNull;
 
 public record ResourcePackConfig(
         boolean enabled,
+        boolean preferAutoLib,
         @NotNull String host,
         int port,
         @NotNull String publicUrl,
@@ -24,6 +25,7 @@ public record ResourcePackConfig(
         FileConfiguration config = plugin.getConfig();
         return new ResourcePackConfig(
                 config.getBoolean("resource-pack.enabled", true),
+                !"internal".equalsIgnoreCase(config.getString("resource-pack.backend", "auto").trim()),
                 string(config, "resource-pack.host", "resource-pack.hosting.host", DEFAULT_HOST),
                 Math.clamp(integer(config, "resource-pack.port", "resource-pack.hosting.port", 8123), 1, 65535),
                 string(config, "resource-pack.public-url", "resource-pack.hosting.public-url", ""),
