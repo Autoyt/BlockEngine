@@ -4,7 +4,7 @@ version: '${version}'
 
 main: dev.auto.blockengine.Main
 bootstrapper: dev.auto.blockengine.PluginBootDriver
-api-version: '1.21.11'
+api-version: '26.3'
 load: POSTWORLD
 
 authors: [ AutoYT, Codex ]

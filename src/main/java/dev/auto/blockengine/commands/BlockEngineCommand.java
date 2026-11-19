@@ -170,7 +170,6 @@ public final class BlockEngineCommand implements BasicCommand {
             int loadedNamespaces,
             int generatedPacks
     ) {
-        // Use immutable components so this path also links against Adventure 4 on Paper 1.21.11.
         return Component.empty()
                 .append(Component.text("✦ ", BlockEngineChat.ORANGE_LIGHT))
                 .append(Component.text("Custom blocks that behave on the server and render through generated resource packs.", BlockEngineChat.WHITE))

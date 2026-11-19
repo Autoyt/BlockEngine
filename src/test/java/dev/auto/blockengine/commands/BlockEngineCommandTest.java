@@ -32,7 +32,7 @@ class BlockEngineCommandTest {
     @Test
     void keepsDocumentationLinksAndCommandActions() {
         Component summary = BlockEngineCommand.infoSummary("test", 0, 0, 0);
-        List<ClickEvent> actions = descendants(summary)
+        List<ClickEvent<?>> actions = descendants(summary)
                 .map(Component::clickEvent)
                 .filter(Objects::nonNull)
                 .toList();

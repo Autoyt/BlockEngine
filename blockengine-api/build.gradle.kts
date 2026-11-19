@@ -11,7 +11,7 @@ repositories {
 }
 
 dependencies {
-    compileOnly("io.papermc.paper:paper-api:1.21.11-R0.1-SNAPSHOT")
+    compileOnly("io.papermc.paper:paper-api:26.3.build.255-stable")
     compileOnly("org.projectlombok:lombok:1.18.38")
     annotationProcessor("org.projectlombok:lombok:1.18.38")
     testCompileOnly("org.projectlombok:lombok:1.18.38")
@@ -19,7 +19,7 @@ dependencies {
 }
 
 java {
-    toolchain.languageVersion = JavaLanguageVersion.of(21)
+    toolchain.languageVersion = JavaLanguageVersion.of(25)
     withSourcesJar()
     withJavadocJar()
 }
@@ -31,7 +31,7 @@ tasks.withType<Javadoc>().configureEach {
         charSet = "UTF-8"
         docEncoding = "UTF-8"
         addBooleanOption("Xdoclint:none", true)
-        links("https://jd.papermc.io/paper/1.21.11/")
+        links("https://jd.papermc.io/paper/26.3/")
     }
 }
 

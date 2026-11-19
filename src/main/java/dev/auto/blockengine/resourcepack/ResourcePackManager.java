@@ -50,7 +50,8 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
 public final class ResourcePackManager {
-    private static final int PACK_FORMAT = 55;
+    private static final int PACK_FORMAT_MAJOR = 97;
+    private static final int PACK_FORMAT_MINOR = 1;
     private static final String DEFAULT_ICON_RESOURCE = "resource/default_icon.png";
     private static final MiniMessage MINI = MiniMessage.miniMessage();
     private static final GsonComponentSerializer GSON = GsonComponentSerializer.gson();
@@ -603,14 +604,12 @@ public final class ResourcePackManager {
     ) throws IOException {
         ObjectNode rootNode = Main.getJsonMapper().createObjectNode();
         ObjectNode packNode = rootNode.putObject("pack");
-        packNode.put("pack_format", PACK_FORMAT);
+        packNode.putArray("min_format").add(PACK_FORMAT_MAJOR).add(PACK_FORMAT_MINOR);
+        packNode.putArray("max_format").add(PACK_FORMAT_MAJOR).add(PACK_FORMAT_MINOR);
         if (!blank(title)) {
             packNode.set("title", Main.getJsonMapper().readTree(GSON.serialize(title)));
         }
         packNode.set("description", Main.getJsonMapper().readTree(GSON.serialize(description)));
-        ObjectNode supportedFormats = packNode.putObject("supported_formats");
-        supportedFormats.put("min_inclusive", 16);
-        supportedFormats.put("max_inclusive", 99);
         Main.getJsonMapper().writeValue(root.resolve("pack.mcmeta").toFile(), rootNode);
     }
 
