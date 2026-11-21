@@ -21,6 +21,7 @@ hs_err_pid*
 run
 
 # Local dev server
+/logs/
 server/logs/
 server/plugins/*
 !server/plugins/.gitkeep
