@@ -2,13 +2,15 @@ package dev.auto.blockengine.flare;
 
 import dev.auto.blockengine.api.BlockEngine;
 import dev.auto.blockengine.api.inspection.BlockInspection;
+import dev.auto.blockengine.api.inspection.InspectorCommand;
 import dev.auto.flare.api.AddonDescriptor;
 import dev.auto.flare.api.FlareAddonProvider;
 import dev.auto.flare.api.FlareAddonRegistrar;
 import dev.auto.flare.api.FlareApi;
 import dev.auto.flare.api.event.FlareAddonsChangedEvent;
 import dev.auto.flare.api.event.FlarePackStatusEvent;
-import io.papermc.paper.command.brigadier.BasicCommand;
+import dev.auto.flare.api.schema.Layout;
+import dev.auto.flare.api.widget.WidgetId;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.dialog.Dialog;
 import io.papermc.paper.registry.data.dialog.DialogBase;
@@ -25,6 +27,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerResourcePackStatusEvent;
 import org.bukkit.event.server.ServerLoadEvent;
+import org.bukkit.plugin.ServicePriority;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.IOException;
@@ -41,7 +44,9 @@ import java.util.concurrent.CompletionStage;
 /** Independently hosted visual consumer. It depends exclusively on BlockEngine and Flare public APIs. */
 public final class BlockEngineInspectorPlugin extends JavaPlugin implements Listener, FlareAddonProvider {
     public static final String ADDON = "blockengine_inspector";
-    private static final String PERMISSION = "blockengine.inspector";
+    private static final String PERMISSION = InspectorCommand.PERMISSION;
+    private static final String WIDGETS_PERMISSION = "flare.widgets.edit";
+    private static final String USAGE = "Usage: /be inspector [info|on|off|resend]";
     private static final Key HUD = Key.key("blockengine_inspector:hud");
     private static final TextColor BLUE = TextColor.color(0x89A7D2);
     private static final TextColor VIOLET = TextColor.color(0xAD9BCB);
@@ -81,37 +86,45 @@ public final class BlockEngineInspectorPlugin extends JavaPlugin implements List
         }
 
         getServer().getPluginManager().registerEvents(this, this);
-        registerCommand("beinspector", "BlockEngine wand inspector settings and diagnostics", new InspectorCommand());
+        getServer().getServicesManager().register(InspectorCommand.class, new InspectorControls(), this,
+                ServicePriority.Normal);
         getLogger().info("Inspector pack: " + packUrl + "; default enabled for blockengine.inspector (operators).");
     }
 
     @Override
     public void registerFlareAddons(FlareAddonRegistrar registrar) {
-        state = new InspectorState(registrar.registerAddon(new AddonDescriptor(ADDON,
+        var registration = registrar.registerAddon(new AddonDescriptor(ADDON,
                 "BlockEngine wand inspector", "Live target identity, coordinates and stored runtime diagnostics.",
-                true, PERMISSION, PERMISSION)));
+                true, PERMISSION, PERMISSION));
+        state = new InspectorState(registration);
+        registration.registerWidget(new InspectorWidget());
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void ready(ServerLoadEvent event) {
         if (started || state == null) return;
 
-        boolean schemaRegistered;
+        Layout layout;
         try {
-            String schemaKey = ADDON + ":" + InspectorState.SCHEMA;
-            schemaRegistered = flare.layout().schemas().stream().anyMatch(schema ->
-                    schema.owner().equals(getName()) && schema.key().equals(schemaKey));
+            layout = flare.layout();
         } catch (IllegalStateException failure) {
             getLogger().warning("The inspector cannot start without a frozen Flare catalog: " + failure.getMessage());
             return;
         }
-        if (!schemaRegistered) {
-            getLogger().warning("The inspector target schema is missing from Flare's startup catalog.");
+
+        String placement = new WidgetId(ADDON, InspectorWidget.ID).placementSchema();
+        if (!hasSchema(layout, InspectorState.SCHEMA) || !hasSchema(layout, placement)) {
+            getLogger().warning("The inspector target or widget schema is missing from Flare's startup catalog.");
             return;
         }
 
         started = true;
         getServer().getScheduler().runTaskTimer(this, this::tick, 1, interval);
+    }
+
+    private boolean hasSchema(Layout layout, String localName) {
+        String key = ADDON + ":" + localName;
+        return layout.schemas().stream().anyMatch(schema -> schema.owner().equals(getName()) && schema.key().equals(key));
     }
 
     private void tick() {
@@ -217,6 +230,7 @@ public final class BlockEngineInspectorPlugin extends JavaPlugin implements List
 
     @Override
     public void onDisable() {
+        getServer().getServicesManager().unregisterAll(this);
         getServer().getScheduler().cancelTasks(this);
         if (started) for (Player player : getServer().getOnlinePlayers()) remove(player);
         started = false;
@@ -228,37 +242,40 @@ public final class BlockEngineInspectorPlugin extends JavaPlugin implements List
     private void showInfo(Player player) {
         var target = inspect(player);
         var session = sessions.get(player.getUniqueId());
-        Component body = row("Add-on", ADDON)
-                .append(row("Enabled", enabled(player)))
-                .append(row("Default / permission", "ON / " + PERMISSION + " (op)"))
-                .append(row("Holding wand", holdingWand(player)))
-                .append(row("Flare pack loaded", flare.isPackLoaded(player)))
-                .append(row("Inspector pack loaded", session != null && session.ready(true, true)))
+        Component body = row("Enabled / wand held", enabled(player) + " / " + holdingWand(player))
+                .append(row("Packs loaded (Flare / inspector)",
+                        flare.isPackLoaded(player) + " / " + (session != null && session.ready(true, true))))
                 .append(row("Pack offer", session == null ? "none" : session.offerId()))
                 .append(row("Pack URL", packUrl))
                 .append(row("Poll / range", interval + " ticks / " + range + " blocks"))
-                .append(row("Schema", "target v1 / 124 bytes / names use bounded uppercase ASCII"));
+                .append(Component.newline());
+
         if (target == null) {
             body = body.append(row("Target", "No block in range"));
         } else {
-            body = body.append(row("Kind", target.kind()))
+            body = body.append(row("Target kind", target.kind()))
                     .append(row("Block", target.blockId()))
-                    .append(row("State", target.stateId()))
+                    .append(row("State", target.stateId().isEmpty() ? "N/A" : target.stateId()))
                     .append(row("Backing material", target.backingMaterial()))
                     .append(row("World", target.worldName() + " / " + target.worldId()))
                     .append(row("XYZ", target.x() + " / " + target.y() + " / " + target.z()))
-                    .append(row("Chunk XZ", target.chunkX() + " / " + target.chunkZ()))
-                    .append(row("Local XZ", target.localX() + " / " + target.localZ()))
-                    .append(row("Stored displays", target.displayCount()))
-                    .append(row("Exposed / unbreakable", target.exposed() + " / " + target.unbreakable()))
-                    .append(row("Hardness / mining speed", target.hardness() + " / " + target.miningSpeed()))
-                    .append(row("Adapter payload bytes", target.payloadBytes()));
+                    .append(row("Chunk XZ / local XZ", target.chunkX() + ", " + target.chunkZ()
+                            + " / " + target.localX() + ", " + target.localZ()));
+            if (target.kind() == BlockInspection.Kind.CUSTOM) {
+                body = body.append(row("Stored displays / payload bytes", target.displayCount() + " / " + target.payloadBytes()))
+                        .append(row("Exposed / unbreakable", target.exposed() + " / " + target.unbreakable()))
+                        .append(row("Hardness / mining speed", target.hardness() + " / " + target.miningSpeed()));
+            }
         }
-        body = body.append(Component.newline()).append(action("Enable", "/beinspector on"))
-                .append(Component.text("  ")).append(action("Remove", "/beinspector off"))
-                .append(Component.text("  ")).append(action("Resend packs", "/beinspector resend"))
+
+        body = body.append(Component.newline()).append(action("Enable", "/be inspector on"))
+                .append(Component.text("  ")).append(action("Disable", "/be inspector off"))
+                .append(Component.text("  ")).append(action("Resend packs", "/be inspector resend"))
                 .append(Component.newline()).append(action("Get wand", "/be wand"))
-                .append(Component.text("  ")).append(action("Refresh", "/beinspector"));
+                .append(Component.text("  ")).append(action("Refresh", "/be inspector"));
+        if (player.hasPermission(WIDGETS_PERMISSION)) {
+            body = body.append(Component.text("  ")).append(action("Move or resize HUD", "/flare widgets"));
+        }
 
         Component contents = body;
         player.showDialog(Dialog.create(factory -> factory.empty()
@@ -277,7 +294,7 @@ public final class BlockEngineInspectorPlugin extends JavaPlugin implements List
         return Component.text("[" + label + "]", GOLD).clickEvent(ClickEvent.runCommand(command));
     }
 
-    private final class InspectorCommand implements BasicCommand {
+    private final class InspectorControls implements InspectorCommand {
         @Override
         public void execute(CommandSourceStack source, String[] args) {
             if (!(source.getSender() instanceof Player player)) {
@@ -299,12 +316,12 @@ public final class BlockEngineInspectorPlugin extends JavaPlugin implements List
                     showInfo(player);
                     return;
                 }
-                if (args.length != 1) throw new IllegalArgumentException("Usage: /beinspector [info|on|off|resend]");
+                if (args.length != 1) throw new IllegalArgumentException(USAGE);
                 CompletionStage<Void> result = switch (args[0].toLowerCase(Locale.ROOT)) {
                     case "on" -> flare.setAddonEnabled(player, ADDON, true);
                     case "off" -> flare.setAddonEnabled(player, ADDON, false);
                     case "resend" -> flare.resendAddons(player);
-                    default -> throw new IllegalArgumentException("Usage: /beinspector [info|on|off|resend]");
+                    default -> throw new IllegalArgumentException(USAGE);
                 };
                 result.whenComplete((ignored, failure) -> {
                     if (!isEnabled()) return;
@@ -325,8 +342,5 @@ public final class BlockEngineInspectorPlugin extends JavaPlugin implements List
             String prefix = args.length == 0 ? "" : args[0].toLowerCase(Locale.ROOT);
             return List.of("info", "on", "off", "resend").stream().filter(value -> value.startsWith(prefix)).toList();
         }
-
-        @Override
-        public String permission() { return PERMISSION; }
     }
 }

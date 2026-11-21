@@ -17,7 +17,7 @@ class BlockEngineCommandTest {
     @Test
     void buildsMainMenuSummaryWithRuntimeStatistics() {
         // Run the formerly failing component assembly against the supported Paper runtime API.
-        Component summary = assertDoesNotThrow(() -> BlockEngineCommand.infoSummary("1.0.7-RELEASE", 42, 3, 2));
+        Component summary = assertDoesNotThrow(() -> BlockEngineCommand.infoSummary("1.0.7-RELEASE", 42, 3, 2, false));
         String text = PlainTextComponentSerializer.plainText().serialize(summary);
 
         assertTrue(text.contains("Version: 1.0.7-RELEASE"));
@@ -31,7 +31,7 @@ class BlockEngineCommandTest {
 
     @Test
     void keepsDocumentationLinksAndCommandActions() {
-        Component summary = BlockEngineCommand.infoSummary("test", 0, 0, 0);
+        Component summary = BlockEngineCommand.infoSummary("test", 0, 0, 0, false);
         List<ClickEvent> actions = descendants(summary)
                 .map(Component::clickEvent)
                 .filter(Objects::nonNull)
@@ -50,6 +50,15 @@ class BlockEngineCommandTest {
                 ClickEvent.runCommand("/be wand"),
                 ClickEvent.runCommand("/be debug")
         ), actions);
+    }
+
+    @Test
+    void linksToTheInspectorSubcommandWhenAvailable() {
+        Component summary = BlockEngineCommand.infoSummary("test", 0, 0, 0, true);
+
+        assertTrue(descendants(summary)
+                .map(Component::clickEvent)
+                .anyMatch(ClickEvent.runCommand("/be inspector")::equals));
     }
 
     private static Stream<Component> descendants(Component component) {

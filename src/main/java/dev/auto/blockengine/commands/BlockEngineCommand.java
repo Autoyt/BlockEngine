@@ -1,6 +1,7 @@
 package dev.auto.blockengine.commands;
 
 import dev.auto.blockengine.Main;
+import dev.auto.blockengine.api.inspection.InspectorCommand;
 import dev.auto.blockengine.chat.BlockEngineChat;
 import dev.auto.blockengine.items.ItemManager;
 import dev.auto.blockengine.registry.BlockRegistry;
@@ -30,9 +31,7 @@ import java.util.List;
 import java.util.Locale;
 
 public final class BlockEngineCommand implements BasicCommand {
-    private static final List<String> ROOT = List.of(
-            "info", "catalog", "packs", "debug", "wand", "inspector"
-    );
+    private static final List<String> ROOT = List.of("info", "catalog", "packs", "debug", "wand");
     private static final String DOCS_URL = "https://autoyt.github.io/BlockEngine/";
     private static final String HOW_IT_WORKS_URL = DOCS_URL + "concepts/how-it-works/";
     private static final String DATA_PACK_GUIDE_URL = DOCS_URL + "guides/create-a-data-pack/";
@@ -69,11 +68,18 @@ public final class BlockEngineCommand implements BasicCommand {
             return;
         }
         if (args[0].equalsIgnoreCase("inspector")) {
-            if (!plugin.getServer().getPluginManager().isPluginEnabled("blockengine-flare")) {
-                BlockEngineChat.error(sender, "The optional blockengine-flare inspector add-on is not installed.");
+            InspectorCommand inspector = inspectorCommand();
+            if (inspector == null) {
+                BlockEngineChat.error(sender, "The optional blockengine-flare inspector add-on is unavailable.");
                 return;
             }
-            plugin.getServer().dispatchCommand(sender, "beinspector " + String.join(" ", Arrays.copyOfRange(args, 1, args.length)));
+
+            if (!inspector.canUse(sender)) {
+                BlockEngineChat.error(sender, "Missing permission: " + InspectorCommand.PERMISSION);
+                return;
+            }
+
+            inspector.execute(source, Arrays.copyOfRange(args, 1, args.length));
             return;
         }
         usage(sender);
@@ -87,10 +93,10 @@ public final class BlockEngineCommand implements BasicCommand {
     @Override
     public Collection<String> suggest(CommandSourceStack source, String[] args) {
         if (args.length == 0) {
-            return ROOT;
+            return rootCommands(source.getSender());
         }
         if (args.length == 1) {
-            return matching(ROOT, args[0]);
+            return matching(rootCommands(source.getSender()), args[0]);
         }
         if (args[0].equalsIgnoreCase("debug")) {
             return debug.suggest(source, Arrays.copyOfRange(args, 1, args.length));
@@ -98,16 +104,39 @@ public final class BlockEngineCommand implements BasicCommand {
         if (args[0].equalsIgnoreCase("catalog") || args[0].equalsIgnoreCase("packs")) {
             return debug.suggest(source, args);
         }
-        if (args[0].equalsIgnoreCase("inspector") && args.length == 2) {
-            return matching(List.of("info", "on", "off", "resend"), args[1]);
+        if (args[0].equalsIgnoreCase("inspector")) {
+            InspectorCommand inspector = inspectorCommand();
+            if (inspector != null && inspector.canUse(source.getSender())) {
+                return inspector.suggest(source, Arrays.copyOfRange(args, 1, args.length));
+            }
         }
         return List.of();
     }
 
+    private @Nullable InspectorCommand inspectorCommand() {
+        return plugin.getServer().getServicesManager().load(InspectorCommand.class);
+    }
+
+    private boolean canUseInspector(@NotNull CommandSender sender) {
+        InspectorCommand inspector = inspectorCommand();
+        return inspector != null && inspector.canUse(sender);
+    }
+
+    private @NotNull List<String> rootCommands(@NotNull CommandSender sender) {
+        if (!canUseInspector(sender)) {
+            return ROOT;
+        }
+
+        List<String> commands = new ArrayList<>(ROOT);
+        commands.add("inspector");
+        return commands;
+    }
+
     private void usage(@NotNull CommandSender sender) {
+        String options = "<" + String.join("|", rootCommands(sender)) + ">";
         BlockEngineChat.send(sender, BlockEngineChat.header("blockengine"));
-        BlockEngineChat.send(sender, BlockEngineChat.row("usage", "/blockengine <info|catalog|packs|debug|wand|inspector>"));
-        BlockEngineChat.send(sender, BlockEngineChat.row("short", "/be <info|catalog|packs|debug|wand|inspector>"));
+        BlockEngineChat.send(sender, BlockEngineChat.row("usage", "/blockengine " + options));
+        BlockEngineChat.send(sender, BlockEngineChat.row("short", "/be " + options));
     }
 
     private void giveWand(@NotNull CommandSender sender) {
@@ -138,21 +167,18 @@ public final class BlockEngineCommand implements BasicCommand {
             BlockEngineChat.send(sender, BlockEngineChat.row("releases", link("download builds", RELEASES_URL)));
             return;
         }
-        player.showDialog(infoDialog());
+        player.showDialog(infoDialog(player));
     }
 
-    private @NotNull Dialog infoDialog() {
+    private @NotNull Dialog infoDialog(@NotNull Player player) {
         Component title = Component.text("BlockEngine", BlockEngineChat.ORANGE).decorate(TextDecoration.BOLD);
-        Component summary = infoSummary(
+        Component body = infoSummary(
                 plugin.getPluginMeta().getVersion(),
                 BlockRegistry.getBlocks().size(),
                 NamespaceRegistry.loaded().size(),
-                ResourcePackManager.getInstance().packIds().size()
+                ResourcePackManager.getInstance().packIds().size(),
+                canUseInspector(player)
         );
-        if (plugin.getServer().getPluginManager().isPluginEnabled("blockengine-flare")) {
-            summary = summary.append(command("/be inspector", "Open Flare wand inspector controls and debug information"));
-        }
-        Component body = summary;
 
         return Dialog.create(factory -> factory.empty()
                 .base(DialogBase.builder(title)
@@ -168,10 +194,11 @@ public final class BlockEngineCommand implements BasicCommand {
             @NotNull String version,
             int registeredBlocks,
             int loadedNamespaces,
-            int generatedPacks
+            int generatedPacks,
+            boolean inspectorAvailable
     ) {
         // Use immutable components so this path also links against Adventure 4 on Paper 1.21.11.
-        return Component.empty()
+        Component summary = Component.empty()
                 .append(Component.text("✦ ", BlockEngineChat.ORANGE_LIGHT))
                 .append(Component.text("Custom blocks that behave on the server and render through generated resource packs.", BlockEngineChat.WHITE))
                 .append(Component.newline())
@@ -203,6 +230,11 @@ public final class BlockEngineCommand implements BasicCommand {
                 .append(command("/be packs", "Inspect loaded data packs"))
                 .append(command("/be wand", "Receive the structure-building wand"))
                 .append(command("/be debug", "Open diagnostics and maintenance tools"));
+
+        if (inspectorAvailable) {
+            summary = summary.append(command("/be inspector", "Open Flare wand inspector controls and diagnostics"));
+        }
+        return summary;
     }
 
     private static @NotNull Component section(@NotNull String label) {

@@ -1,6 +1,8 @@
 #version 330
 #extension GL_ARB_separate_shader_objects : require
 #include <flare:schemas/blockengine_inspector/target.glsl>
+#include <flare:schemas/blockengine_inspector/widget_inspector/scoped.glsl>
+#include <flare:widget_bounds.glsl>
 #include <blockengine_inspector:text.glsl>
 
 uniform sampler2D SceneSampler;
@@ -13,12 +15,23 @@ layout(std140) uniform SamplerInfo {
 layout(location = 0) in vec2 texCoord;
 layout(location = 0) out vec4 fragColor;
 
-const vec3 GRAPHITE = vec3(0x33, 0x39, 0x44) / 255.0;
+const vec3 GRAPHITE = vec3(0x19, 0x1c, 0x25) / 255.0;
 const vec3 PEARL = vec3(0xf0, 0xee, 0xeb) / 255.0;
 const vec3 GOLD = vec3(0xd9, 0xbc, 0x82) / 255.0;
 const vec3 BLUE = vec3(0x89, 0xa7, 0xd2) / 255.0;
 const vec3 VIOLET = vec3(0xad, 0x9b, 0xcb) / 255.0;
 const vec3 SEA = vec3(0x8f, 0xbf, 0xc3) / 255.0;
+const ivec2 GLYPH_CELL = ivec2(6, 9);
+const ivec2 PADDING = ivec2(8);
+const ivec2 DESIGN_SIZE = ivec2(TEXT_COLUMNS, TEXT_ROWS) * GLYPH_CELL + 2 * PADDING;
+
+const uint VANILLA = 0u;
+const uint CUSTOM = 1u;
+const int NO_TARGET = 3;
+const int YES = 4;
+const int NO = 5;
+const int NOT_APPLICABLE = 6;
+const int LOOK_AT_BLOCK = 7;
 
 int unsignedAt(uint value, int column, int width) {
     if (column < 0 || column >= width) return 32;
@@ -28,12 +41,16 @@ int unsignedAt(uint value, int column, int width) {
     return 48 + int(value % 10u);
 }
 
-int signedAt(int value, int column, int width) {
+int signedAt(int value, int column, int width, bool rightAligned) {
     uint magnitude = value < 0 ? 0u - uint(value) : uint(value);
     int digits = 1;
     for (uint rest = magnitude / 10u; rest > 0u; rest /= 10u) digits++;
-    if (value < 0 && column == width - digits - 1) return 45;
-    return unsignedAt(magnitude, column, width);
+
+    int sign = value < 0 ? 1 : 0;
+    int start = rightAligned ? width - digits - sign : 0;
+    int position = column - start;
+    if (sign == 1 && position == 0) return 45;
+    return unsignedAt(magnitude, position - sign, digits);
 }
 
 int fixedAt(float value, int column) {
@@ -45,69 +62,109 @@ int fixedAt(float value, int column) {
     if (column >= 6) return 48 + (column == 6 ? hundredths / 10 : hundredths) % 10;
     int whole = hundredths / 100;
     if (value < 0.0 && whole == 0 && column == 3) return 45;
-    return signedAt(value < 0.0 ? -whole : whole, column, 5);
+    return signedAt(value < 0.0 ? -whole : whole, column, 5, true);
 }
 
 int wordAt(int word, int column) {
     if (column < 0 || column >= 16) return 32;
-    // VANILLA / CUSTOM / PLACEHOLDER / NO TARGET / YES / NO / N/A
-    const int WORDS[112] = int[112](
+    // VANILLA / CUSTOM / PLACEHOLDER / NO TARGET / YES / NO / N/A / LOOK AT A BLOCK
+    const int WORDS[128] = int[128](
         86,65,78,73,76,76,65,32,32,32,32,32,32,32,32,32,
         67,85,83,84,79,77,32,32,32,32,32,32,32,32,32,32,
         80,76,65,67,69,72,79,76,68,69,82,32,32,32,32,32,
         78,79,32,84,65,82,71,69,84,32,32,32,32,32,32,32,
         89,69,83,32,32,32,32,32,32,32,32,32,32,32,32,32,
         78,79,32,32,32,32,32,32,32,32,32,32,32,32,32,32,
-        78,47,65,32,32,32,32,32,32,32,32,32,32,32,32,32);
-    return WORDS[clamp(word, 0, 6) * 16 + column];
+        78,47,65,32,32,32,32,32,32,32,32,32,32,32,32,32,
+        76,79,79,75,32,65,84,32,65,32,66,76,79,67,75,32);
+    return WORDS[clamp(word, 0, LOOK_AT_BLOCK) * 16 + column];
 }
 
-int characterAt(int row, int column) {
-    if (row == 2 && column >= 10) return wordAt(getTarget() ? int(getKind()) : 3, column - 10);
-    if (!getTarget() && row >= 3 && row <= 15) return 32;
-    if (row == 3 && column >= 10 && column < 42) return int(getBlockId(column - 10));
-    if (row == 4 && column >= 10 && column < 34) return int(getStateId(column - 10));
-    if (row == 5 && column >= 10 && column < 34) return int(getMaterial(column - 10));
-    if (row == 6 && column >= 10 && column < 26) return int(getWorld(column - 10));
-    if (row >= 7 && row <= 9 && column >= 10 && column < 22) {
-        int value = row == 7 ? getX() : row == 8 ? getY() : getZ();
-        return signedAt(value, column - 10, 12);
+// An empty character in a value field remains blank. Only -1 falls back to a static label.
+int valueAt(int row, int column, uint kind, bool hasTarget) {
+    if (row == 0) return column >= 31 ? wordAt(hasTarget ? int(kind) : NO_TARGET, column - 31) : -1;
+    if (!hasTarget) return row == 1 ? wordAt(LOOK_AT_BLOCK, column) : 32;
+
+    if (row == 1 && column >= 8 && column < 40) return int(getBlockId(column - 8));
+    if (row == 2 && column >= 8 && column < 32) {
+        return kind == VANILLA ? wordAt(NOT_APPLICABLE, column - 8) : int(getStateId(column - 8));
     }
-    if (row == 10 && column >= 8 && column < 19) return signedAt(getX() >> 4, column - 8, 11);
-    if (row == 10 && column >= 23 && column < 34) return signedAt(getZ() >> 4, column - 23, 11);
-    if (row == 11 && column >= 10 && column < 16) return unsignedAt(getDisplays(), column - 10, 6);
-    if (row == 11 && column >= 29) return wordAt(getKind() == 1u ? (getExposed() ? 4 : 5) : 6, column - 29);
-    if (row == 12 && column >= 16 && column < 27) return unsignedAt(getPayload(), column - 16, 11);
-    if ((row == 13 || row == 14) && column >= 16 && column < 24) {
-        if (getKind() != 1u) return wordAt(6, column - 16);
-        return fixedAt(row == 13 ? getHardness() : getMiningSpeed(), column - 16);
+    if (row == 3 && column >= 8 && column < 32) return int(getMaterial(column - 8));
+    if (row == 4 && column >= 8 && column < 24) return int(getWorld(column - 8));
+
+    if (row == 5) {
+        int coordinate = column / 14;
+        int value = coordinate == 0 ? getX() : coordinate == 1 ? getY() : getZ();
+        int digit = column % 14 - 2;
+        if (digit >= 0 && digit < 11) return signedAt(value, digit, 11, false);
     }
-    if (row == 15 && column >= 16) return wordAt(getKind() == 1u ? (getUnbreakable() ? 4 : 5) : 6, column - 16);
-    return label(row, column);
+    if (row == 6) {
+        if (column >= 8 && column < 18) return signedAt(getX() >> 4, column - 8, 10, false);
+        if (column >= 21 && column < 31) return signedAt(getZ() >> 4, column - 21, 10, false);
+        if (column >= 37 && column < 39) return unsignedAt(uint(getX() & 15), column - 37, 2);
+        if (column == 39) return 47;
+        if (column >= 40) return unsignedAt(uint(getZ() & 15), column - 40, 2);
+    }
+
+    bool custom = kind == CUSTOM;
+    if (row == 7) {
+        if (column >= 9 && column < 14) {
+            return custom ? unsignedAt(getDisplays(), column - 9, 5) : wordAt(NOT_APPLICABLE, column - 9);
+        }
+        if (column >= 31 && column < 41) {
+            return custom ? unsignedAt(getPayload(), column - 31, 10) : wordAt(NOT_APPLICABLE, column - 31);
+        }
+    }
+    if (row == 8) {
+        if (column >= 9 && column < 17) return custom ? fixedAt(getHardness(), column - 9) : wordAt(NOT_APPLICABLE, column - 9);
+        if (column >= 33 && column < 41) return custom ? fixedAt(getMiningSpeed(), column - 33) : wordAt(NOT_APPLICABLE, column - 33);
+    }
+    if (row == 9) {
+        if (column >= 9 && column < 12) return wordAt(custom ? (getExposed() ? YES : NO) : NOT_APPLICABLE, column - 9);
+        if (column >= 33 && column < 36) return wordAt(custom ? (getUnbreakable() ? YES : NO) : NOT_APPLICABLE, column - 33);
+    }
+    return -1;
 }
 
 void main() {
     fragColor = texture(SceneSampler, texCoord);
     if (!flareReady() || !getVisible()) return;
 
-    float scale = float(max(1, min(int(OutSize.x) / 600, int(OutSize.y) / 440)));
-    ivec2 p = ivec2(floor(vec2(gl_FragCoord.x, OutSize.y - gl_FragCoord.y) / scale)) - ivec2(12);
-    const ivec2 panel = ivec2(280, 187);
-    if (any(lessThan(p, ivec2(0))) || any(greaterThanEqual(p, panel))) return;
+    vec2 pixel = vec2(gl_FragCoord.x, OutSize.y - gl_FragCoord.y);
+    vec2 point = flareWidgetCanvasPoint(pixel, OutSize);
+    vec2 topLeft = flareWidgetPoint(blockengine_inspector_widget_inspector_getTopLeft());
+    vec2 bottomRight = flareWidgetPoint(blockengine_inspector_widget_inspector_getBottomRight());
+    if (!flareWidgetContains(point, topLeft, bottomRight)) return;
 
-    vec3 color = mix(fragColor.rgb, GRAPHITE * 0.48, 0.94);
-    if (p.x == 0 || p.y == 0 || p.x == panel.x - 1 || p.y == panel.y - 1) {
-        color = mix(VIOLET, BLUE, float(p.x) / float(panel.x));
+    // Fit the text in the actual rectangle without stretching glyphs when placement rounds to the grid.
+    float cell = flareWidgetCanvasCell(OutSize);
+    vec2 panel = (bottomRight - topLeft) * cell;
+    vec2 local = (point - topLeft) * cell;
+    vec2 fit = panel / vec2(DESIGN_SIZE);
+    float scale = min(fit.x, fit.y);
+    vec2 inset = (panel - vec2(DESIGN_SIZE) * scale) * 0.5;
+    ivec2 design = ivec2(floor((local - inset) / scale));
+
+    bool hasTarget = getTarget();
+    vec3 color = mix(fragColor.rgb, GRAPHITE, 0.94);
+    if (design.y < 16) color = mix(color, BLUE, 0.14);
+    if (hasTarget && (design.y == 16 || design.y == 52 || design.y == 70)) {
+        color = mix(color, BLUE, 0.32);
     }
-    if (p.y == 16 && p.x >= 8 && p.x < panel.x - 8) color = mix(VIOLET, BLUE, float(p.x) / float(panel.x));
+    vec2 edge = min(local, panel - local);
+    if (min(edge.x, edge.y) < max(1.0, floor(scale))) {
+        color = mix(VIOLET, BLUE, local.x / panel.x);
+    }
 
-    ivec2 text = p - ivec2(8, 8);
-    if (all(greaterThanEqual(text, ivec2(0)))) {
-        int row = text.y / 9;
-        int column = text.x / 6;
-        int code = characterAt(row, column);
-        if (glyph(code, ivec2(text.x % 6, text.y % 9))) {
-            color = row == 0 ? GOLD : row == 1 ? SEA : row >= 17 ? BLUE : column < 10 ? VIOLET : PEARL;
+    ivec2 text = design - PADDING;
+    ivec2 textSize = ivec2(TEXT_COLUMNS, TEXT_ROWS) * GLYPH_CELL;
+    if (all(greaterThanEqual(text, ivec2(0))) && all(lessThan(text, textSize))) {
+        int row = text.y / GLYPH_CELL.y;
+        int column = text.x / GLYPH_CELL.x;
+        int value = valueAt(row, column, getKind(), hasTarget);
+        int code = value < 0 ? label(row, column) : value;
+        if (glyph(code, text % GLYPH_CELL)) {
+            color = row == 0 ? (value < 0 ? GOLD : SEA) : (value < 0 ? VIOLET : PEARL);
         }
     }
 

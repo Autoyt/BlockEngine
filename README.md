@@ -61,7 +61,7 @@ Build the plugin jar:
 ./gradlew shadowJar
 ```
 
-The optional [BlockEngine Flare inspector](blockengine-flare/README.md) adds a post-effect debug panel to the existing structure wand. It runs on Flare's Paper 26.3 target, is enabled by default for operators, and owns its visual resource pack. The base BlockEngine plugin continues to compile against Paper 1.21.11 and does not require Flare.
+The optional [BlockEngine Flare inspector](blockengine-flare/README.md) adds a resizable debug widget to the structure wand. Open its controls with `/be inspector`. The add-on runs on Flare's Paper 26.3 target and is enabled by default for operators. The base BlockEngine plugin compiles against Paper 1.21.11 and can run independently of Flare.
 
 Build the documentation site locally:
 

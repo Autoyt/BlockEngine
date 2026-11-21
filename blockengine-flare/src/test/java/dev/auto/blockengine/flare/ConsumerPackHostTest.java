@@ -1,5 +1,6 @@
 package dev.auto.blockengine.flare;
 
+import dev.auto.flare.api.widget.WidgetId;
 import org.junit.jupiter.api.Test;
 
 import java.net.InetSocketAddress;
@@ -70,6 +71,12 @@ class ConsumerPackHostTest {
         assertTrue(chain.contains("flare:post/present_view"));
         assertNotNull(shader);
         assertTrue(shader.contains("#include <flare:schemas/blockengine_inspector/target.glsl>"));
+        var widgetId = new WidgetId(BlockEngineInspectorPlugin.ADDON, new InspectorWidget().id());
+        String placementInclude = widgetId.placementInclude().replace(".glsl", "/scoped.glsl");
+        assertTrue(shader.contains("#include <" + placementInclude + ">"));
+        assertTrue(shader.contains("#include <flare:widget_bounds.glsl>"));
+        assertTrue(shader.contains("_getTopLeft()"));
+        assertTrue(shader.contains("_getBottomRight()"));
         assertTrue(shader.contains("getX()"));
         assertTrue(shader.contains("getBlockId("));
         assertTrue(shader.contains("getVisible()"));
