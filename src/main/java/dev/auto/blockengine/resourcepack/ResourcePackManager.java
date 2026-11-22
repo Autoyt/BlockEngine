@@ -7,6 +7,7 @@ import dev.auto.blockengine.api.CustomBlockSystem;
 import dev.auto.blockengine.api.resourcepack.GeneratedItemModel;
 import dev.auto.blockengine.creative.BlockDisplayNames;
 import dev.auto.blockengine.creative.CreativeInventoryManager;
+import dev.auto.blockengine.items.ItemManager;
 import dev.auto.blockengine.datapack.BlockPack;
 import dev.auto.blockengine.datapack.DataBlockPacks;
 import dev.auto.blockengine.registry.BlockRegistry;
@@ -189,14 +190,13 @@ public final class ResourcePackManager {
             packMeta(root, title, description);
             copyIcon(root, null);
             ItemModelGenerator.generateBackingBlock(root);
-            ItemModelGenerator.generateWand(root);
             ItemModelGenerator.generateWandFeedback(root);
             demoTextures(root);
 
             for (dev.auto.blockengine.types.BlockDefinition registered : BlockRegistry.getBlocks()) {
                 ItemModelGenerator.generateBlock(root, registered.apiDefinition());
             }
-            writeCreativeTranslations(root, BlockRegistry.getBlocks());
+            writeCreativeTranslations(root, BlockRegistry.getBlocks(), true);
             Map<Plugin, List<GeneratedItemModel>> contributedModels = generatedItemModels();
             var contributors = contributedModels.entrySet().iterator();
             while (contributors.hasNext()) {
@@ -589,7 +589,7 @@ public final class ResourcePackManager {
         }
         writeCreativeTranslations(root, BlockRegistry.getBlocks().stream()
                 .filter(registered -> namespaces.contains(registered.name().namespace()))
-                .toList());
+                .toList(), false);
         for (GeneratedItemModel model : models) {
             ItemModelGenerator.generateItemModel(root, model);
         }
@@ -659,7 +659,7 @@ public final class ResourcePackManager {
         }
         writeCreativeTranslations(root, BlockRegistry.getBlocks().stream()
                 .filter(registered -> blockPack.namespace().equals(registered.name().namespace()))
-                .toList());
+                .toList(), false);
 
         zip(root, zip);
         byte[] sha1 = sha1(zip);
@@ -704,7 +704,8 @@ public final class ResourcePackManager {
 
     private static void writeCreativeTranslations(
             @NotNull Path root,
-            @NotNull Collection<dev.auto.blockengine.types.BlockDefinition> blocks
+            @NotNull Collection<dev.auto.blockengine.types.BlockDefinition> blocks,
+            boolean primaryPack
     ) throws IOException {
         Map<String, ObjectNode> translations = new LinkedHashMap<>();
         for (dev.auto.blockengine.types.BlockDefinition block : blocks) {
@@ -717,6 +718,15 @@ public final class ResourcePackManager {
             lang.put(CreativeInventoryManager.enchantmentTranslationKey(block.id()), displayName);
             ItemModelGenerator.generateCreativeEnchantmentItemModel(root, block.apiDefinition());
         }
+
+        // Only overlays that already need an enchanted-book model should replace the primary one.
+        if (!primaryPack && translations.isEmpty()) {
+            return;
+        }
+        ObjectNode wandLanguage = translations.computeIfAbsent(CreativeInventoryManager.WAND_ENCHANTMENT.getNamespace(),
+                ignored -> Main.getJsonMapper().createObjectNode());
+        wandLanguage.put(CreativeInventoryManager.WAND_TRANSLATION_KEY, ItemManager.WAND_NAME);
+        ItemModelGenerator.generateWand(root);
         ItemModelGenerator.generateCreativeEnchantedBookModel(root, blocks);
 
         for (Map.Entry<String, ObjectNode> entry : translations.entrySet()) {

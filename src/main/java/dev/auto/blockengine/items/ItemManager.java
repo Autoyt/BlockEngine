@@ -25,6 +25,8 @@ import java.util.function.Supplier;
 import java.util.logging.Level;
 
 public final class ItemManager {
+    public static final String WAND_NAME = "Block Engine Wand";
+
     private static final NamespacedKey BLOCK_ID_KEY = new NamespacedKey("blockengine", "block_id");
     private static final NamespacedKey STATE_ID_KEY = new NamespacedKey("blockengine", "state_id");
     private static final NamespacedKey SUDO_BLOCK_ID_KEY = new NamespacedKey("blockengine", "sudo_block_id");
@@ -173,7 +175,7 @@ public final class ItemManager {
         ItemMeta meta = stack.getItemMeta();
         meta.getPersistentDataContainer().set(WAND_KEY, PersistentDataType.BOOLEAN, true);
         itemModel(meta, wandModelKey());
-        meta.displayName(Component.text("Block Engine Wand", NamedTextColor.LIGHT_PURPLE, TextDecoration.BOLD));
+        meta.displayName(Component.text(WAND_NAME, NamedTextColor.LIGHT_PURPLE, TextDecoration.BOLD));
         meta.lore(java.util.List.of(
                 Component.text("Structure authoring tool", NamedTextColor.DARK_PURPLE),
                 BlockDisplayNames.rich("<light_purple>Click <gray>full blocks to make placeholders."),
@@ -335,7 +337,7 @@ public final class ItemManager {
     }
 
     public static @NotNull NamespacedKey wandModelKey() {
-        return new NamespacedKey(Main.getInstance(), "block_engine_wand");
+        return WAND_KEY;
     }
 
     public static @NotNull NamespacedKey wandFeedbackModelKey(boolean sudoConversion) {

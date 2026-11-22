@@ -17,6 +17,8 @@ BlockEngine's creative-menu system is built around Paper bootstrap enchantment r
 
 Modern Paper can expose custom enchantments in the creative inventory. BlockEngine uses one hidden creative enchantment per custom block and lets Minecraft produce an enchanted-book entry.
 
+Search for **Block Engine Wand** in the creative inventory to get the structure tool. Its enchanted-book entry registers at bootstrap, even on a fresh install. Taking it gives you the same wand as `/be wand`. Using the wand requires Creative mode and the `blockengine.structure` permission.
+
 That entry is not the final block item. It is a discovery-safe placeholder that can exist early enough for the creative menu.
 
 The placeholder is necessary because the vanilla creative inventory is built before normal plugin runtime item creation can know about every loaded block. The enchantment is the stable registry object; the real BlockEngine item is created when the player takes it.

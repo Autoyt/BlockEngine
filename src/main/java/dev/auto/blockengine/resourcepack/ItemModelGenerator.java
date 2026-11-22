@@ -6,7 +6,9 @@ import dev.auto.blockengine.Main;
 import dev.auto.blockengine.api.blocks.BlockDefinition;
 import dev.auto.blockengine.api.resourcepack.GeneratedItemModel;
 import dev.auto.blockengine.creative.CreativeInventoryManager;
+import dev.auto.blockengine.items.ItemManager;
 import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
 import org.jetbrains.annotations.NotNull;
 
 import javax.imageio.ImageIO;
@@ -48,19 +50,19 @@ public final class ItemModelGenerator {
                 .filter(block -> block.apiDefinition().creativeMenu())
                 .sorted(Comparator.comparing(dev.auto.blockengine.types.BlockDefinition::id))
                 .toList();
-        if (creativeBlocks.isEmpty()) {
-            return;
-        }
-
         ObjectNode model = itemModel("minecraft:item/enchanted_book");
         for (int index = creativeBlocks.size() - 1; index >= 0; index--) {
             dev.auto.blockengine.types.BlockDefinition block = creativeBlocks.get(index);
             model = storedEnchantmentCondition(
-                    block,
+                    CreativeInventoryManager.enchantmentKey(block.id()),
                     itemModel(block.name().namespace() + ":item/" + block.name().name()),
                     model
             );
         }
+
+        NamespacedKey wand = ItemManager.wandModelKey();
+        model = storedEnchantmentCondition(CreativeInventoryManager.WAND_ENCHANTMENT,
+                itemModel(wand.getNamespace() + ":item/" + wand.getKey()), model);
 
         Path output = root.resolve("assets")
                 .resolve("minecraft")
@@ -381,7 +383,7 @@ public final class ItemModelGenerator {
     }
 
     private static @NotNull ObjectNode storedEnchantmentCondition(
-            @NotNull dev.auto.blockengine.types.BlockDefinition block,
+            @NotNull NamespacedKey key,
             @NotNull ObjectNode onTrue,
             @NotNull ObjectNode onFalse
     ) {
@@ -392,7 +394,7 @@ public final class ItemModelGenerator {
 
         ArrayNode value = condition.putArray("value");
         ObjectNode enchantment = value.addObject();
-        enchantment.put("enchantments", CreativeInventoryManager.enchantmentKey(block.id()).asString());
+        enchantment.put("enchantments", key.asString());
         enchantment.putObject("levels").put("min", 1);
 
         condition.set("on_true", onTrue);

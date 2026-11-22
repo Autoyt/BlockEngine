@@ -25,12 +25,15 @@ import net.minecraft.network.Connection;
 import net.minecraft.network.protocol.PacketFlow;
 import net.minecraft.network.protocol.game.ServerboundPlayerActionPacket;
 import net.minecraft.network.protocol.game.ServerboundPlayerLoadedPacket;
+import net.minecraft.network.protocol.game.ServerboundSetCreativeModeSlotPacket;
 import net.minecraft.network.protocol.game.ServerboundUseItemOnPacket;
 import net.minecraft.server.level.ClientInformation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.network.CommonListenerCookie;
 import net.minecraft.server.network.ServerGamePacketListenerImpl;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.item.CreativeModeTabs;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.item.SwingAnimationType;
 import net.minecraft.world.item.component.SwingAnimation;
 import net.minecraft.world.phys.BlockHitResult;
@@ -45,6 +48,7 @@ import org.bukkit.block.Dispenser;
 import org.bukkit.block.data.Directional;
 import org.bukkit.craftbukkit.CraftServer;
 import org.bukkit.craftbukkit.CraftWorld;
+import org.bukkit.craftbukkit.inventory.CraftItemStack;
 import org.bukkit.entity.Item;
 import org.bukkit.event.Event;
 import org.bukkit.event.EventHandler;
@@ -61,6 +65,7 @@ import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
 import org.bukkit.inventory.meta.Damageable;
+import org.bukkit.inventory.meta.EnchantmentStorageMeta;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
 
@@ -88,7 +93,7 @@ public final class BlockLifecycleProbe extends JavaPlugin implements Listener {
                 () -> testOrientation(BlockDefinition.Placement.HORIZONTAL_FACING, BlockOrientation.NORTH, BlockFace.UP, 14),
                 () -> testOrientation(BlockDefinition.Placement.AXIS, BlockOrientation.AXIS_X, BlockFace.EAST, 16),
                 () -> testOrientation(BlockDefinition.Placement.DIRECTIONAL, BlockOrientation.UP, BlockFace.UP, 18),
-                this::testDispenser, this::testInventoryClick);
+                this::testDispenser, this::testInventoryClick, this::testCreativeWand);
 
         new BukkitRunnable() {
             int next;
@@ -383,6 +388,26 @@ public final class BlockLifecycleProbe extends JavaPlugin implements Listener {
         check(click.getCursor() != click.getCursor(), "Paper returns distinct cursor mirrors");
         Bukkit.getPluginManager().callEvent(click);
         check(click.writes == 0 && click.getCursor().getType() == Material.APPLE, "unrelated cursor is never rewritten");
+    }
+
+    private void testCreativeWand() {
+        var level = world.getHandle();
+        CreativeModeTabs.tryRebuildTabContents(level.enabledFeatures(), false, level.registryAccess());
+        var books = CreativeModeTabs.searchTab().getDisplayItems().stream()
+                .filter(stack -> stack.is(Items.ENCHANTED_BOOK))
+                .filter(stack -> {
+                    var meta = (EnchantmentStorageMeta) CraftItemStack.asBukkitCopy(stack).getItemMeta();
+                    return meta.getStoredEnchants().keySet().stream()
+                            .anyMatch(enchantment -> enchantment.getKey().toString().equals("blockengine:creative_wand"));
+                })
+                .toList();
+        check(books.size() == 1, "first startup has one wand book in vanilla creative search");
+
+        player.getBukkitEntity().setGameMode(GameMode.CREATIVE);
+        player.connection.handleSetCreativeModeSlot(new ServerboundSetCreativeModeSlotPacket(36, books.getFirst()));
+        ItemStack wand = inventory.getItem(0);
+        check(wand != null && wand.getAmount() == 1 && wand.isSimilar(ItemManager.createWand()) && ItemManager.wand(wand),
+                "taking the creative book puts the working wand in the hotbar");
     }
 
     private Block target(int x) {

@@ -37,6 +37,17 @@ class BlockEnginePackSnapshotTest {
     }
 
     @Test
+    void rendersTheWandWhenNoCreativeBlocksAreRegistered() throws IOException {
+        ItemModelGenerator.generateCreativeEnchantedBookModel(temporary, List.of());
+
+        var model = new ObjectMapper().readTree(temporary.resolve(BOOK).toFile()).get("model");
+        assertEquals("minecraft:stored_enchantments", model.path("predicate").asText());
+        assertEquals("blockengine:creative_wand", model.at("/value/0/enchantments").asText());
+        assertEquals("blockengine:item/block_engine_wand", model.at("/on_true/model").asText());
+        assertEquals("minecraft:item/enchanted_book", model.at("/on_false/model").asText());
+    }
+
+    @Test
     void keepsAllCreativeRoutesAndMergesSystemAndDataAssets() throws Exception {
         GeneratedPack base = pack("base", false, Map.of(
                 "pack.mcmeta", "metadata",

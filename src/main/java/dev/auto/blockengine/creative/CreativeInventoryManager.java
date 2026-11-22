@@ -38,6 +38,9 @@ import java.util.Objects;
 import java.util.regex.Pattern;
 
 public final class CreativeInventoryManager {
+    public static final NamespacedKey WAND_ENCHANTMENT = new NamespacedKey("blockengine", "creative_wand");
+    public static final String WAND_TRANSLATION_KEY = "enchantment.blockengine.creative_wand";
+
     private static final ObjectMapper MAPPER = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
     private static final Pattern NAMESPACE_PATTERN = Pattern.compile("^[a-z0-9._-]+$");
     private static final Pattern NAME_PATTERN = Pattern.compile("^[a-z0-9._-]+(?:/[a-z0-9._-]+)*$");
@@ -60,7 +63,14 @@ public final class CreativeInventoryManager {
             @NotNull EnchantmentRegistryEntry.Builder builder,
             @NotNull CreativeBlock block
     ) {
-        builder.description(Component.translatable(enchantmentTranslationKey(block.id())))
+        configureEnchantment(builder, Component.translatable(enchantmentTranslationKey(block.id())));
+    }
+
+    public static void configureEnchantment(
+            @NotNull EnchantmentRegistryEntry.Builder builder,
+            @NotNull Component description
+    ) {
+        builder.description(description)
                 .supportedItems(RegistrySet.keySet(
                         RegistryKey.ITEM,
                         List.of(ItemTypeKeys.KNOWLEDGE_BOOK, ItemTypeKeys.ENCHANTED_BOOK)
@@ -100,7 +110,18 @@ public final class CreativeInventoryManager {
     }
 
     public static @Nullable ItemStack convertCreativeStack(@Nullable ItemStack stack) {
-        String blockId = creativeBlockId(stack);
+        ItemMeta meta = placeholderMeta(stack);
+        if (meta == null) {
+            return stack;
+        }
+
+        if (meta instanceof EnchantmentStorageMeta book && book.getStoredEnchants().keySet().stream()
+                .anyMatch(enchantment -> WAND_ENCHANTMENT.equals(enchantment.getKey()))) {
+            // Creative clients can request a full stack of books. The structure wand is a single tool.
+            return ItemManager.wand(stack) ? stack : ItemManager.createWand();
+        }
+
+        String blockId = creativeBlockId(meta);
         if (blockId == null) {
             return stack;
         }
@@ -115,15 +136,18 @@ public final class CreativeInventoryManager {
     }
 
     public static @Nullable String creativeBlockId(@Nullable ItemStack stack) {
+        ItemMeta meta = placeholderMeta(stack);
+        return meta == null ? null : creativeBlockId(meta);
+    }
+
+    private static @Nullable ItemMeta placeholderMeta(@Nullable ItemStack stack) {
         if (stack == null || stack.getType().isAir() || !stack.hasItemMeta()) {
             return null;
         }
-        String existing = ItemManager.blockId(stack);
-        if (existing != null) {
-            return null;
-        }
+        return ItemManager.blockId(stack) == null ? stack.getItemMeta() : null;
+    }
 
-        ItemMeta meta = stack.getItemMeta();
+    private static @Nullable String creativeBlockId(@NotNull ItemMeta meta) {
         String direct = blockId(meta.getEnchants().keySet());
         if (direct != null) {
             return direct;
