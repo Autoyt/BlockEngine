@@ -15,8 +15,13 @@ import org.bukkit.NamespacedKey;
 import org.bukkit.SoundCategory;
 import org.bukkit.World;
 import org.bukkit.block.Block;
+import org.bukkit.entity.Item;
+import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public final class BlockRemover {
     private BlockRemover() {
@@ -66,14 +71,43 @@ public final class BlockRemover {
             boolean applyPhysics,
             @NotNull BlockEngineBlockRemovedEvent.Reason reason
     ) {
-        if (customBlock.storedBlock().unbreakable()) {
-            return false;
+        List<ItemStack> drops = List.of();
+        if (drop && customBlock.storedBlock().dropsItem() && !customBlock.storedBlock().unbreakable()) {
+            BlockDefinition definition = BlockRegistry.getBlock(customBlock.storedBlock().blockId());
+            if (definition != null) {
+                drops = List.of(ItemManager.create(definition));
+            }
         }
 
-        if (drop && customBlock.storedBlock().dropsItem()) {
-            drop(block, customBlock);
+        // Non-player removals retain the existing single self-item behavior.
+        return removeWithDrops(block, customBlock, drops, replacement, applyPhysics, reason).removed();
+    }
+
+    public static @NotNull RemovalResult removeWithDrops(
+            @NotNull Block block,
+            @NotNull RuntimeBlockView customBlock,
+            @NotNull List<ItemStack> drops,
+            @NotNull Material replacement,
+            boolean applyPhysics,
+            @NotNull BlockEngineBlockRemovedEvent.Reason reason
+    ) {
+        if (customBlock.storedBlock().unbreakable()) {
+            return new RemovalResult(false, List.of());
         }
-        sound(block, customBlock);
+
+        List<ItemStack> prepared = customBlock.storedBlock().dropsItem()
+                ? BlockDropResolver.prepareItems(drops)
+                : List.of();
+
+        // A callback may have removed or replaced this block, even with the same id/state.
+        BlockLocationKey location = new BlockLocationKey(
+                block.getWorld().getUID(), block.getX(), block.getY(), block.getZ()
+        );
+        RuntimeBlockView current = ChunkEngine.getBlock(location);
+        if (!location.equals(customBlock.location()) || current == null
+                || current.storedBlock() != customBlock.storedBlock()) {
+            return new RemovalResult(false, List.of());
+        }
 
         ChunkEngine.Data data = ChunkEngine.data(block.getChunk());
         data.removeBlock(block.getX() & 15, block.getY(), block.getZ() & 15);
@@ -86,12 +120,15 @@ public final class BlockRemover {
 
         block.setType(replacement, applyPhysics);
         ChunkEngine.changed(block);
+        sound(block, customBlock);
+
+        List<ItemStack> spawned = spawn(block, prepared);
         BlockEngineEvents.call(new BlockEngineBlockRemovedEvent(
                 block,
                 customBlock.storedBlock().blockId(),
                 customBlock.storedBlock().stateId(),
                 reason,
-                drop && customBlock.storedBlock().dropsItem()
+                spawned
         ));
         BlockIntegrityManager.getInstance().callEvent(
                 BlockEngineModificationEvent.Action.REMOVE_CUSTOM_BLOCK,
@@ -101,17 +138,30 @@ public final class BlockRemover {
                 null,
                 null
         );
-        return true;
+        return new RemovalResult(true, spawned);
     }
 
-    private static void drop(@NotNull Block block, @NotNull RuntimeBlockView customBlock) {
-        BlockDefinition definition = BlockRegistry.getBlock(customBlock.storedBlock().blockId());
-        if (definition == null) {
-            return;
+    private static @NotNull List<ItemStack> spawn(@NotNull Block block, @NotNull List<ItemStack> stacks) {
+        Location location = block.getLocation().add(0.5, 0.5, 0.5);
+        List<ItemStack> spawned = new ArrayList<>();
+        for (ItemStack stack : stacks) {
+            Item entity = block.getWorld().dropItemNaturally(location, stack);
+            if (entity.isValid()) {
+                spawned.add(entity.getItemStack().clone());
+            }
+        }
+        return List.copyOf(spawned);
+    }
+
+    public record RemovalResult(boolean removed, @NotNull List<ItemStack> drops) {
+        public RemovalResult {
+            drops = drops.stream().map(ItemStack::clone).toList();
         }
 
-        Location location = block.getLocation().add(0.5, 0.5, 0.5);
-        block.getWorld().dropItemNaturally(location, ItemManager.create(definition));
+        @Override
+        public @NotNull List<ItemStack> drops() {
+            return drops.stream().map(ItemStack::clone).toList();
+        }
     }
 
     private static void sound(@NotNull Block block, @NotNull RuntimeBlockView customBlock) {

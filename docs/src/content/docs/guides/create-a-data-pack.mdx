@@ -89,6 +89,8 @@ Create `blocks/ruby_block.json`:
 
 If `name` is omitted, the file path under `blocks/` becomes the block name. In this example, the id becomes `example:ruby_block`.
 
+The example keeps the normal self-drop. To produce other items, add a state's `drops` array with independent item, count, chance, and Fortune settings. See the [drop reference](/BlockEngine/reference/data-driven-packs/#dynamic-drops-and-fortune) for a complete ore example and Silk Touch behavior.
+
 ## Restart behavior
 
 New creative-menu entries are discovered during startup and realized on the next full restart. Players with `blockengine.debug` are notified on join when new entries were found and another restart is required.

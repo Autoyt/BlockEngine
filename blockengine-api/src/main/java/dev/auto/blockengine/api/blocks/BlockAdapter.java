@@ -1,9 +1,14 @@
 package dev.auto.blockengine.api.blocks;
 
+import dev.auto.blockengine.api.drops.BlockDrop;
+import dev.auto.blockengine.api.drops.BlockDropContext;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+
+import java.util.List;
 
 /**
  * Code-first definition and behavior surface for a BlockEngine custom block.
@@ -34,6 +39,18 @@ public interface BlockAdapter {
     void define(@NotNull BlockDefinition.Builder builder);
 
     /**
+     * Called on the server thread after this block is added to the registry.
+     *
+     * <p>The supplied stack is the same default-state item BlockEngine gives to players.
+     * An adapter may keep or modify this stack, for example to use it in a recipe.
+     * BlockEngine calls this hook each time the block is registered, including registry rebuilds.</p>
+     *
+     * @param defaultItem fresh item stack for the registered block's default state
+     */
+    default void onRegistered(@NotNull ItemStack defaultItem) {
+    }
+
+    /**
      * Creates the first mutable data object for a newly placed block.
      *
      * <p>Use this hook to seed stateful values such as owner ids, inventory ids,
@@ -61,6 +78,23 @@ public interface BlockAdapter {
      */
     default boolean onBreak(@NotNull BlockContext context) {
         return true;
+    }
+
+    /**
+     * Resolves the items produced by an eligible player break of this custom block.
+     *
+     * <p>BlockEngine calls this on the server thread before removing the block,
+     * after drop eligibility checks. Return an empty list to produce no items.
+     * Do not spawn items or remove the block here; the engine handles both after
+     * resolution succeeds. The default preserves the normal single self-drop.
+     * Explosions, gravity, and explicit API removals retain their existing behavior
+     * and do not call this hook.</p>
+     *
+     * @param context block, tool, and removal details
+     * @return drop results with independent item types and total counts
+     */
+    default @NotNull List<BlockDrop> getDrops(@NotNull BlockDropContext context) {
+        return List.of(context.selfDrop());
     }
 
     /**

@@ -314,13 +314,14 @@ public final class BlockPackLoader {
             if (!NAME_PATTERN.matcher(stateId).matches()) {
                 throw new IllegalArgumentException("Invalid state id '" + stateId + "'.");
             }
-            states.put(stateId, state(entry.getValue(), file));
+            states.put(stateId, state(entry.getValue(), stateId, file));
         });
         return states;
     }
 
     private static @NotNull BlockPackBlock.State state(
             @NotNull JsonNode node,
+            @NotNull String stateId,
             @NotNull Path file
     ) {
         BlockDefinition.Textures textures = textures(node.path("textures"));
@@ -345,7 +346,9 @@ public final class BlockPackLoader {
                 boolValue(node, "drops-item", true),
                 boolValue(node, "drop-in-creative", false),
                 textures,
-                sounds(node.path("sounds"))
+                sounds(node.path("sounds")),
+                BlockPackDropParser.drops(node, stateId, file),
+                BlockPackDropParser.silkTouchSelf(node, stateId, file)
         );
     }
 
@@ -401,7 +404,7 @@ public final class BlockPackLoader {
         return material;
     }
 
-    private static void validateMaterialFamily(
+    static void validateMaterialFamily(
             @NotNull Material material,
             @NotNull String raw,
             @NotNull String field,
@@ -421,7 +424,7 @@ public final class BlockPackLoader {
         }
     }
 
-    private static <T extends Enum<T>> @NotNull T enumValue(
+    static <T extends Enum<T>> @NotNull T enumValue(
             @NotNull Class<T> type,
             @NotNull String raw,
             @NotNull String field,

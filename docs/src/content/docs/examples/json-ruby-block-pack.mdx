@@ -148,3 +148,11 @@ generated-resource-pack/data-packs/ruby-pack/
 ```
 
 The data pack's own texture is copied into the generated pack. You do not need to write model JSON for simple cube blocks.
+
+## 8. Add an ore with dynamic drops
+
+Keep `ruby_block.json` unchanged so the decorative block continues to drop itself. Add a separate `blocks/fortune_ore.json` using the complete JSON in the [dynamic-drop reference](/BlockEngine/reference/data-driven-packs/#dynamic-drops-and-fortune). It uses a vanilla iron-ore texture, so it needs no additional PNG.
+
+The ore produces 1–3 raw iron, modified by Fortune, plus an independent 25% chance of two flint. Silk Touch produces one ore block instead. After restarting, give yourself `example:fortune_ore` and test an unenchanted pickaxe, Fortune I–III, Silk Touch, the wrong tool, and creative mode. The existing drop gates still apply.
+
+The bundled sample expansion pack includes the same ore as `sample_expansion:fortune_ore`, alongside the existing `sample_expansion:ruby_block`.

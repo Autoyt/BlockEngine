@@ -100,6 +100,91 @@ Each file in `blocks/**/*.json` defines one block. If `name` is omitted, the pat
 }
 ```
 
+## Dynamic drops and Fortune
+
+Each state can define a `drops` array for player mining. Entries roll independently, so a single block can drop several different items with different counts and Fortune rules. These optional fields use pack format `1`.
+
+```json
+{
+  "name": "fortune_ore",
+  "item": {
+    "name": "<gold>Fortune Ore"
+  },
+  "default-state": "default",
+  "states": {
+    "default": {
+      "hardness": 3.0,
+      "mining-profile": "iron_ore",
+      "preferred-tools": ["pickaxe"],
+      "require-preferred-tool-for-drops": true,
+      "drops-item": true,
+      "drop-in-creative": false,
+      "silk-touch-self": true,
+      "drops": [
+        {
+          "item": {"material": "raw_iron"},
+          "count": {"min": 1, "max": 3},
+          "fortune": "ore_multiplier"
+        },
+        {
+          "item": {"material": "flint"},
+          "count": 2,
+          "chance": 0.25
+        }
+      ],
+      "textures": {
+        "all": "minecraft:block/iron_ore"
+      }
+    }
+  }
+}
+```
+
+Without Silk Touch, this example drops 1–3 raw iron with an ore-style Fortune multiplier and independently has a 25% chance to drop two flint. Fortune affects only the raw iron entry. With Silk Touch, `silk-touch-self` replaces all normal entries with one default-state block item, and the normal entries are not rolled.
+
+### State settings
+
+| Field | Default | Meaning |
+| --- | --- | --- |
+| `drops` | Omitted | Omission preserves the normal single self-drop. An explicit empty array produces no normal rewards. |
+| `silk-touch-self` | `false` | A Silk Touch tool drops one default-state item for this block instead of the normal table. |
+
+Each state's settings are independent. A state that omits `drops` keeps its self-drop even if another state defines custom rewards. An empty `drops` array together with `silk-touch-self: true` drops nothing normally and drops the block with Silk Touch.
+
+Existing gates apply before these rules: `drops-item: false` disables every reward, `drop-in-creative: false` suppresses creative drops, and tool/Silk Touch requirements still control harvest eligibility. `require-silk-touch-for-drops` requires Silk Touch to produce any reward; `silk-touch-self` chooses the reward when Silk Touch is present. Cancelling the break prevents drops.
+
+These tables run for eligible player breaks. Explosion, gravity, and direct API removal keep their existing behavior.
+
+### Entry settings
+
+| Field | Default | Meaning |
+| --- | --- | --- |
+| `item` | Required | One of the item sources below. |
+| `count` | `1` | A whole number from 0 through 2,147,483,647, or an object with both `min` and `max` in that range. Bounds are inclusive and `min` must not exceed `max`. |
+| `chance` | `1` | A finite probability from 0 through 1. `0.25` means 25%. |
+| `fortune` | `"none"` | `none`, `ore_multiplier`, or `uniform_bonus`. Names are case-insensitive; `ore-multiplier` and `uniform-bonus` are also accepted. |
+
+For each entry, the engine checks chance, rolls the base count, then applies Fortune. A final count of zero emits nothing. `ore_multiplier` multiplies the base count; at Fortune III its equally likely multipliers are 1, 1, 2, 3, and 4. `uniform_bonus` adds a random whole number from zero through the Fortune level. `none` preserves the base count. Silk Touch makes the effective Fortune level zero, including when `silk-touch-self` is disabled.
+
+### Item sources
+
+| `item` value | Result |
+| --- | --- |
+| `"self"` | This block's registered default-state item. |
+| `{"material": "raw_iron"}` | A vanilla item. Material names are case-insensitive and must identify an obtainable, non-AIR Bukkit item material. |
+| `{"block": "example:ruby_block"}` | Another registered BlockEngine block's default-state item. |
+| `{"block": "example:lamp", "state": "on"}` | The registered item for that block's named state. |
+
+An item source accepts exactly the shown fields. A material source cannot also contain `block` or `state`. JSON drops do not look up arbitrary plugin item registries or evaluate code; use a [Java adapter](/BlockEngine/code-driven/#dynamic-drops-and-fortune) for custom item factories and count callbacks.
+
+Block references resolve lazily after registration, when a reward is selected during an eligible player break. Declare the owning namespace in `pack.json`'s `dependencies` when referencing another pack or system. The block and optional state must exist when the reward is resolved. The full generated item metadata is retained, and large counts are split into valid stacks.
+
+### Drop validation
+
+The loader rejects malformed entries, invalid count ranges, unknown Fortune rules, and invalid vanilla item materials. The JSON Schema checks the object shapes and numeric bounds; material availability, `min <= max`, and registered block references require runtime checks.
+
+If resolving a selected reward fails, such as a missing registered block or state, the entire break is aborted before block removal and the failure is logged. The engine also rejects a result requiring more than 1,024 item stacks across all entries before removal. Keep counts within a practical range even though the JSON integer limit is larger.
+
 ## Resource packs
 
 Data packs get individual hosted resource packs, parallel to plugin-provided `CustomBlockSystem` packs:

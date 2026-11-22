@@ -193,6 +193,18 @@
           "type": "boolean",
           "default": false
         },
+        "drops": {
+          "type": "array",
+          "description": "Independent rewards for eligible player breaks. Omit for the normal self-drop; an empty array produces no normal rewards.",
+          "items": {
+            "$ref": "#/$defs/dropEntry"
+          }
+        },
+        "silk-touch-self": {
+          "type": "boolean",
+          "description": "Replace this state's normal rewards with one default-state block item when the tool has Silk Touch.",
+          "default": false
+        },
         "textures": {
           "$ref": "#/$defs/textures"
         },
@@ -200,6 +212,103 @@
           "$ref": "#/$defs/sounds"
         }
       }
+    },
+    "dropEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "item"
+      ],
+      "properties": {
+        "item": {
+          "$ref": "#/$defs/dropItem"
+        },
+        "count": {
+          "$ref": "#/$defs/dropCount",
+          "default": 1
+        },
+        "chance": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 1
+        },
+        "fortune": {
+          "type": "string",
+          "description": "none, ore_multiplier, or uniform_bonus; case-insensitive, with hyphens accepted instead of underscores.",
+          "pattern": "^(?:[Nn][Oo][Nn][Ee]|[Oo][Rr][Ee][_-][Mm][Uu][Ll][Tt][Ii][Pp][Ll][Ii][Ee][Rr]|[Uu][Nn][Ii][Ff][Oo][Rr][Mm][_-][Bb][Oo][Nn][Uu][Ss])$",
+          "default": "none"
+        }
+      }
+    },
+    "dropItem": {
+      "oneOf": [
+        {
+          "type": "string",
+          "const": "self",
+          "description": "The current block's registered default-state item."
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "material"
+          ],
+          "properties": {
+            "material": {
+              "$ref": "#/$defs/materialName",
+              "description": "An obtainable, non-AIR Bukkit item material; validated by the loader."
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "block"
+          ],
+          "properties": {
+            "block": {
+              "type": "string",
+              "pattern": "^[a-z0-9._-]+:[a-z0-9._-]+(?:/[a-z0-9._-]+)*$",
+              "description": "Registered BlockEngine block id, resolved when an eligible player break rolls this reward."
+            },
+            "state": {
+              "$ref": "#/$defs/blockName",
+              "description": "Referenced block state; omit to use its default state."
+            }
+          }
+        }
+      ]
+    },
+    "dropCount": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/itemCount"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "min",
+            "max"
+          ],
+          "description": "Inclusive uniform range. The loader also requires min to be no greater than max.",
+          "properties": {
+            "min": {
+              "$ref": "#/$defs/itemCount"
+            },
+            "max": {
+              "$ref": "#/$defs/itemCount"
+            }
+          }
+        }
+      ]
+    },
+    "itemCount": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 2147483647
     },
     "movement": {
       "type": "object",

@@ -1,6 +1,8 @@
 package dev.auto.blockengine.registry;
 
+import dev.auto.blockengine.Main;
 import dev.auto.blockengine.api.blocks.BlockAdapter;
+import dev.auto.blockengine.items.ItemManager;
 import dev.auto.blockengine.types.BlockDefinition;
 import dev.auto.blockengine.types.BlockName;
 import org.jetbrains.annotations.NotNull;
@@ -10,6 +12,7 @@ import java.util.IdentityHashMap;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
+import java.util.logging.Level;
 import java.util.regex.Pattern;
 
 public class BlockRegistry {
@@ -73,6 +76,14 @@ public class BlockRegistry {
         blocks.put(definition.name(), definition);
         blocksById.put(definition.id(), definition);
         blocksByAdapter.put(adapter, definition);
+
+        try {
+            adapter.onRegistered(ItemManager.create(definition));
+        } catch (RuntimeException exception) {
+            Main.getInstance().getLogger().log(Level.WARNING,
+                    "Block registration callback failed for " + definition.id(), exception);
+        }
+
         return definition;
     }
 

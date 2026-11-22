@@ -1,6 +1,6 @@
 ---
 title: Code-Driven Blocks
-description: Setup, first block walkthrough, states, textures, mining, events, and testing for Java block systems.
+description: Setup, first block walkthrough, states, textures, mining, dynamic drops, Fortune, events, and testing for Java block systems.
 ---
 
 import { Aside, CardGrid, LinkCard, TabItem, Tabs } from '@astrojs/starlight/components';
@@ -405,6 +405,74 @@ state.hardness(1.5f)
 
 `unbreakable(true)` prevents normal breaking. `dropsItem(false)` prevents item drops. `dropInCreative(false)` is normally what you want so creative-mode breaks do not duplicate items.
 
+## Dynamic drops and Fortune
+
+Override `BlockAdapter#getDrops(BlockDropContext)` when a player breaking a block should receive other items or variable quantities. Existing adapters can leave this method alone: BlockEngine keeps the normal single self-drop, subject to the state's drop settings.
+
+Use a reusable `DropTable` to describe independent rewards. Each entry has its own item factory, count, chance, and Fortune policy, so one block can yield several different items in different amounts:
+
+```java
+import dev.auto.blockengine.api.drops.BlockDrop;
+import dev.auto.blockengine.api.drops.BlockDropContext;
+import dev.auto.blockengine.api.drops.DropTable;
+import dev.auto.blockengine.api.drops.Fortune;
+
+import java.util.List;
+
+import org.bukkit.Material;
+import org.bukkit.inventory.ItemStack;
+
+// Fields and callback inside your BlockAdapter implementation.
+private static final DropTable DROPS = DropTable.builder()
+        .item(() -> new ItemStack(Material.RAW_IRON), drop -> drop
+                .count(1, 3)
+                .fortune(Fortune.ORE_MULTIPLIER))
+        .item(() -> new ItemStack(Material.FLINT), drop -> drop
+                .count(1, 2)
+                .chance(0.25))
+        .silkTouchSelf()
+        .build();
+
+@Override
+public List<BlockDrop> getDrops(BlockDropContext context) {
+    return DROPS.roll(context);
+}
+```
+
+The example rolls 1–3 raw iron and independently gives a 25% chance of 1–2 flint. Fortune affects only the raw iron entry. `silkTouchSelf()` replaces the entire table result with one block item when the tool has Silk Touch, so the ordinary rewards are not rolled in that case.
+
+Item factories can return custom items with names, models, enchantments, and persistent data. BlockEngine preserves that metadata and splits large counts into valid stacks. Counts belong to the drop entry, rather than the amount on the factory's item template.
+
+### Count rules
+
+Use `.count(2)` for a fixed amount, `.count(1, 3)` for an inclusive random range, or a callback for a value computed at break time. Each entry is evaluated separately; its amount does not control another reward. For example, a block can drop a quantity stored in its placed-block data:
+
+```java
+private static final DropTable STORED_DROPS = DropTable.builder()
+        .item(() -> new ItemStack(Material.GOLD_NUGGET), drop -> drop
+                .count(context -> {
+                    Integer nuggets = context.data().integer("stored_nuggets");
+                    return nuggets == null ? 0 : Math.max(0, nuggets);
+                }))
+        .build();
+```
+
+An entry first checks its chance, computes its base count once, then applies Fortune. A final count of zero produces no item. Counts must be nonnegative, range bounds must be ordered, and chance must be a finite value from 0 to 1. The item factory runs only when the final count is positive.
+
+`Fortune.ORE_MULTIPLIER` applies an ore-style multiplier to the base count: at Fortune III the equally likely multipliers are 1, 1, 2, 3, and 4. `Fortune.UNIFORM_BONUS` adds a random integer from zero through the Fortune level instead. Entries without a Fortune policy use `Fortune.NONE` and keep their base count. If a count callback already uses `context.fortuneLevel()` to calculate its own bonus, leave the built-in Fortune policy off to avoid applying the bonus twice.
+
+The context captures the block id, state id, responsible player reference, tool, and enchantment levels for one removal. `tool()` returns a fresh copy, and `fortuneLevel()` is zero when the captured tool has Silk Touch. `data()` and `block()` remain live for the synchronous callback. Read the data while resolving drops and return the results; let BlockEngine remove the block and spawn the items.
+
+### Compatibility and drop settings
+
+State settings still control whether drops are allowed. `dropsItem(false)`, `dropInCreative(false)`, preferred-tool requirements, and Silk Touch requirements apply before the custom drop callback. Cancelling the break also prevents drops. Overriding `getDrops(...)` replaces the default self-drop; the engine does not add a second block item to your result.
+
+Both the default self-drop and `silkTouchSelf()` use the registered block's default-state item. They do not turn placed-block data into item metadata or retain a temporary visual state. Raw storage blocks can keep the default callback and remain unaffected by Fortune.
+
+Explosions, gravity, and explicit API removals keep their existing drop behavior and do not invoke `getDrops(...)`.
+
+BlockEngine resolves and validates the complete drop result before removing the block. If the provider throws an exception or returns invalid results, the engine logs the failure and leaves the block intact. Results requiring more than 1,024 item stacks after splitting are rejected before removal; this limit applies to all entries combined. Keep callbacks free of world changes so their own side effects do not occur before validation succeeds.
+
 ## Movement
 
 Movement settings also live on states:
@@ -553,6 +621,8 @@ public void onBlockEngineBroken(BlockEngineBlockBrokenEvent event) {
 ```
 
 Use the cancellable break event for protection logic. Use the after event for analytics, quests, cleanup, and effects.
+
+`BlockEngineBlockBrokenEvent#drops()` and `BlockEngineBlockRemovedEvent#drops()` expose the stacks actually spawned, after item-spawn handling. Each call returns an unmodifiable list of independent item copies, so a listener cannot change another listener's snapshot by editing a returned stack. `droppedItem()` reports whether any items were spawned. The older boolean event constructors remain available; events created through those constructors retain the supplied flag but have an empty detailed drop list.
 
   </TabItem>
   <TabItem label="Data save">

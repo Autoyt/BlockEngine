@@ -4,8 +4,15 @@ import dev.auto.blockengine.api.blocks.BlockAdapter;
 import dev.auto.blockengine.api.blocks.BlockCreateContext;
 import dev.auto.blockengine.api.blocks.BlockData;
 import dev.auto.blockengine.api.blocks.BlockDefinition;
+import dev.auto.blockengine.api.drops.BlockDrop;
+import dev.auto.blockengine.api.drops.BlockDropContext;
+import dev.auto.blockengine.api.drops.DropTable;
+import dev.auto.blockengine.items.ItemManager;
+import dev.auto.blockengine.registry.BlockRegistry;
+import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.List;
 import java.util.Objects;
 
 public final class DataBlockAdapter implements BlockAdapter {
@@ -72,5 +79,61 @@ public final class DataBlockAdapter implements BlockAdapter {
     @Override
     public @NotNull BlockData createDefaultData(@NotNull BlockCreateContext context) {
         return context.createData();
+    }
+
+    @Override
+    public @NotNull List<BlockDrop> getDrops(@NotNull BlockDropContext context) {
+        BlockPackBlock.State state = block.states().get(context.stateId());
+        if (state == null) {
+            throw new IllegalArgumentException("Unknown drop state '" + context.stateId()
+                    + "' for " + context.blockId());
+        }
+        if (state.drops() == null) {
+            return BlockAdapter.super.getDrops(context);
+        }
+
+        // Use the Java table evaluator so JSON and code share chance, count,
+        // Fortune, and Silk Touch behavior. Factories resolve only when selected.
+        DropTable.Builder table = DropTable.builder();
+        for (int index = 0; index < state.drops().size(); index++) {
+            BlockPackBlock.Drop drop = state.drops().get(index);
+            String path = context.blockId() + ": states." + context.stateId() + ".drops[" + index + "].item";
+            table.item(() -> dropItem(drop.item(), context, path), entry -> entry
+                    .count(drop.count().min(), drop.count().max())
+                    .chance(drop.chance())
+                    .fortune(drop.fortune()));
+        }
+        if (state.silkTouchSelf()) {
+            table.silkTouchSelf();
+        }
+
+        return table.build().roll(context);
+    }
+
+    private static @NotNull ItemStack dropItem(
+            @NotNull BlockPackBlock.DropItem item,
+            @NotNull BlockDropContext context,
+            @NotNull String path
+    ) {
+        if (item.self()) {
+            return context.selfDrop().item();
+        }
+        if (item.material() != null) {
+            return new ItemStack(item.material());
+        }
+
+        // Resolve against the current registry, allowing forward references and
+        // avoiding stale definitions after a pack reload.
+        var definition = BlockRegistry.getBlock(item.blockId());
+        if (definition == null) {
+            throw new IllegalArgumentException(path + ".block: Unknown BlockEngine block '" + item.blockId() + "'");
+        }
+        String stateId = item.stateId() == null ? definition.apiDefinition().defaultState() : item.stateId();
+        if (!definition.apiDefinition().states().containsKey(stateId)) {
+            throw new IllegalArgumentException(path + ".state: Unknown state '" + stateId
+                    + "' for BlockEngine block '" + item.blockId() + "'");
+        }
+
+        return ItemManager.create(definition, stateId);
     }
 }

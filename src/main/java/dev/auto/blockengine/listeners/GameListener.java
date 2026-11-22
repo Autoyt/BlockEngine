@@ -20,6 +20,7 @@ import dev.auto.blockengine.resourcepack.ResourcePackManager;
 import dev.auto.blockengine.runtime.RuntimeBlockView;
 import dev.auto.blockengine.runtime.BlockContext;
 import dev.auto.blockengine.runtime.BlockDataManager;
+import dev.auto.blockengine.runtime.BlockDropResolver;
 import dev.auto.blockengine.runtime.BlockRemover;
 import dev.auto.blockengine.runtime.ChunkEngine;
 import dev.auto.blockengine.runtime.GravityManager;
@@ -75,14 +76,17 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.logging.Level;
 
 public class GameListener implements Listener {
     private final Map<UUID, Integer> lastPlacementTicks = new HashMap<>();
     private final Map<UUID, MiningSession> miningSessions = new HashMap<>();
+    private final Set<BlockLocationKey> breakingBlocks = new HashSet<>();
 
     public GameListener() {
         Main.getInstance().getServer().getPluginManager().registerEvents(this, Main.getInstance());
@@ -163,7 +167,7 @@ public class GameListener implements Listener {
         stopMining(event.getPlayer(), event.getBlock());
     }
 
-    @EventHandler
+    @EventHandler(ignoreCancelled = true)
     public void onBreak(BlockBreakEvent event) {
         if (ItemManager.wand(event.getPlayer().getInventory().getItemInMainHand())) {
             event.setCancelled(true);
@@ -581,33 +585,92 @@ public class GameListener implements Listener {
             @NotNull Player player,
             boolean harvestable
     ) {
+        BlockLocationKey location = location(block);
+        if (customBlock.storedBlock().unbreakable() || !breakingBlocks.add(location)) {
+            return false;
+        }
+
+        try {
+            return finishBreak(block, customBlock, player, harvestable);
+        } finally {
+            breakingBlocks.remove(location);
+        }
+    }
+
+    private boolean finishBreak(
+            @NotNull Block block,
+            @NotNull RuntimeBlockView customBlock,
+            @NotNull Player player,
+            boolean harvestable
+    ) {
+        if (!isCurrentBlock(block, customBlock)) {
+            return false;
+        }
+
+        // Start the pending edit before callbacks. Loading that edit replaces the
+        // persisted record objects; subsequent edits to neighboring blocks must
+        // not look like a replacement of the block being broken.
+        ChunkEngine.data(block.getChunk());
+        customBlock = block(block);
+        if (customBlock == null) {
+            return false;
+        }
+
+        ItemStack tool = player.getInventory().getItemInMainHand().clone();
+        boolean drop = (player.getGameMode() == GameMode.CREATIVE
+                ? customBlock.storedBlock().dropInCreative()
+                : harvestable) && customBlock.storedBlock().dropsItem();
         BlockContext context = BlockDataManager.getInstance().context(block, customBlock, player);
+        if (!isCurrentBlock(block, customBlock)) {
+            return false;
+        }
+
         if (context != null && BlockEngineEvents.callCancellable(new BlockEngineBlockBreakEvent(
                 block,
                 context,
                 player
         ))) {
-            BlockDataManager.getInstance().save(block, context);
+            saveCancelledBreak(block, customBlock, context);
             return false;
         }
-        if (context != null && !context.adapter().onBreak(context)) {
-            BlockDataManager.getInstance().save(block, context);
+        if (!isCurrentBlock(block, customBlock)) {
             return false;
         }
 
-        boolean drop = player.getGameMode() == GameMode.CREATIVE
-                ? customBlock.storedBlock().dropInCreative()
-                : harvestable;
+        if (context != null && !context.adapter().onBreak(context)) {
+            saveCancelledBreak(block, customBlock, context);
+            return false;
+        }
+        if (!isCurrentBlock(block, customBlock)) {
+            return false;
+        }
+
+        List<ItemStack> drops = List.of();
+        if (drop && context != null) {
+            BlockDefinition definition = BlockRegistry.getBlock(customBlock.storedBlock().blockId());
+            if (definition != null) {
+                try {
+                    drops = BlockDropResolver.resolve(context, tool, ItemManager.create(definition));
+                } catch (RuntimeException error) {
+                    Main.getInstance().getLogger().log(Level.SEVERE,
+                            "Could not resolve drops for " + customBlock.storedBlock().blockId()
+                                    + " at " + customBlock.location() + "; leaving the block intact", error);
+                    return false;
+                }
+            }
+        }
+
         String blockId = customBlock.storedBlock().blockId();
         String stateId = customBlock.storedBlock().stateId();
-        if (!BlockRemover.remove(
+        BlockRemover.RemovalResult result = BlockRemover.removeWithDrops(
                 block,
                 customBlock,
-                drop,
+                drops,
                 Material.AIR,
                 false,
                 BlockEngineBlockRemovedEvent.Reason.PLAYER_BREAK
-        )) {
+        );
+        if (!result.removed()) {
             return false;
         }
         queueGravityUpdateAround(block);
@@ -616,9 +679,25 @@ public class GameListener implements Listener {
                 player,
                 blockId,
                 stateId,
-                drop && customBlock.storedBlock().dropsItem()
+                result.drops()
         ));
         return true;
+    }
+
+    private boolean isCurrentBlock(@NotNull Block block, @NotNull RuntimeBlockView expected) {
+        RuntimeBlockView current = block(block);
+        return current != null && current.storedBlock() == expected.storedBlock();
+    }
+
+    private void saveCancelledBreak(
+            @NotNull Block block,
+            @NotNull RuntimeBlockView expected,
+            @NotNull BlockContext context
+    ) {
+        // A cancellation must not recreate a block already removed by a callback.
+        if (isCurrentBlock(block, expected)) {
+            BlockDataManager.getInstance().save(block, context);
+        }
     }
 
     private void playCustomSound(@Nullable RuntimeBlockView customBlock, @NotNull String type) {

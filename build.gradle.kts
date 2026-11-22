@@ -1,6 +1,7 @@
 import org.gradle.api.tasks.Copy
 import org.gradle.api.tasks.Exec
 import org.gradle.jvm.tasks.Jar
+import org.gradle.api.tasks.bundling.Zip
 
 plugins {
     id("java-library")
@@ -44,6 +45,19 @@ val shadowJarTask = tasks.named<Jar>("shadowJar")
 val serverDir = layout.projectDirectory.dir("server")
 val pluginsDir = serverDir.dir("plugins")
 
+// Keep the downloadable sample pack in sync with its editable JSON sources.
+val sampleExpansionPackZip = tasks.register<Zip>("sampleExpansionPackZip") {
+    archiveFileName.set("sample-expansion-pack.zip")
+    destinationDirectory.set(layout.buildDirectory.dir("generated-expansion-packs"))
+    from(layout.projectDirectory.dir("src/main/resources/expansion-packs/sample-expansion-pack"))
+    isPreserveFileTimestamps = false
+    isReproducibleFileOrder = true
+}
+
+sourceSets.main {
+    resources.exclude("expansion-packs/sample-expansion-pack.zip")
+}
+
 tasks {
     test {
         useJUnitPlatform()
@@ -62,6 +76,10 @@ tasks {
     }
 
     processResources {
+        from(sampleExpansionPackZip) {
+            into("expansion-packs")
+        }
+
         val props = mapOf("version" to version)
         inputs.properties(props)
 
