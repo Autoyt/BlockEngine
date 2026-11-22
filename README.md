@@ -47,7 +47,7 @@ The API module is also set up for GitHub Packages publishing from `api-v*` tags.
 
 ## Building
 
-BlockEngine uses the separately installed **PacketEvents 2.14.0** plugin. It no longer embeds or owns a second PacketEvents runtime, so it can safely share packet handling with Flare and other plugins. Install PacketEvents alongside BlockEngine, including on existing installations upgrading to this build. The runtime enables in the post-world phase after PacketEvents; its bootstrapper still registers creative enchantments during bootstrap.
+BlockEngine targets Paper 26.3 and requires Java 25 and the separately installed **PacketEvents 2.14.0** plugin. BlockEngine and Flare can share this PacketEvents runtime. The runtime enables in the post-world phase after PacketEvents, and BlockEngine registers creative enchantments during bootstrap.
 
 BlockEngine builds against the versioned AutoLib pack and item API snapshots in `gradle/lib`. To develop against AutoLib changes, build `:AutoLib:packApiJar :AutoLib:itemApiJar` in a sibling `Trims` checkout, or pass `-PautolibApiJar=/path/to/autolib-pack-api-1.0.0.jar` and `-PautolibItemApiJar=/path/to/autolib-item-api-1.0.0.jar`. Both are compile-time dependencies and are not shaded into BlockEngine. AutoLib remains optional; install its separate plugin to enable shared resource packs and the custom item facade.
 
@@ -67,7 +67,7 @@ Build the plugin jar:
 ./gradlew shadowJar
 ```
 
-The optional [BlockEngine Flare inspector](blockengine-flare/README.md) adds a resizable debug widget to the structure wand. Open its controls with `/be inspector`. The add-on runs on Flare's Paper 26.3 target and is enabled by default for operators. The base BlockEngine plugin compiles against Paper 1.21.11 and can run independently of Flare.
+The optional [BlockEngine Flare inspector](blockengine-flare/README.md) adds a resizable debug widget to the structure wand. Open its controls with `/be inspector`. The add-on targets Paper 26.3, is enabled by default for operators, and owns its visual resource pack. The base BlockEngine plugin can run independently of Flare.
 
 Build the documentation site locally:
 

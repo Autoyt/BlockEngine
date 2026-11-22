@@ -16,6 +16,9 @@ repositories {
     maven("https://repo.codemc.io/repository/maven-snapshots/")
 }
 
+val paperApi = "io.papermc.paper:paper-api:26.3.build.255-stable"
+val packetEventsVersion = "2.14.0"
+
 val localAutoLibApi = providers.gradleProperty("autolibApiJar").orNull?.let { path ->
     rootProject.file(path).also { require(it.isFile) { "AutoLib pack API JAR does not exist: $it" } }
 }
@@ -31,15 +34,15 @@ val localAutoLibItemApi = providers.gradleProperty("autolibItemApiJar").orNull?.
 dependencies {
     compileOnly(files(localAutoLibApi))
     compileOnly(files(localAutoLibItemApi))
-    compileOnly("io.papermc.paper:paper-api:1.21.11-R0.1-SNAPSHOT")
+    compileOnly(paperApi)
     implementation("com.fasterxml.jackson.core:jackson-databind:2.19.2")
-    compileOnly("com.github.retrooper:packetevents-spigot:2.14.0")
+    compileOnly("com.github.retrooper:packetevents-spigot:$packetEventsVersion")
     implementation(project(":blockengine-api"))
     compileOnly("org.projectlombok:lombok:1.18.38")
     annotationProcessor("org.projectlombok:lombok:1.18.38")
     testCompileOnly("org.projectlombok:lombok:1.18.38")
     testAnnotationProcessor("org.projectlombok:lombok:1.18.38")
-    testImplementation("io.papermc.paper:paper-api:1.21.11-R0.1-SNAPSHOT")
+    testImplementation(paperApi)
     testImplementation("org.junit.jupiter:junit-jupiter:5.14.3")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher:1.14.3")
 }
@@ -75,11 +78,11 @@ tasks {
     }
 
     runServer {
-        // Configure the Minecraft version for our task.
-        // This is the only required configuration besides applying the plugin.
-        // Your plugin's jar (or shadowJar if present) will be used automatically.
-        minecraftVersion("1.21.11")
+        minecraftVersion("26.3")
         jvmArgs("-Xms2G", "-Xmx2G")
+        downloadPlugins {
+            url("https://github.com/retrooper/packetevents/releases/download/v$packetEventsVersion/packetevents-spigot-$packetEventsVersion.jar")
+        }
     }
 
     processResources {
