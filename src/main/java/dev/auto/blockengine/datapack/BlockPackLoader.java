@@ -283,7 +283,7 @@ public final class BlockPackLoader {
     }
 
     private static @NotNull BlockPackBlock.Item item(@NotNull JsonNode node, @NotNull Path file) {
-        Material material = material(node, "material", Material.KNOWLEDGE_BOOK, false, file);
+        Material material = material(node, "material", Material.PAPER, false, file);
         List<String> lore = new ArrayList<>();
         JsonNode loreNode = node.path("lore");
         if (loreNode.isArray()) {

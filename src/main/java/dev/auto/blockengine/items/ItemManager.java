@@ -5,6 +5,8 @@ import dev.auto.blockengine.creative.BlockDisplayNames;
 import dev.auto.blockengine.registry.BlockRegistry;
 import dev.auto.blockengine.runtime.RuntimeBlockView;
 import dev.auto.blockengine.types.BlockDefinition;
+import io.papermc.paper.datacomponent.DataComponentTypes;
+import io.papermc.paper.datacomponent.item.SwingAnimation;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
@@ -13,6 +15,7 @@ import org.bukkit.NamespacedKey;
 import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.PlayerInventory;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -93,8 +96,9 @@ public final class ItemManager {
 
     public static @NotNull ItemStack create(@NotNull BlockDefinition block, @NotNull String stateId) {
         block.apiDefinition().state(stateId);
-        return registered(customItemId(block, stateId, false), () -> build(block, stateId),
+        ItemStack stack = registered(customItemId(block, stateId, false), () -> build(block, stateId),
                 meta -> blockIdentity(meta, block.id(), stateId, false));
+        return preparePlacementItem(stack, block);
     }
 
     private static ItemStack build(BlockDefinition block, String stateId) {
@@ -119,6 +123,9 @@ public final class ItemManager {
         meta.setMaxStackSize(64);
 
         stack.setItemMeta(meta);
+        if (item.placeable()) {
+            stack.setData(DataComponentTypes.INTERACT_ANIMATION, PlacementAnimations.SILENT);
+        }
         return stack;
     }
 
@@ -213,10 +220,52 @@ public final class ItemManager {
     }
 
     public static @Nullable String blockId(@Nullable ItemStack stack) {
-        if (stack == null || stack.getType().isAir() || !stack.hasItemMeta()) {
+        if (stack == null || stack.isEmpty()) {
             return null;
         }
-        return stack.getItemMeta().getPersistentDataContainer().get(BLOCK_ID_KEY, PersistentDataType.STRING);
+        return stack.getPersistentDataContainer().get(BLOCK_ID_KEY, PersistentDataType.STRING);
+    }
+
+    public static @Nullable ItemStack updatePlacementItem(@Nullable ItemStack stack) {
+        String id = blockId(stack);
+        if (id == null) {
+            return stack;
+        }
+
+        BlockDefinition definition = BlockRegistry.getBlock(id);
+        return definition == null ? stack : preparePlacementItem(stack, definition);
+    }
+
+    public static void updatePlacementItems(PlayerInventory inventory) {
+        for (int slot = 0; slot < inventory.getSize(); slot++) {
+            ItemStack current = inventory.getItem(slot);
+            ItemStack updated = updatePlacementItem(current);
+            if (updated != current) {
+                inventory.setItem(slot, updated);
+            }
+        }
+    }
+
+    private static ItemStack preparePlacementItem(ItemStack stack, BlockDefinition definition) {
+        var item = definition.apiDefinition().item();
+        if (!item.placeable()) {
+            return stack;
+        }
+
+        // Old default knowledge books consume themselves locally before the server sees the click.
+        boolean oldCarrier = stack.getType() == Material.KNOWLEDGE_BOOK && item.material() == Material.PAPER;
+        if (!oldCarrier && PlacementAnimations.SILENT.equals(stack.getData(DataComponentTypes.INTERACT_ANIMATION))) {
+            return stack;
+        }
+
+        ItemStack updated = oldCarrier ? stack.withType(Material.PAPER) : stack.clone();
+        updated.setData(DataComponentTypes.INTERACT_ANIMATION, PlacementAnimations.SILENT);
+        return updated;
+    }
+
+    private static final class PlacementAnimations {
+        static final SwingAnimation SILENT = SwingAnimation.swingAnimation()
+                .type(SwingAnimation.Animation.NONE).duration(0).build();
     }
 
     public static @Nullable String stateId(@Nullable ItemStack stack) {

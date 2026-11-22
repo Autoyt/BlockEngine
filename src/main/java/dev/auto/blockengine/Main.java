@@ -111,6 +111,7 @@ public final class Main extends JavaPlugin implements Listener {
             }
         }
         for (Player player : Bukkit.getOnlinePlayers()) {
+            ItemManager.updatePlacementItems(player.getInventory());
             VisibilityManager.getInstance().forceRecalculate(player);
         }
 

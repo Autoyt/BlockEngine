@@ -223,7 +223,9 @@ Blocks saved by earlier releases keep their original display rotation. Chunks co
 
 Most blocks should not override `item(...)`.
 
-The default item is a BlockEngine-managed `KNOWLEDGE_BOOK`. The runtime gives it the correct metadata and generated item model, and the creative-menu placeholder converts into this real item when it reaches a player inventory.
+The default item uses `PAPER` with the block's generated item model. The creative-menu placeholder converts to this item when it reaches a player inventory. Paper has no right-click action of its own, so the hand swings only when placement succeeds. If you specify a material with a vanilla use action, such as a written book, the client can still briefly lower the item.
+
+A player can place one custom block per server tick across both hands. A failed placement leaves the item and the player's placement for that tick available.
 
 ```java
 builder.item(item -> item

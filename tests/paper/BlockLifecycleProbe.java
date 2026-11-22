@@ -15,17 +15,24 @@ import dev.auto.blockengine.placement.BlockOrientation;
 import dev.auto.blockengine.registry.BlockRegistry;
 import dev.auto.blockengine.runtime.ChunkEngine;
 import dev.auto.blockengine.types.BlockLocationKey;
+import io.papermc.paper.datacomponent.DataComponentTypes;
+import io.papermc.paper.event.player.PlayerInventorySlotChangeEvent;
 import io.papermc.paper.event.player.PlayerPickBlockEvent;
+import net.kyori.adventure.text.Component;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.network.Connection;
 import net.minecraft.network.protocol.PacketFlow;
 import net.minecraft.network.protocol.game.ServerboundPlayerActionPacket;
+import net.minecraft.network.protocol.game.ServerboundPlayerLoadedPacket;
+import net.minecraft.network.protocol.game.ServerboundUseItemOnPacket;
 import net.minecraft.server.level.ClientInformation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.network.CommonListenerCookie;
 import net.minecraft.server.network.ServerGamePacketListenerImpl;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.item.SwingAnimationType;
+import net.minecraft.world.item.component.SwingAnimation;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
 import org.bukkit.Bukkit;
@@ -55,7 +62,9 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
 import org.bukkit.inventory.meta.Damageable;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.scheduler.BukkitRunnable;
 
+import java.util.List;
 import java.util.UUID;
 import java.util.logging.Level;
 
@@ -64,90 +73,176 @@ public final class BlockLifecycleProbe extends JavaPlugin implements Listener {
     private CraftWorld world;
     private PlayerInventory inventory;
     private EquipmentSlot observedHand;
+    private InteractionHand swingHand;
+    private SwingAnimation swingAnimation;
+    private boolean swingSentToSelf;
     private boolean denyInteract, denyPlace, denyEnginePlace, denyBreak, denyEngineBreak, suppressDrops;
-    private int checks, breakEvents, brokenEvents;
+    private int checks, breakEvents, brokenEvents, swings, sequence, blockInteractions, burstTick;
 
     @Override
     public void onEnable() {
         getServer().getPluginManager().registerEvents(this, this);
-        Bukkit.getScheduler().runTaskLater(this, () -> {
-            try {
-                createPlayer();
-                testPlacement();
-                testAdventure();
-                testMining();
-                testOrientation();
-                testDispenser();
-                testInventoryClick();
-                getLogger().info("LIFECYCLE PROBE PASS (" + checks + " checks)");
-            } catch (Throwable failure) {
-                getLogger().log(Level.SEVERE, "LIFECYCLE PROBE FAIL", failure);
-            } finally {
+        List<Runnable> steps = List.of(
+                this::createPlayer, this::testCarrierAnimations, this::testPlacementBurst, this::testPlacementVetoes,
+                this::testTwoHands, this::testCreativePlacement, this::testAdventure, this::testMining,
+                () -> testOrientation(BlockDefinition.Placement.HORIZONTAL_FACING, BlockOrientation.NORTH, BlockFace.UP, 14),
+                () -> testOrientation(BlockDefinition.Placement.AXIS, BlockOrientation.AXIS_X, BlockFace.EAST, 16),
+                () -> testOrientation(BlockDefinition.Placement.DIRECTIONAL, BlockOrientation.UP, BlockFace.UP, 18),
+                this::testDispenser, this::testInventoryClick);
+
+        new BukkitRunnable() {
+            int next;
+
+            @Override
+            public void run() {
+                try {
+                    steps.get(next++).run();
+                    if (next < steps.size()) return;
+                    getLogger().info("LIFECYCLE PROBE PASS (" + checks + " checks)");
+                } catch (Throwable failure) {
+                    getLogger().log(Level.SEVERE, "LIFECYCLE PROBE FAIL", failure);
+                }
+                cancel();
                 Bukkit.shutdown();
             }
-        }, 5L);
+        }.runTaskTimer(this, 5L, 1L);
     }
 
     private void createPlayer() {
         world = (CraftWorld) Bukkit.getWorlds().getFirst();
         var server = ((CraftServer) Bukkit.getServer()).getServer();
         GameProfile profile = new GameProfile(UUID.randomUUID(), "LifecycleProbe");
-        player = new ServerPlayer(server, world.getHandle(), profile, ClientInformation.createDefault());
+        player = new ServerPlayer(server, world.getHandle(), profile, ClientInformation.createDefault()) {
+            @Override
+            public boolean isImmobile() {
+                // Paper treats players without a connected client as immobile at packet entry.
+                return false;
+            }
+
+            @Override
+            public boolean swing(InteractionHand hand, SwingAnimation animation, boolean sendToSelf) {
+                swings++;
+                swingHand = hand;
+                swingAnimation = animation;
+                swingSentToSelf = sendToSelf;
+                return super.swing(hand, animation, sendToSelf);
+            }
+        };
         player.connection = new ServerGamePacketListenerImpl(server, new Connection(PacketFlow.SERVERBOUND),
                 player, CommonListenerCookie.createInitial(profile, false));
+        player.connection.handleAcceptPlayerLoad(new ServerboundPlayerLoadedPacket());
         player.setPos(4.5, 121, 3.5);
         inventory = player.getBukkitEntity().getInventory();
     }
 
-    private void testPlacement() {
+    private void testCarrierAnimations() {
+        ItemStack custom = ItemManager.create(BlockRegistry.getBlock("blockengine_test:red_block"));
+        inventory.setItemInMainHand(custom);
+        var managed = player.getItemInHand(InteractionHand.MAIN_HAND);
+        var vanilla = new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.PAPER);
+        check(custom.getType() == Material.PAPER && managed.getInteractAnimation().type() == SwingAnimationType.NONE
+                && managed.getInteractAnimation().duration() == 0, "fresh carrier suppresses the client's use swing");
+        check(managed.getAttackAnimation().equals(vanilla.getAttackAnimation()), "carrier preserves vanilla attack animation");
+
+        ItemStack legacy = custom.withType(Material.KNOWLEDGE_BOOK).asQuantity(7);
+        legacy.resetData(DataComponentTypes.INTERACT_ANIMATION);
+        Component name = Component.text("Renamed before upgrade");
+        legacy.setData(DataComponentTypes.CUSTOM_NAME, name);
+        inventory.setItemInOffHand(legacy);
+        // Raw slot 45 is the offhand in the player's own inventory view.
+        new PlayerInventorySlotChangeEvent(player.getBukkitEntity(), 45, ItemStack.empty(), legacy).callEvent();
+
+        var updated = inventory.getItemInOffHand();
+        check(updated.getType() == Material.PAPER && updated.getAmount() == 7
+                && name.equals(updated.getData(DataComponentTypes.CUSTOM_NAME))
+                && ItemManager.blockId(custom).equals(ItemManager.blockId(updated)),
+                "legacy offhand carrier upgrades without losing identity, name or count");
+        check(player.getItemInHand(InteractionHand.OFF_HAND).getInteractAnimation().type() == SwingAnimationType.NONE,
+                "upgraded carrier suppresses the client's use swing");
+    }
+
+    private void testPlacementBurst() {
         ItemStack custom = ItemManager.create(BlockRegistry.getBlock("blockengine_test:red_block"));
         inventory.setItemInMainHand(new ItemStack(Material.DIAMOND_PICKAXE));
         inventory.setItemInOffHand(custom.asQuantity(3));
 
         Block target = target(4);
-        click(target, InteractionHand.OFF_HAND);
+        burstTick = Bukkit.getCurrentTick();
+        packetClick(target, InteractionHand.OFF_HAND);
         check(placed(target) && offhandCount() == 2, "survival offhand places and charges one");
         check(observedHand == EquipmentSlot.OFF_HAND && inventory.getItemInMainHand().getType() == Material.DIAMOND_PICKAXE,
                 "Bukkit reports the offhand and the main slot stays intact");
+        check(swings == 1 && swingHand == InteractionHand.OFF_HAND && swingSentToSelf
+                && swingAnimation.type() == SwingAnimationType.WHACK, "approved offhand swings visibly once");
 
-        target = target(5);
+        inventory.setItemInMainHand(custom.asQuantity(3));
+        for (int x = 5; x <= 8; x++) {
+            Block next = target(x);
+            packetClick(next, x % 2 == 0 ? InteractionHand.OFF_HAND : InteractionHand.MAIN_HAND);
+            check(next.getType().isAir() && !placed(next), "same-tick burst cannot place at x=" + x);
+        }
+        check(swings == 1 && offhandCount() == 2 && inventory.getItemInMainHand().getAmount() == 3,
+                "burst across distinct targets and both hands only consumes and swings once");
+
+        inventory.setItemInMainHand(new ItemStack(Material.COBBLESTONE, 2));
+        Block vanillaTarget = target(3);
+        packetClick(vanillaTarget, InteractionHand.MAIN_HAND);
+        check(vanillaTarget.getType() == Material.COBBLESTONE && inventory.getItemInMainHand().getAmount() == 1,
+                "vanilla block placement still works during the custom placement limit");
+    }
+
+    private void testPlacementVetoes() {
+        check(Bukkit.getCurrentTick() == burstTick + 1, "next attempts run on the immediately following tick");
+        int before = swings;
+        Block target = target(5);
         denyPlace = true;
-        click(target, InteractionHand.OFF_HAND);
-        check(target.getType().isAir() && !placed(target) && offhandCount() == 2, "Bukkit placement veto");
+        packetClick(target, InteractionHand.OFF_HAND);
+        check(target.getType().isAir() && !placed(target) && offhandCount() == 2 && swings == before,
+                "Bukkit placement veto preserves the stack without a swing");
         denyPlace = false;
         denyEnginePlace = true;
-        click(target, InteractionHand.OFF_HAND);
-        check(target.getType().isAir() && !placed(target) && offhandCount() == 2, "BlockEngine placement veto");
+        packetClick(target, InteractionHand.OFF_HAND);
+        check(target.getType().isAir() && !placed(target) && offhandCount() == 2 && swings == before,
+                "BlockEngine placement veto preserves the stack without a swing");
         denyEnginePlace = false;
         denyInteract = true;
-        click(target, InteractionHand.OFF_HAND);
-        check(!placed(target) && offhandCount() == 2, "interaction veto");
+        packetClick(target, InteractionHand.OFF_HAND);
+        check(!placed(target) && offhandCount() == 2 && swings == before, "interaction veto suppresses the swing");
         denyInteract = false;
 
         target = target(6);
         player.setPos(6.5, 121, 4.5);
         click(target, InteractionHand.OFF_HAND);
-        check(!placed(target) && offhandCount() == 2, "player collision preserves the stack");
+        check(!placed(target) && offhandCount() == 2 && swings == before, "player collision preserves stack and swing");
         player.setPos(4.5, 121, 3.5);
 
         target = target(7);
         target.setType(Material.SHORT_GRASS, false);
         clickOn(target, InteractionHand.OFF_HAND);
-        check(placed(target) && offhandCount() == 1, "replaceable target uses the clicked position");
+        check(placed(target) && offhandCount() == 1 && swings == before + 1,
+                "vetoes leave this tick available for placing into a replaceable block");
         var air = new PlayerInteractEvent(player.getBukkitEntity(), Action.RIGHT_CLICK_AIR,
                 inventory.getItemInOffHand(), null, BlockFace.SELF, EquipmentSlot.OFF_HAND);
         Bukkit.getPluginManager().callEvent(air);
         check(air.useItemInHand() == Event.Result.DENY && offhandCount() == 1, "air click suppresses carrier use");
+    }
 
-        target = target(8);
+    private void testTwoHands() {
+        ItemStack custom = ItemManager.create(BlockRegistry.getBlock("blockengine_test:red_block"));
+        Block target = target(8);
         inventory.setItemInMainHand(custom.asQuantity(3));
+        int before = swings;
         click(target, InteractionHand.MAIN_HAND);
         click(target, InteractionHand.OFF_HAND);
         check(placed(target) && inventory.getItemInMainHand().getAmount() == 2 && offhandCount() == 1,
                 "two hands targeting the same click charge only once");
+        check(swings == before + 1 && swingHand == InteractionHand.MAIN_HAND && swingSentToSelf
+                && swingAnimation.type() == SwingAnimationType.WHACK, "approved main hand swings visibly once");
+    }
 
+    private void testCreativePlacement() {
         player.getBukkitEntity().setGameMode(GameMode.CREATIVE);
-        target = target(9);
+        Block target = target(9);
         click(target, InteractionHand.MAIN_HAND);
         check(placed(target) && inventory.getItemInMainHand().getAmount() == 2, "creative retains stack");
         var pick = new PlayerPickBlockEvent(player.getBukkitEntity(), target, new ItemStack(Material.BARRIER), false, 3, -1);
@@ -220,14 +315,8 @@ public final class BlockLifecycleProbe extends JavaPlugin implements Listener {
                 "creative break preserves durability and suppresses drops");
     }
 
-    private void testOrientation() {
-        player.setYRot(0);
-        testOrientation(BlockDefinition.Placement.HORIZONTAL_FACING, BlockOrientation.NORTH, BlockFace.UP, 14);
-        testOrientation(BlockDefinition.Placement.AXIS, BlockOrientation.AXIS_X, BlockFace.EAST, 16);
-        testOrientation(BlockDefinition.Placement.DIRECTIONAL, BlockOrientation.UP, BlockFace.UP, 18);
-    }
-
     private void testOrientation(BlockDefinition.Placement mode, BlockOrientation expected, BlockFace face, int x) {
+        player.setYRot(0);
         var definition = BlockRegistry.registerBlock(new BlockAdapter() {
             @Override
             public String name() {
@@ -311,11 +400,23 @@ public final class BlockLifecycleProbe extends JavaPlugin implements Listener {
     }
 
     private void clickOn(Block block, InteractionHand hand, BlockFace face) {
+        player.gameMode.useItemOn(player, world.getHandle(), player.getItemInHand(hand), hand, hit(block, face));
+    }
+
+    private void packetClick(Block target, InteractionHand hand) {
+        var hit = hit(target.getRelative(BlockFace.DOWN), BlockFace.UP);
+        int before = blockInteractions;
+        player.connection.handleUseItemOn(new ServerboundUseItemOnPacket(hand, hit, ++sequence));
+        if (blockInteractions != before + 1) {
+            throw new AssertionError("Use-on packet " + sequence + " did not reach the Bukkit interaction handler once");
+        }
+    }
+
+    private BlockHitResult hit(Block block, BlockFace face) {
         var position = new BlockPos(block.getX(), block.getY(), block.getZ());
         var point = new Vec3(block.getX() + .5 + face.getModX() * .5, block.getY() + .5 + face.getModY() * .5,
                 block.getZ() + .5 + face.getModZ() * .5);
-        var hit = new BlockHitResult(point, Direction.valueOf(face.name()), position, false);
-        player.gameMode.useItemOn(player, world.getHandle(), player.getItemInHand(hand), hand, hit);
+        return new BlockHitResult(point, Direction.valueOf(face.name()), position, false);
     }
 
     private void mine(Block block) {
@@ -344,6 +445,7 @@ public final class BlockLifecycleProbe extends JavaPlugin implements Listener {
 
     @EventHandler
     public void onInteract(PlayerInteractEvent event) {
+        if (event.getAction() == Action.RIGHT_CLICK_BLOCK) blockInteractions++;
         if (denyInteract) event.setCancelled(true);
     }
 

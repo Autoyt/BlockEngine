@@ -4,7 +4,7 @@
   "creative-menu": true,
   "placement": "none",
   "item": {
-    "material": "knowledge_book",
+    "material": "paper",
     "name": "<#ff3355>Sample Ruby Block",
     "lore": [
       "<gray>Loaded from a JSON expansion pack."

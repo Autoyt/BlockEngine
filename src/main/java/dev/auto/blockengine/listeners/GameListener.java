@@ -33,7 +33,9 @@ import dev.auto.blockengine.types.BlockDefinition;
 import dev.auto.blockengine.types.BlockLocationKey;
 import dev.auto.blockengine.visibility.VisibilityManager;
 import io.papermc.paper.event.player.PlayerPickBlockEvent;
+import io.papermc.paper.event.player.PlayerInventorySlotChangeEvent;
 import io.papermc.paper.datacomponent.DataComponentTypes;
+import io.papermc.paper.datacomponent.item.SwingAnimation;
 import org.bukkit.Bukkit;
 import org.bukkit.ExplosionResult;
 import org.bukkit.GameMode;
@@ -95,6 +97,7 @@ import java.util.logging.Level;
 
 public class GameListener implements Listener {
     private final Map<UUID, MainHandClick> mainHandClicks = new HashMap<>();
+    private final Map<UUID, Integer> placementTicks = new HashMap<>();
     private final Map<UUID, MiningSession> miningSessions = new HashMap<>();
     private final Set<BlockLocationKey> breakingBlocks = new HashSet<>();
 
@@ -107,6 +110,7 @@ public class GameListener implements Listener {
             stopMining(session.player());
         }
         mainHandClicks.clear();
+        placementTicks.clear();
     }
 
     @EventHandler
@@ -168,14 +172,31 @@ public class GameListener implements Listener {
 
     @EventHandler
     public void onJoin(PlayerJoinEvent event) {
+        ItemManager.updatePlacementItems(event.getPlayer().getInventory());
         ResourcePackManager.getInstance().send(event.getPlayer());
         VisibilityManager.getInstance().forceRecalculate(event.getPlayer());
+    }
+
+    @EventHandler
+    public void onInventorySlotChange(PlayerInventorySlotChangeEvent event) {
+        ItemStack current = event.getNewItemStack();
+        ItemStack updated = ItemManager.updatePlacementItem(current);
+        if (updated == current) {
+            return;
+        }
+
+        PlayerInventory inventory = event.getPlayer().getInventory();
+        int slot = event.getSlot();
+        if (slot >= 0 && slot < inventory.getSize() && current.equals(inventory.getItem(slot))) {
+            inventory.setItem(slot, updated);
+        }
     }
 
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
         ChunkEngine.flushNow();
         mainHandClicks.remove(event.getPlayer().getUniqueId());
+        placementTicks.remove(event.getPlayer().getUniqueId());
         stopMining(event.getPlayer());
         VisibilityManager.getInstance().cleanup(event.getPlayer());
     }
@@ -878,17 +899,34 @@ public class GameListener implements Listener {
         PlayerInventory inventory = player.getInventory();
         int slot = PlacementInventory.slot(inventory, hand);
 
-        if (!PlacementVerificationEngine.verify(new PlacementVerificationEngine.Request(
-                target, definition, stateId, player, face, hand, PlacementVerificationEngine.Source.PLAYER
-        )).allowed() || !bukkitAllowsPlacement(target, clicked, expected, player, hand)) {
+        // Reserve before firing placement events, which can trigger another use from either hand.
+        UUID playerId = player.getUniqueId();
+        int tick = Bukkit.getCurrentTick();
+        Integer previousTick = placementTicks.put(playerId, tick);
+        if (previousTick != null && previousTick == tick) {
             return;
         }
 
-        boolean placed = PlacementManager.getInstance().place(target, definition, player, face, stateId,
-                () -> player.getGameMode() == GameMode.CREATIVE || PlacementInventory.consumeOne(inventory, slot, expected));
+        boolean placed = false;
+        try {
+            if (!PlacementVerificationEngine.verify(new PlacementVerificationEngine.Request(
+                    target, definition, stateId, player, face, hand, PlacementVerificationEngine.Source.PLAYER
+            )).allowed() || !bukkitAllowsPlacement(target, clicked, expected, player, hand)) {
+                return;
+            }
+
+            placed = PlacementManager.getInstance().place(target, definition, player, face, stateId,
+                    () -> player.getGameMode() == GameMode.CREATIVE || PlacementInventory.consumeOne(inventory, slot, expected));
+        } finally {
+            if (!placed) {
+                placementTicks.remove(playerId);
+            }
+        }
+
         if (placed) {
             queueGravityUpdateAround(target);
-            player.swingHand(hand);
+            // Use the vanilla interaction swing only after placement and payment have succeeded.
+            player.swingHand(hand, SwingAnimation.swingAnimation().build());
         }
     }
 

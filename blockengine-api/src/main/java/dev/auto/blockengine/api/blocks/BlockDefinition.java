@@ -453,7 +453,7 @@ public final class BlockDefinition {
         private final @NotNull Material defaultBlock = BASE_BLOCK;
         private boolean catalog = true;
         private boolean creativeMenu = true;
-        private @NotNull Item item = new Item(Material.KNOWLEDGE_BOOK, null, List.of(), false, true);
+        private @NotNull Item item = new Item(Material.PAPER, null, List.of(), false, true);
         private @NotNull Placement placement = Placement.NONE;
         private @NotNull String defaultState = "default";
         private final @NotNull Map<String, State> states = new LinkedHashMap<>();
@@ -561,7 +561,7 @@ public final class BlockDefinition {
      * Mutable builder for {@link Item}.
      */
     public static final class ItemBuilder {
-        private @NotNull Material material = Material.KNOWLEDGE_BOOK;
+        private @NotNull Material material = Material.PAPER;
         private @Nullable String name;
         private final @NotNull List<String> lore = new ArrayList<>();
         private boolean glint = false;

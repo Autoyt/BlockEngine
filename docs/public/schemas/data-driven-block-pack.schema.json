@@ -122,7 +122,7 @@
       "properties": {
         "material": {
           "$ref": "#/$defs/materialName",
-          "default": "knowledge_book"
+          "default": "paper"
         },
         "name": {
           "type": "string"
