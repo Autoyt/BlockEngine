@@ -58,6 +58,16 @@ public final class OverideFillCommand implements Listener {
             return false;
         }
 
+        if (!command.name().equals("give")) {
+            int targetIndex = command.name().equals("fill") ? 6 : 3;
+            if (command.args().length <= targetIndex) {
+                return false;
+            }
+            Target target = Target.parse(command.args()[targetIndex]);
+            if (target == null || BlockRegistry.getBlock(target.blockId()) == null) {
+                return false;
+            }
+        }
         return switch (command.name()) {
             case "fill" -> {
                 Source source = Source.from(sender);
@@ -153,6 +163,13 @@ public final class OverideFillCommand implements Listener {
             BlockEngineChat.send(sender, "You do not have permission to use /fill.");
             return true;
         }
+        if (!validState(sender, definition, target)) {
+            return true;
+        }
+        if (args.length > 8) {
+            BlockEngineChat.send(sender, "BlockEngine fill does not support filters or additional arguments.");
+            return true;
+        }
 
         Position from = Position.parse(args[0], args[1], args[2], source.location());
         Position to = Position.parse(args[3], args[4], args[5], source.location());
@@ -173,9 +190,12 @@ public final class OverideFillCommand implements Listener {
         int maxX = Math.max(from.x(), to.x());
         int maxY = Math.max(from.y(), to.y());
         int maxZ = Math.max(from.z(), to.z());
-        long count = (long) (maxX - minX + 1) * (maxY - minY + 1) * (maxZ - minZ + 1);
-        if (count > MAX_BLOCKS) {
-            BlockEngineChat.send(sender, "Too many BlockEngine blocks in fill area: " + count + " > " + MAX_BLOCKS + ".");
+        if (!withinWorld(source.world(), minX, minY, minZ) || !withinWorld(source.world(), maxX, maxY, maxZ)) {
+            BlockEngineChat.send(sender, "Fill coordinates are outside the world.");
+            return true;
+        }
+        if (!withinFillLimit(minX, maxX, minY, maxY, minZ, maxZ)) {
+            BlockEngineChat.send(sender, "Fill area exceeds the " + MAX_BLOCKS + " block limit.");
             return true;
         }
 
@@ -187,7 +207,7 @@ public final class OverideFillCommand implements Listener {
                     if (mode.equals("keep") && !block.getType().isAir()) {
                         continue;
                     }
-                    if (!place(block, definition, source.player(), target.stateId(), mode.equals("destroy"), mode.equals("destroy"))) {
+                    if (!place(block, definition, source.player(), target.stateId(), mode.equals("destroy"))) {
                         continue;
                     }
                     changed++;
@@ -218,6 +238,9 @@ public final class OverideFillCommand implements Listener {
             BlockEngineChat.send(sender, "You do not have permission to use /setblock.");
             return true;
         }
+        if (!validState(sender, definition, target)) {
+            return true;
+        }
 
         Position position = Position.parse(args[0], args[1], args[2], source.location());
         if (position == null) {
@@ -226,18 +249,26 @@ public final class OverideFillCommand implements Listener {
         }
 
         String mode = args.length >= 5 ? args[4].toLowerCase(Locale.ROOT) : "replace";
+        if (args.length > 5) {
+            BlockEngineChat.send(sender, "BlockEngine setblock does not support additional arguments.");
+            return true;
+        }
         if (!mode.equals("replace") && !mode.equals("destroy") && !mode.equals("keep")) {
             BlockEngineChat.send(sender, "BlockEngine full block setblock currently supports replace, destroy, and keep.");
             return true;
         }
 
+        if (!withinWorld(source.world(), position.x(), position.y(), position.z())) {
+            BlockEngineChat.send(sender, "Block coordinates are outside the world.");
+            return true;
+        }
         Block block = source.world().getBlockAt(position.x(), position.y(), position.z());
         if (mode.equals("keep") && !block.getType().isAir()) {
             BlockEngineChat.send(sender, "No block was changed.");
             return true;
         }
 
-        boolean changed = place(block, definition, source.player(), target.stateId(), true, mode.equals("destroy"));
+        boolean changed = place(block, definition, source.player(), target.stateId(), mode.equals("destroy"));
         BlockEngineChat.send(sender, changed ? "Set BlockEngine block." : "No block was changed.");
         return true;
     }
@@ -247,19 +278,40 @@ public final class OverideFillCommand implements Listener {
             @NotNull BlockDefinition definition,
             @Nullable Player player,
             @Nullable String stateId,
-            boolean removeExisting,
             boolean dropExisting
     ) {
-        if (removeExisting && ChunkEngine.getBlock(new BlockLocationKey(
-                block.getWorld().getUID(),
-                block.getX(),
-                block.getY(),
-                block.getZ()
-        )) != null && !BlockRemover.remove(block, dropExisting)) {
-            return false;
-        }
+        return PlacementManager.getInstance().place(block, definition, player, null, stateId, () -> {
+            BlockLocationKey location = new BlockLocationKey(block.getWorld().getUID(), block.getX(), block.getY(), block.getZ());
+            if (ChunkEngine.getBlock(location) == null) {
+                if (dropExisting && !block.getType().isAir()) {
+                    block.breakNaturally();
+                    return block.getType().isAir() && ChunkEngine.getBlock(location) == null;
+                }
+                return true;
+            }
+            return BlockRemover.remove(block, dropExisting)
+                    && block.getType().isAir() && ChunkEngine.getBlock(location) == null;
+        });
+    }
 
-        return PlacementManager.getInstance().place(block, definition, player, null, stateId);
+    private static boolean validState(CommandSender sender, BlockDefinition definition, Target target) {
+        if (target.stateId() == null || definition.apiDefinition().states().containsKey(target.stateId())) {
+            return true;
+        }
+        BlockEngineChat.send(sender, "Unknown BlockEngine block state: " + target.stateId() + ".");
+        return false;
+    }
+
+    private static boolean withinWorld(World world, int x, int y, int z) {
+        return x >= -30_000_000 && x < 30_000_000 && z >= -30_000_000 && z < 30_000_000
+                && y >= world.getMinHeight() && y < world.getMaxHeight();
+    }
+
+    static boolean withinFillLimit(int minX, int maxX, int minY, int maxY, int minZ, int maxZ) {
+        long width = (long) maxX - minX + 1;
+        long height = (long) maxY - minY + 1;
+        long depth = (long) maxZ - minZ + 1;
+        return width <= MAX_BLOCKS && height <= MAX_BLOCKS && depth <= MAX_BLOCKS && width * height * depth <= MAX_BLOCKS;
     }
 
     private record ParsedCommand(@NotNull String name, String @NotNull [] args) {
@@ -272,7 +324,7 @@ public final class OverideFillCommand implements Listener {
 
             String name = split[0].toLowerCase(Locale.ROOT);
             int namespaceSeparator = name.indexOf(':');
-            if (namespaceSeparator != -1) {
+            if (namespaceSeparator != -1 && name.startsWith("minecraft:")) {
                 name = name.substring(namespaceSeparator + 1);
             }
             if (!name.equals("fill") && !name.equals("setblock") && !name.equals("give")) {
@@ -294,12 +346,13 @@ public final class OverideFillCommand implements Listener {
         int remaining = amount;
         while (remaining > 0) {
             ItemStack stack = ItemManager.create(definition, stateId);
-            stack.setAmount(Math.min(64, remaining));
+            int count = Math.min(stack.getMaxStackSize(), remaining);
+            stack.setAmount(count);
             Map<Integer, ItemStack> leftovers = player.getInventory().addItem(stack);
             for (ItemStack leftover : leftovers.values()) {
                 player.getWorld().dropItemNaturally(player.getLocation(), leftover);
             }
-            remaining -= stack.getAmount();
+            remaining -= count;
         }
     }
 
@@ -335,7 +388,11 @@ public final class OverideFillCommand implements Listener {
             if (!blockId.contains(":")) {
                 return null;
             }
-            return new Target(blockId, state(token, dataStart));
+            String stateId = state(token, dataStart);
+            if (dataStart >= 0 && (stateId == null || stateId.isBlank())) {
+                return null;
+            }
+            return new Target(blockId, stateId);
         }
 
         private static int firstDataIndex(@NotNull String token) {
@@ -391,12 +448,16 @@ public final class OverideFillCommand implements Listener {
                     return source;
                 }
                 if (token.startsWith("~")) {
-                    return source + (int) Math.floor(Double.parseDouble(token.substring(1)));
+                    return coordinateValue(source + Math.floor(Double.parseDouble(token.substring(1))));
                 }
-                return (int) Math.floor(Double.parseDouble(token));
+                return coordinateValue(Math.floor(Double.parseDouble(token)));
             } catch (NumberFormatException ignored) {
                 return null;
             }
+        }
+
+        private static @Nullable Integer coordinateValue(double value) {
+            return Double.isFinite(value) && value >= Integer.MIN_VALUE && value <= Integer.MAX_VALUE ? (int) value : null;
         }
     }
 

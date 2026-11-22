@@ -34,54 +34,85 @@ public final class BlockDataManager {
 
         long loadStarted = System.nanoTime();
         BlockData data = view.storedBlock().loadData(definition);
-        PerformanceMetrics.record(PerformanceMetrics.ADAPTER_LOAD, System.nanoTime() - loadStarted, 1, view.storedBlock().payload().length);
+        PerformanceMetrics.record(PerformanceMetrics.ADAPTER_LOAD, System.nanoTime() - loadStarted, 1, view.storedBlock().payloadBytes());
         if (data == null) {
-            data = ChunkEngine.SimpleBlockData.copyOf(view.storedBlock().data());
+            return null;
         }
-        return new BlockContext(definition.adapter(), data, block, player);
+        return new BlockContext(definition.adapter(), data, block, player, view.storedBlock());
+    }
+
+    public boolean saveIfChanged(
+            @NotNull Block block, @NotNull BlockContext context, @NotNull RuntimeBlockView expected,
+            @NotNull ChunkEngine.SimpleBlockData before
+    ) {
+        RuntimeBlockView current = ChunkEngine.getBlock(expected.location());
+        if (current == null || current.storedBlock().data() != expected.storedBlock().data()) {
+            return false;
+        }
+
+        // An adapter can change its private payload without touching any public data maps.
+        boolean modified = !before.equalsData(context.data())
+                || !expected.storedBlock().matchesPayload(context.adapter().save(context.data()));
+        return modified && save(block, context, expected);
     }
 
     public boolean save(@NotNull Block block, @NotNull BlockContext context) {
+        return save(block, context, null);
+    }
+
+    public boolean save(@NotNull Block block, @NotNull BlockContext context, @Nullable RuntimeBlockView expected) {
         BlockDefinition definition = BlockRegistry.getBlock(context.blockId());
         if (definition == null) {
             return false;
         }
         definition.apiDefinition().state(context.stateId());
 
-        RuntimeBlockView previous = ChunkEngine.getBlock(new BlockLocationKey(
+        BlockLocationKey location = new BlockLocationKey(
                 block.getWorld().getUID(),
                 block.getX(),
                 block.getY(),
                 block.getZ()
-        ));
+        );
+        RuntimeBlockView previous = ChunkEngine.getBlock(location);
+        if (previous == null || !context.matches(previous)
+                || expected != null && previous.storedBlock().data() != expected.storedBlock().data()) {
+            return false;
+        }
+
         if (BlockEngineEvents.callCancellable(new BlockEngineBlockDataSaveEvent(
                 block,
                 context,
-                previous == null ? null : previous.storedBlock().blockId(),
-                previous == null ? null : previous.storedBlock().stateId()
+                previous.storedBlock().blockId(),
+                previous.storedBlock().stateId()
         ))) {
             return false;
         }
 
-        ChunkEngine.Data chunkData = ChunkEngine.data(block.getChunk());
         long saveStarted = System.nanoTime();
         byte[] payload = definition.adapter().save(context.data());
         PerformanceMetrics.record(PerformanceMetrics.ADAPTER_SAVE, System.nanoTime() - saveStarted,
                 1, payload == null ? 0 : payload.length);
-        chunkData.setBlock(
+        RuntimeBlockView current = ChunkEngine.getBlock(location);
+        if (current == null || current.storedBlock().data() != previous.storedBlock().data()) {
+            return false;
+        }
+
+        ChunkEngine.data(block.getChunk()).setBlock(ChunkEngine.StoredBlock.from(
                 block.getX() & 15,
                 block.getY(),
                 block.getZ() & 15,
                 context.data(),
                 definition.apiDefinition(),
-                payload
-        );
+                payload,
+                current.storedBlock().displays(),
+                current.storedBlock().orientation()
+        ));
         ChunkEngine.changed(block);
         BlockEngineEvents.call(new BlockEngineBlockDataSavedEvent(
                 block,
                 context.data(),
-                previous == null ? null : previous.storedBlock().blockId(),
-                previous == null ? null : previous.storedBlock().stateId()
+                previous.storedBlock().blockId(),
+                previous.storedBlock().stateId()
         ));
         return true;
     }

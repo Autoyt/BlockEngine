@@ -214,6 +214,10 @@ builder.catalog(true)
 
 `placement(...)` tells BlockEngine how to choose initial orientation. Use `NONE` for simple blocks, `HORIZONTAL_FACING` for player-facing blocks, `AXIS` for pillar-style blocks, and `DIRECTIONAL` when every face matters.
 
+The generated model's north texture is its front. Horizontal placement points the front toward the player, directional placement points it out of the clicked face, and axis placement aligns the model's top with the clicked axis. The placed orientation persists across state changes, gravity moves, and restarts.
+
+Blocks saved by earlier releases keep their original display rotation. Chunks containing a stored placement orientation use chunk format 7. Chunks containing only legacy or unoriented blocks continue to use format 6. To downgrade to a release that reads only format 6, restore a world backup from before the upgrade.
+
   </TabItem>
   <TabItem label="Item">
 

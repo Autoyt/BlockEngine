@@ -7,24 +7,26 @@ import dev.auto.blockengine.api.event.BlockEngineModificationEvent;
 import dev.auto.blockengine.event.BlockEngineEvents;
 import dev.auto.blockengine.Main;
 import dev.auto.blockengine.integrity.BlockIntegrityManager;
-import dev.auto.blockengine.items.ItemManager;
-import dev.auto.blockengine.registry.BlockRegistry;
-import dev.auto.blockengine.registry.NamespaceRegistry;
+import dev.auto.blockengine.entity.ManagedDisplayManager;
 import dev.auto.blockengine.runtime.BlockContext;
+import dev.auto.blockengine.runtime.BlockDataManager;
 import dev.auto.blockengine.runtime.CreateContext;
 import dev.auto.blockengine.runtime.ChunkEngine;
 import dev.auto.blockengine.runtime.RuntimeBlockView;
 import dev.auto.blockengine.types.BlockDefinition;
+import dev.auto.blockengine.types.BlockLocationKey;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.block.data.Waterlogged;
-import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.entity.Player;
 import org.bukkit.NamespacedKey;
 import org.bukkit.SoundCategory;
 import org.bukkit.World;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+
+import java.util.function.BooleanSupplier;
+import java.util.logging.Level;
 
 public final class PlacementManager {
     private static final PlacementManager instance = new PlacementManager();
@@ -36,48 +38,6 @@ public final class PlacementManager {
         return instance;
     }
 
-    public boolean place(@NotNull BlockPlaceEvent event) {
-        String blockId = ItemManager.blockId(event.getItemInHand());
-        if (blockId == null) {
-            return false;
-        }
-
-        String namespace = ItemManager.namespace(event.getItemInHand());
-        BlockDefinition definition = BlockRegistry.getBlock(blockId);
-        if (namespace == null
-                || !NamespaceRegistry.loaded(namespace)
-                || definition == null
-                || !definition.apiDefinition().item().placeable()) {
-            event.setCancelled(true);
-            return true;
-        }
-
-        BlockFace placedAgainst = event.getBlockAgainst().getFace(event.getBlockPlaced());
-        PlacementVerificationEngine.Result verification = PlacementVerificationEngine.verify(
-                new PlacementVerificationEngine.Request(
-                        event.getBlockPlaced(),
-                        definition,
-                        ItemManager.stateId(event.getItemInHand()),
-                        event.getPlayer(),
-                        placedAgainst,
-                        event.getHand(),
-                        PlacementVerificationEngine.Source.PLAYER
-                )
-        );
-        if (!verification.allowed()) {
-            event.setCancelled(true);
-            return true;
-        }
-
-        return place(
-                event.getBlockPlaced(),
-                definition,
-                event.getPlayer(),
-                placedAgainst,
-                ItemManager.stateId(event.getItemInHand())
-        );
-    }
-
     public boolean place(
             @NotNull Block block,
             @NotNull BlockDefinition definition,
@@ -85,21 +45,61 @@ public final class PlacementManager {
             @Nullable BlockFace placedAgainst,
             @Nullable String stateId
     ) {
-        if (waterloggedSolid(block)) {
+        return place(block, definition, player, placedAgainst, stateId, () -> true);
+    }
+
+    public boolean place(
+            @NotNull Block block,
+            @NotNull BlockDefinition definition,
+            @Nullable Player player,
+            @Nullable BlockFace placedAgainst,
+            @Nullable String stateId,
+            @NotNull BooleanSupplier beforeReplace
+    ) {
+        BlockOrientation orientation = BlockOrientation.forPlacement(definition.apiDefinition().placement(),
+                player == null ? null : player.getFacing(), placedAgainst);
+        return place(block, definition, player, placedAgainst, stateId, beforeReplace, orientation);
+    }
+
+    public boolean place(
+            @NotNull Block block, @NotNull BlockDefinition definition, @Nullable Player player,
+            @Nullable BlockFace placedAgainst, @Nullable String stateId, @NotNull BlockOrientation orientation
+    ) {
+        return place(block, definition, player, placedAgainst, stateId, () -> true, orientation);
+    }
+
+    private boolean place(
+            @NotNull Block block, @NotNull BlockDefinition definition, @Nullable Player player,
+            @Nullable BlockFace placedAgainst, @Nullable String stateId,
+            @NotNull BooleanSupplier beforeReplace, @NotNull BlockOrientation orientation
+    ) {
+        if (block.getY() < block.getWorld().getMinHeight() || block.getY() >= block.getWorld().getMaxHeight()
+                || waterloggedSolid(block)) {
             return false;
         }
 
         String defaultState = stateId == null || stateId.isBlank()
                 ? definition.apiDefinition().defaultState()
                 : stateId;
-        definition.apiDefinition().state(defaultState);
+        if (!definition.apiDefinition().states().containsKey(defaultState)) {
+            return false;
+        }
 
-        RuntimeBlockView previous = ChunkEngine.getBlock(new dev.auto.blockengine.types.BlockLocationKey(
+        BlockLocationKey location = new BlockLocationKey(
                 block.getWorld().getUID(),
                 block.getX(),
                 block.getY(),
                 block.getZ()
-        ));
+        );
+        ChunkEngine.Data chunkData;
+        try {
+            chunkData = ChunkEngine.data(block.getChunk());
+        } catch (IllegalStateException unreadableChunk) {
+            // Loading logs the underlying failure. Leave the original block and item untouched.
+            return false;
+        }
+        RuntimeBlockView previous = ChunkEngine.getBlock(location);
+        var originalBlockData = block.getBlockData();
         if (BlockEngineEvents.callCancellable(new BlockEngineBlockPlaceEvent(
                 block,
                 definition.apiDefinition(),
@@ -128,14 +128,38 @@ public final class PlacementManager {
         definition.apiDefinition().state(data.stateId());
 
         byte[] payload = definition.adapter().save(data);
-        ChunkEngine.Data chunkData = ChunkEngine.data(block.getChunk());
-        chunkData.setBlock(block.getX() & 15, block.getY(), block.getZ() & 15, data, definition.apiDefinition(), payload);
+        ChunkEngine.StoredBlock prepared = ChunkEngine.StoredBlock.from(
+                block.getX() & 15, block.getY(), block.getZ() & 15, data, definition.apiDefinition(), payload
+        ).withOrientation(orientation);
 
+        // Placement listeners and adapter callbacks can replace the same position.
+        RuntimeBlockView current = ChunkEngine.getBlock(location);
+        if ((current == null ? null : current.storedBlock()) != (previous == null ? null : previous.storedBlock())
+                || !originalBlockData.equals(block.getBlockData()) || chunkData != ChunkEngine.data(block.getChunk())) {
+            return false;
+        }
+        if (!beforeReplace.getAsBoolean()) {
+            return false;
+        }
+
+        if (previous != null) {
+            ManagedDisplayManager.getInstance().removeBlockAttached(location);
+        }
+        chunkData.setBlock(prepared);
         block.setType(Main.getBackingBlock(), false);
         ChunkEngine.changed(block);
 
         sound(block, definition, data.stateId());
-        definition.adapter().onPlace(new BlockContext(definition.adapter(), data, block, player));
+        RuntimeBlockView placed = ChunkEngine.getBlock(location);
+        BlockContext context = new BlockContext(definition.adapter(), data, block, player);
+        try {
+            definition.adapter().onPlace(context);
+            if (placed != null) {
+                BlockDataManager.getInstance().saveIfChanged(block, context, placed, prepared.data());
+            }
+        } catch (RuntimeException exception) {
+            Main.getInstance().getLogger().log(Level.WARNING, "Placement callback failed for " + definition.id(), exception);
+        }
         BlockEngineEvents.call(new BlockEngineBlockPlacedEvent(
                 block,
                 definition.apiDefinition(),

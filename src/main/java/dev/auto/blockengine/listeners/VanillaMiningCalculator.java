@@ -32,8 +32,18 @@ final class VanillaMiningCalculator {
 
         MiningSettings settings = miningSettings(customBlock);
         BlockData profile = settings.profile().createBlockData();
-        int divisor = hasCorrectToolForDrops(player, profile, settings) ? 30 : 100;
-        return destroySpeed(player, profile, settings) / Math.max(0.0001f, hardness) / divisor;
+        return progress(destroySpeed(player, profile, settings), hardness, customBlock.storedBlock().miningSpeed(),
+                hasCorrectToolForDrops(player, profile, settings));
+    }
+
+    static float progress(float toolSpeed, float hardness, float multiplier, boolean correctTool) {
+        if (hardness < 0.0f || !(multiplier > 0.0f)) {
+            return 0.0f;
+        }
+        if (hardness == 0.0f) {
+            return 1.0f;
+        }
+        return toolSpeed * multiplier / hardness / (correctTool ? 30 : 100);
     }
 
     static boolean canHarvest(@NotNull Player player, @NotNull RuntimeBlockView customBlock) {

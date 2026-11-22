@@ -22,7 +22,13 @@ public final class BlockUpdates {
     public static void update(@NotNull Block block) {
         poke(block);
         for (BlockFace face : FACES) {
-            poke(block.getRelative(face));
+            int x = block.getX() + face.getModX();
+            int y = block.getY() + face.getModY();
+            int z = block.getZ() + face.getModZ();
+            if (y >= block.getWorld().getMinHeight() && y < block.getWorld().getMaxHeight()
+                    && block.getWorld().isChunkLoaded(x >> 4, z >> 4)) {
+                poke(block.getRelative(face));
+            }
         }
     }
 

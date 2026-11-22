@@ -1,5 +1,6 @@
 package dev.auto.blockengine.defaultadapters;
 
+import dev.auto.blockengine.Main;
 import dev.auto.blockengine.registry.BlockRegistry;
 import dev.auto.blockengine.registry.NamespaceRegistry;
 
@@ -19,7 +20,10 @@ public final class DebugBlocks {
         NamespaceRegistry.load(NAMESPACE);
         BlockRegistry.registerBlock(new RedBlockAdapter(), NAMESPACE);
         BlockRegistry.registerBlock(new InvisibleBlockAdapter(), NAMESPACE);
-        BlockRegistry.registerBlock(new DemoInventoryBlockAdapter(), NAMESPACE);
+        DemoInventoryBlockAdapter inventory = new DemoInventoryBlockAdapter();
+        BlockRegistry.registerBlock(inventory, NAMESPACE);
+        Main plugin = Main.getInstance();
+        plugin.getServer().getPluginManager().registerEvents(inventory, plugin);
         BlockRegistry.registerBlock(new DemoBreakBlockAdapter(), NAMESPACE);
         BlockRegistry.registerBlock(new DemoStateBlockAdapter(), NAMESPACE);
         BlockRegistry.registerBlock(new DemoMovementBlockAdapter(), NAMESPACE);

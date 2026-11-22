@@ -53,7 +53,6 @@ public final class CatalogListeners implements Listener {
     }
 
     public static void open(@NotNull Player player, @Nullable String namespace) {
-        registerRecipes();
         List<BlockDefinition> blocks = filteredBlocks(namespace);
         open(player, namespace, blocks);
     }
@@ -70,15 +69,26 @@ public final class CatalogListeners implements Listener {
             return;
         }
 
+        if (sessions.containsKey(player.getUniqueId())) {
+            player.closeInventory();
+        }
+        if (recipes.isEmpty()) {
+            registerRecipes();
+        }
         Collection<NamespacedKey> keys = recipeKeys(blocks);
-        player.discoverRecipes(keys);
         BlockDefinition first = blocks.getFirst();
         CatalogHolder holder = new CatalogHolder(namespace, keys);
-        sessions.put(player.getUniqueId(), new Session(first, keys, holder));
-
         InventoryView view = MenuType.STONECUTTER.create(player, TITLE);
         player.openInventory(view);
+        if (!player.getOpenInventory().getTopInventory().equals(view.getTopInventory())) {
+            if (sessions.isEmpty()) {
+                clearRecipes();
+            }
+            return;
+        }
         holder.inventory(view.getTopInventory());
+        sessions.put(player.getUniqueId(), new Session(first, keys, holder));
+        player.discoverRecipes(keys);
         view.getTopInventory().setItem(INPUT_SLOT, inputItem());
         view.getTopInventory().setItem(OUTPUT_SLOT, output(first));
     }
@@ -87,6 +97,9 @@ public final class CatalogListeners implements Listener {
         for (UUID playerId : sessions.keySet().toArray(UUID[]::new)) {
             Player player = Bukkit.getPlayer(playerId);
             if (player != null) {
+                if (isCatalog(player.getOpenInventory())) {
+                    clearCatalogItems(player.getOpenInventory());
+                }
                 player.undiscoverRecipes(sessions.get(playerId).recipes());
             }
         }
@@ -138,13 +151,19 @@ public final class CatalogListeners implements Listener {
 
         if (rawSlot == OUTPUT_SLOT) {
             event.setCancelled(true);
-            give(player, session.selected());
+            BlockDefinition current = BlockRegistry.getBlock(session.selected().id());
+            if (current == null) {
+                player.closeInventory();
+                return;
+            }
+            give(player, current);
             event.getView().getTopInventory().setItem(INPUT_SLOT, inputItem());
-            event.getView().getTopInventory().setItem(OUTPUT_SLOT, output(session.selected()));
+            event.getView().getTopInventory().setItem(OUTPUT_SLOT, output(current));
             return;
         }
 
-        if (rawSlot < event.getView().getTopInventory().getSize()) {
+        if (rawSlot < event.getView().getTopInventory().getSize() || event.isShiftClick()
+                || event.getAction() == org.bukkit.event.inventory.InventoryAction.COLLECT_TO_CURSOR) {
             event.setCancelled(true);
         }
     }
@@ -158,6 +177,9 @@ public final class CatalogListeners implements Listener {
 
     @EventHandler
     public void onClose(InventoryCloseEvent event) {
+        if (!isCatalog(event.getView())) {
+            return;
+        }
         Session session = sessions.remove(event.getPlayer().getUniqueId());
         if (session != null && event.getPlayer() instanceof Player player) {
             clearCatalogItems(event.getView());
@@ -170,9 +192,11 @@ public final class CatalogListeners implements Listener {
 
     @EventHandler
     public void onLeave(PlayerQuitEvent event) {
+        if (isCatalog(event.getPlayer().getOpenInventory())) {
+            clearCatalogItems(event.getPlayer().getOpenInventory());
+        }
         Session session = sessions.remove(event.getPlayer().getUniqueId());
         if (session != null) {
-            clearCatalogItems(event.getPlayer().getOpenInventory());
             event.getPlayer().undiscoverRecipes(session.recipes());
         }
         if (sessions.isEmpty()) {
@@ -250,13 +274,11 @@ public final class CatalogListeners implements Listener {
     }
 
     private static boolean isCatalog(@NotNull InventoryView view) {
-        return view.getType() == InventoryType.STONECUTTER && view.title().equals(TITLE);
+        Session session = sessions.get(view.getPlayer().getUniqueId());
+        return session != null && session.holder().getInventory().equals(view.getTopInventory());
     }
 
     private static void clearCatalogItems(@NotNull InventoryView view) {
-        if (!isCatalog(view)) {
-            return;
-        }
         view.getTopInventory().setItem(INPUT_SLOT, null);
         view.getTopInventory().setItem(OUTPUT_SLOT, null);
     }

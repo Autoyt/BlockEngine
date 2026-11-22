@@ -4,38 +4,35 @@ import dev.auto.blockengine.Main;
 import dev.auto.blockengine.api.blocks.BlockAdapter;
 import dev.auto.blockengine.api.blocks.BlockDefinition.Movement;
 import dev.auto.blockengine.api.event.BlockEngineGravityEvent;
-import dev.auto.blockengine.entity.PacketEntityManager;
-import dev.auto.blockengine.entity.VirtualItemDisplay;
+import dev.auto.blockengine.api.event.BlockEngineBlockRemovedEvent;
+import dev.auto.blockengine.visibility.VisibilityManager;
 import dev.auto.blockengine.event.BlockEngineEvents;
 import dev.auto.blockengine.items.ItemManager;
 import dev.auto.blockengine.registry.BlockRegistry;
 import dev.auto.blockengine.types.BlockDefinition;
 import dev.auto.blockengine.types.BlockLocationKey;
 import org.bukkit.Bukkit;
-import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.BoundingBox;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayDeque;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Map;
+import java.util.List;
 import java.util.Queue;
 import java.util.Set;
-import java.util.UUID;
 
 public final class GravityManager {
     private static final double VANILLA_FALL_GRAVITY = 0.04D;
     private static final double VANILLA_FALL_DRAG = 0.98D;
     private static final int MAX_FALL_ANIMATION_TICKS = 80;
-    private static final int MAX_QUEUED_GRAVITY_CHANGES = 100_000;
+    private static final int CHECKS_PER_FLUSH = 512;
     private static final Set<BlockFace> HORIZONTAL_FACES = Set.of(
             BlockFace.NORTH,
             BlockFace.SOUTH,
@@ -44,7 +41,7 @@ public final class GravityManager {
     );
     private static final GravityManager instance = new GravityManager();
     private final Set<BlockLocationKey> movedThisTick = new HashSet<>();
-    private final Map<ColumnKey, Set<Integer>> claimedLandingHeights = new HashMap<>();
+
     private final Queue<BlockLocationKey> gravityQueue = new ArrayDeque<>();
     private final Set<BlockLocationKey> queuedGravityChecks = new HashSet<>();
     private final Queue<BlockLocationKey> cascadeQueue = new ArrayDeque<>();
@@ -63,6 +60,29 @@ public final class GravityManager {
         queueCascadeAfterFlush(location(origin));
     }
 
+    public void queueLoaded(@Nullable ChunkEngine.LoadedChunk chunk) {
+        if (chunk == null) {
+            return;
+        }
+        for (RuntimeBlockView block : chunk.blocks()) {
+            if (gravityEnabled(block)) {
+                queueGravityCheck(block.location());
+            }
+        }
+        if (!gravityQueue.isEmpty()) {
+            scheduleGravityDrainAfterFlush();
+        }
+    }
+
+    public void clear() {
+        movedThisTick.clear();
+        gravityQueue.clear();
+        queuedGravityChecks.clear();
+        cascadeQueue.clear();
+        queuedCascades.clear();
+        gravityDrainScheduled = false;
+    }
+
     public boolean check(@NotNull Block block) {
         int tick = Bukkit.getCurrentTick();
         if (tick != movementTick) {
@@ -78,7 +98,7 @@ public final class GravityManager {
             return false;
         }
 
-        Block stopBlock = stopBlock(block, customBlock);
+        Block stopBlock = stopBlock(block);
         if (stopBlock == null || stopBlock.equals(block)) {
             return false;
         }
@@ -106,115 +126,55 @@ public final class GravityManager {
 
         BlockLocationKey from = location(block);
         BlockLocationKey to = location(target);
-        ItemStack displayItem = ItemManager.display(customBlock);
-        boolean breaksOnPartialSupport = breaksOnPartialSupport(customBlock, target);
-        if (!BlockMover.canMove(block, customBlock, target, BlockAdapter.MoveCause.GRAVITY)) {
+        if (!BlockMover.canOccupy(target)) {
             return false;
         }
-        if (!claimLanding(to)) {
-            return false;
-        }
-
-        if (breaksOnPartialSupport) {
-            if (!BlockRemover.remove(block, customBlock, false)) {
-                releaseLanding(to);
+        if (breaksOnPartialSupport(customBlock, target)) {
+            if (!BlockMover.canMove(block, customBlock, target, BlockAdapter.MoveCause.GRAVITY)) {
                 return false;
             }
-            if (customBlock.storedBlock().dropsItem()) {
-                target.getWorld().dropItemNaturally(
-                        target.getLocation().add(0.5, 0.5, 0.5),
-                        ItemManager.create(definition, customBlock.storedBlock().stateId())
-                );
+            List<ItemStack> drops = customBlock.storedBlock().dropsItem()
+                    ? List.of(ItemManager.create(definition, customBlock.storedBlock().stateId()))
+                    : List.of();
+            if (!BlockRemover.removeWithDrops(block, customBlock, drops, Material.AIR, false,
+                    BlockEngineBlockRemovedEvent.Reason.PLUGIN_REQUEST, target).removed()) {
+                return false;
             }
-            movedThisTick.add(to);
-            releaseLanding(to);
-            queueCascadeAfterFlush(block);
-            queueCascadeAfterFlush(target);
-            return true;
-        }
+        } else {
+            // Persist the landing in the same operation as source removal. The animation
+            // can then stop at any point without owning the only copy of the block.
+            if (!BlockMover.move(block, customBlock, target, BlockAdapter.MoveCause.GRAVITY)) {
+                return false;
+            }
 
-        BlockMover.PendingMove pendingMove = BlockMover.beginMove(block, customBlock, target, BlockAdapter.MoveCause.GRAVITY);
-        if (pendingMove == null) {
-            releaseLanding(to);
-            return false;
+            RuntimeBlockView landed = ChunkEngine.getBlock(to);
+            int duration = fallDuration(distance(from, to));
+            if (landed != null) {
+                ChunkEngine.afterFlush(() -> {
+                    RuntimeBlockView current = ChunkEngine.getBlock(to);
+                    if (current != null && current.storedBlock() == landed.storedBlock() && current.exposed()) {
+                        VisibilityManager.getInstance().animateBlockMove(from, to, ItemManager.display(current), duration);
+                    }
+                });
+            }
         }
 
         movedThisTick.add(to);
         queueCascadeAfterFlush(block);
-        ChunkEngine.afterFlush(() -> animateFallingBlock(pendingMove, from, to, displayItem, definition));
+        queueCascadeAfterFlush(target);
         return true;
     }
 
-    private void animateFallingBlock(
-            @NotNull BlockMover.PendingMove pendingMove,
-            @NotNull BlockLocationKey from,
-            @NotNull BlockLocationKey to,
-            @NotNull ItemStack displayItem,
-            @NotNull BlockDefinition definition
-    ) {
-        if (Bukkit.getWorld(from.worldId()) == null) {
-            finishFallingBlock(pendingMove, null, definition);
-            return;
-        }
-        VirtualItemDisplay display = fallingDisplay(from, to, displayItem);
-        Collection<? extends org.bukkit.entity.Player> viewers = Bukkit.getOnlinePlayers().stream()
-                .filter(player -> player.getWorld().getUID().equals(from.worldId()))
-                .toList();
-        display.spawnFor(viewers);
-
-        FallingAnimation animation = new FallingAnimation(pendingMove, from, to, display, definition, viewers);
-        animation.task(Bukkit.getScheduler().runTaskTimer(Main.getInstance(), animation, 1L, 1L));
-    }
-
-    private void finishFallingBlock(
-            @NotNull BlockMover.PendingMove pendingMove,
-            @Nullable VirtualItemDisplay display,
-            @NotNull BlockDefinition definition
-    ) {
-        boolean placed = BlockMover.finishMove(pendingMove);
-        releaseLanding(location(pendingMove.to()));
-        if (!placed) {
-            pendingMove.to().getWorld().dropItemNaturally(
-                    pendingMove.to().getLocation().add(0.5, 0.5, 0.5),
-                    ItemManager.create(definition, pendingMove.moved().stateId())
-            );
-        }
-
-        ChunkEngine.afterFlush(() -> {
-            if (display != null) {
-                display.destroyForAll();
-                PacketEntityManager.release(display);
-            }
-        });
-        queueCascadeAfterFlush(pendingMove.from());
-        queueCascadeAfterFlush(pendingMove.to());
-    }
-
-    private @NotNull VirtualItemDisplay fallingDisplay(
-            @NotNull BlockLocationKey from,
-            @NotNull BlockLocationKey to,
-            @NotNull ItemStack displayItem
-    ) {
-        Location location = new Location(
-                Bukkit.getWorld(from.worldId()),
-                from.x() + 0.5,
-                from.y() + 0.5,
-                from.z() + 0.5,
-                0.0f,
-                0.0f
-        );
-        float viewRange = (float) Math.clamp(distance(from, to) + 2.0D, 2.0D, 64.0D);
-        return PacketEntityManager.itemDisplay()
-                .location(location)
-                .itemStack(displayItem)
-                .displayContext(VirtualItemDisplay.DISPLAY_CONTEXT_FIXED)
-                .scale(2.0f, 2.0f, 2.0f)
-                .brightness(15, 15)
-                .viewRange(viewRange)
-                .shadowRadius(0.0f)
-                .shadowStrength(0.0f)
-                .transformationInterpolationDelay(0)
-                .transformationInterpolationDuration(1);
+    static int fallDuration(double distance) {
+        double speed = 0;
+        double fallen = 0;
+        int ticks = 0;
+        do {
+            speed = (speed + VANILLA_FALL_GRAVITY) * VANILLA_FALL_DRAG;
+            fallen += speed;
+            ticks++;
+        } while (fallen < distance && ticks < MAX_FALL_ANIMATION_TICKS);
+        return ticks;
     }
 
     private double distance(@NotNull BlockLocationKey from, @NotNull BlockLocationKey to) {
@@ -224,12 +184,12 @@ public final class GravityManager {
         return Math.sqrt(dx * dx + dy * dy + dz * dz);
     }
 
-    private Block stopBlock(@NotNull Block start, @NotNull RuntimeBlockView customBlock) {
+    private Block stopBlock(@NotNull Block start) {
         Block stop = start;
         int minY = start.getWorld().getMinHeight();
         while (stop.getY() > minY) {
             Block below = stop.getRelative(BlockFace.DOWN);
-            if (!BlockMover.canOccupy(below) || claimedLanding(location(below))) {
+            if (!BlockMover.canOccupy(below)) {
                 break;
             }
             stop = below;
@@ -246,7 +206,7 @@ public final class GravityManager {
         Movement movement = movement(customBlock);
         return movement != null
                 && movement.gravityBreaksOnPartialBlock()
-                && !claimedLanding(location(target.getRelative(BlockFace.DOWN)))
+                && target.getY() > target.getWorld().getMinHeight()
                 && partialCollision(target.getRelative(BlockFace.DOWN));
     }
 
@@ -290,22 +250,10 @@ public final class GravityManager {
     }
 
     private void queueCascadeAfterFlush(@NotNull BlockLocationKey origin) {
-        if (!queueCascadeSeed(origin)) {
-            return;
+        if (Main.getInstance().isEnabled() && queuedCascades.add(origin)) {
+            cascadeQueue.add(origin);
+            scheduleGravityDrainAfterFlush();
         }
-        scheduleGravityDrainAfterFlush();
-    }
-
-    private boolean queueCascadeSeed(@NotNull BlockLocationKey origin) {
-        if (queuedCascades.contains(origin)) {
-            return true;
-        }
-        if (queuedCascades.size() >= MAX_QUEUED_GRAVITY_CHANGES) {
-            return false;
-        }
-        queuedCascades.add(origin);
-        cascadeQueue.add(origin);
-        return true;
     }
 
     private void queueCascade(@NotNull BlockLocationKey origin) {
@@ -322,14 +270,9 @@ public final class GravityManager {
     }
 
     private void queueGravityCheck(@NotNull BlockLocationKey key) {
-        if (queuedGravityChecks.contains(key)) {
-            return;
+        if (ChunkEngine.getBlock(key) != null && queuedGravityChecks.add(key)) {
+            gravityQueue.add(key);
         }
-        if (queuedGravityChecks.size() >= MAX_QUEUED_GRAVITY_CHANGES) {
-            return;
-        }
-        queuedGravityChecks.add(key);
-        gravityQueue.add(key);
     }
 
     private void scheduleGravityDrainAfterFlush() {
@@ -342,26 +285,25 @@ public final class GravityManager {
 
     private void processGravityDrain() {
         gravityDrainScheduled = false;
-        while (!cascadeQueue.isEmpty()) {
+        for (int i = 0; i < CHECKS_PER_FLUSH && !cascadeQueue.isEmpty(); i++) {
             BlockLocationKey origin = cascadeQueue.poll();
             queuedCascades.remove(origin);
             queueCascade(origin);
         }
         processGravityQueue();
+        if (!gravityQueue.isEmpty() || !cascadeQueue.isEmpty()) {
+            scheduleGravityDrainAfterFlush();
+        }
     }
 
     private void processGravityQueue() {
         int processed = 0;
-        Set<BlockLocationKey> processedThisPass = new HashSet<>();
-        while (processed < MAX_QUEUED_GRAVITY_CHANGES) {
+        while (processed < CHECKS_PER_FLUSH) {
             BlockLocationKey key = gravityQueue.poll();
             if (key == null) {
                 break;
             }
             queuedGravityChecks.remove(key);
-            if (!processedThisPass.add(key)) {
-                continue;
-            }
             processed++;
 
             Block block = block(key);
@@ -374,28 +316,15 @@ public final class GravityManager {
                 continue;
             }
 
+            // A successful move already queues the neighbors of both ends for the next flush.
             check(block);
-            BlockLocationKey above = relative(key, BlockFace.UP);
-            BlockLocationKey below = relative(key, BlockFace.DOWN);
-            if (!processedThisPass.contains(above)) {
-                queueGravityCheck(above);
-            }
-            if (!processedThisPass.contains(below)) {
-                queueGravityCheck(below);
-            }
-        }
-        if (!gravityQueue.isEmpty()) {
-            gravityQueue.clear();
-            queuedGravityChecks.clear();
-            Main.getInstance().getLogger().warning(
-                    "Gravity queue hit the hard limit of " + MAX_QUEUED_GRAVITY_CHANGES + " checks; discarded remaining gravity work."
-            );
         }
     }
 
     private @Nullable Block block(@NotNull BlockLocationKey key) {
         World world = Bukkit.getWorld(key.worldId());
-        if (world == null || !world.isChunkLoaded(key.x() >> 4, key.z() >> 4)) {
+        if (world == null || key.y() < world.getMinHeight() || key.y() >= world.getMaxHeight()
+                || !world.isChunkLoaded(key.x() >> 4, key.z() >> 4)) {
             return null;
         }
         return world.getBlockAt(key.x(), key.y(), key.z());
@@ -412,94 +341,5 @@ public final class GravityManager {
 
     private static @NotNull BlockLocationKey location(@NotNull Block block) {
         return new BlockLocationKey(block.getWorld().getUID(), block.getX(), block.getY(), block.getZ());
-    }
-
-    private boolean claimLanding(@NotNull BlockLocationKey key) {
-        return claimedLandingHeights
-                .computeIfAbsent(ColumnKey.from(key), ignored -> new HashSet<>())
-                .add(key.y());
-    }
-
-    private void releaseLanding(@NotNull BlockLocationKey key) {
-        ColumnKey column = ColumnKey.from(key);
-        Set<Integer> heights = claimedLandingHeights.get(column);
-        if (heights == null) {
-            return;
-        }
-        heights.remove(key.y());
-        if (heights.isEmpty()) {
-            claimedLandingHeights.remove(column);
-        }
-    }
-
-    private boolean claimedLanding(@NotNull BlockLocationKey key) {
-        Set<Integer> heights = claimedLandingHeights.get(ColumnKey.from(key));
-        return heights != null && heights.contains(key.y());
-    }
-
-    private record ColumnKey(
-            @NotNull UUID worldId,
-            int x,
-            int z
-    ) {
-        private static @NotNull ColumnKey from(@NotNull BlockLocationKey key) {
-            return new ColumnKey(key.worldId(), key.x(), key.z());
-        }
-    }
-
-    private final class FallingAnimation implements Runnable {
-        private final @NotNull BlockMover.PendingMove pendingMove;
-        private final @NotNull BlockLocationKey from;
-        private final @NotNull BlockLocationKey to;
-        private final @NotNull VirtualItemDisplay display;
-        private final @NotNull BlockDefinition definition;
-        private final @NotNull Collection<? extends org.bukkit.entity.Player> viewers;
-        private final double totalDistance;
-        private double velocity;
-        private double fallen;
-        private int ticks;
-        private BukkitTask task;
-
-        private FallingAnimation(
-                @NotNull BlockMover.PendingMove pendingMove,
-                @NotNull BlockLocationKey from,
-                @NotNull BlockLocationKey to,
-                @NotNull VirtualItemDisplay display,
-                @NotNull BlockDefinition definition,
-                @NotNull Collection<? extends org.bukkit.entity.Player> viewers
-        ) {
-            this.pendingMove = pendingMove;
-            this.from = from;
-            this.to = to;
-            this.display = display;
-            this.definition = definition;
-            this.viewers = viewers;
-            this.totalDistance = Math.max(1.0D, distance(from, to));
-        }
-
-        private void task(@NotNull BukkitTask task) {
-            this.task = task;
-        }
-
-        @Override
-        public void run() {
-            ticks++;
-            velocity = (velocity - VANILLA_FALL_GRAVITY) * VANILLA_FALL_DRAG;
-            fallen = Math.min(totalDistance, fallen + -velocity);
-            double progress = Math.clamp(fallen / totalDistance, 0.0D, 1.0D);
-
-            display.translation(
-                    (float) ((to.x() - from.x()) * progress),
-                    (float) ((to.y() - from.y()) * progress),
-                    (float) ((to.z() - from.z()) * progress)
-            );
-            display.transformationInterpolationDuration(1);
-            display.updateMetadataFor(viewers);
-
-            if (progress >= 1.0D || ticks >= MAX_FALL_ANIMATION_TICKS) {
-                task.cancel();
-                finishFallingBlock(pendingMove, display, definition);
-            }
-        }
     }
 }

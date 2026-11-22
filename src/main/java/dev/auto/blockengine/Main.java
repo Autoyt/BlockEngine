@@ -12,6 +12,7 @@ import dev.auto.blockengine.commands.PerfCommand;
 import dev.auto.blockengine.creative.CreativeInventoryListeners;
 import dev.auto.blockengine.creative.CreativeInventoryManager;
 import dev.auto.blockengine.defaultadapters.DebugBlocks;
+import dev.auto.blockengine.defaultadapters.DemoInventoryBlockAdapter;
 import dev.auto.blockengine.entity.ManagedDisplayManager;
 import dev.auto.blockengine.integrity.BlockIntegrityManager;
 import dev.auto.blockengine.inspection.RuntimeInspectionService;
@@ -22,6 +23,7 @@ import dev.auto.blockengine.registry.DiscoverySystem;
 import dev.auto.blockengine.resourcepack.ResourcePackManager;
 import dev.auto.blockengine.runtime.BlockTicker;
 import dev.auto.blockengine.runtime.ChunkEngine;
+import dev.auto.blockengine.runtime.GravityManager;
 import dev.auto.blockengine.structure.SudoBlockListeners;
 import dev.auto.blockengine.structure.SudoBlockManager;
 import dev.auto.blockengine.visibility.VisibilityManager;
@@ -38,6 +40,8 @@ import org.bukkit.event.server.PluginDisableEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public final class Main extends JavaPlugin implements Listener {
+    private GameListener gameListener;
+
     @Getter
     private static Main instance;
     @Getter
@@ -78,7 +82,7 @@ public final class Main extends JavaPlugin implements Listener {
         new CreativeInventoryListeners();
         new OverideFillCommand();
         new SudoBlockListeners();
-        new GameListener();
+        gameListener = new GameListener();
 
         for (World world : Bukkit.getWorlds()) {
             for (Chunk chunk : world.getLoadedChunks()) {
@@ -87,22 +91,39 @@ public final class Main extends JavaPlugin implements Listener {
             }
         }
 
-        for (Player player : Bukkit.getOnlinePlayers()) {
-            VisibilityManager.getInstance().forceRecalculate(player);
-        }
-
         Bukkit.getScheduler().runTask(this, this::reloadDiscoveredSystems);
     }
 
     private void reloadDiscoveredSystems() {
         DiscoverySystem.discoverBlocks();
         DebugBlocks.register();
+
+        // Spawn chunks can load before contributors register their ticking and display definitions.
+        for (World world : Bukkit.getWorlds()) {
+            for (Chunk chunk : world.getLoadedChunks()) {
+                ChunkEngine.Key key = ChunkEngine.Key.from(chunk);
+                ChunkEngine.LoadedChunk loaded = ChunkEngine.get(key);
+                if (loaded != null) {
+                    BlockTicker.getInstance().loadChunk(key, loaded);
+                    GravityManager.getInstance().queueLoaded(loaded);
+                }
+                SudoBlockManager.getInstance().convertGeneratedMarkers(chunk);
+            }
+        }
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            VisibilityManager.getInstance().forceRecalculate(player);
+        }
+
         CreativeInventoryManager.writeBootstrapManifest(BlockRegistry.getBlocks());
         ResourcePackManager.getInstance().reload();
     }
 
     @Override
     public void onDisable() {
+        if (gameListener != null) {
+            gameListener.stop();
+        }
+        GravityManager.getInstance().clear();
         SudoBlockManager.getInstance().flushPendingNow();
         ChunkEngine.flushNow();
 
@@ -111,6 +132,7 @@ public final class Main extends JavaPlugin implements Listener {
         }
 
         CatalogListeners.cleanup();
+        DemoInventoryBlockAdapter.closeMenus();
         BlockRegistry.clear();
         ItemManager.shutdown();
         ResourcePackManager.getInstance().stop();
@@ -141,7 +163,9 @@ public final class Main extends JavaPlugin implements Listener {
             getDataFolder().mkdirs();
         }
 
-        saveResource("config.yml", overwriteFromJar);
+        if (overwriteFromJar || !new java.io.File(getDataFolder(), "config.yml").isFile()) {
+            saveResource("config.yml", overwriteFromJar);
+        }
         reloadConfig();
 
         getConfig().options().copyDefaults(true);

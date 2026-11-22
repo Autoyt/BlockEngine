@@ -197,8 +197,18 @@ public final class ResourcePackManager {
                 ItemModelGenerator.generateBlock(root, registered.apiDefinition());
             }
             writeCreativeTranslations(root, BlockRegistry.getBlocks());
-            for (GeneratedItemModel model : generatedItemModels()) {
-                ItemModelGenerator.generateItemModel(root, model);
+            Map<Plugin, List<GeneratedItemModel>> contributedModels = generatedItemModels();
+            var contributors = contributedModels.entrySet().iterator();
+            while (contributors.hasNext()) {
+                var contributor = contributors.next();
+                try {
+                    for (GeneratedItemModel model : contributor.getValue()) {
+                        ItemModelGenerator.generateItemModel(root, model);
+                    }
+                } catch (IOException | RuntimeException exception) {
+                    logPackFailure(contributor.getKey().getName(), exception);
+                    contributors.remove();
+                }
             }
 
             zip(root, zip);
@@ -217,7 +227,7 @@ public final class ResourcePackManager {
             );
             hostedPacks.clear();
             hostedPacks.add(pack);
-            hostedPacks.addAll(generateSystemPacks(config));
+            hostedPacks.addAll(generateSystemPacks(config, contributedModels));
             hostedPacks.addAll(generateDataPacks(config));
             Main.getInstance().getLogger().info("Generated BlockEngine resource pack at " + zip.toAbsolutePath()
                     + " sha1=" + HexFormat.of().formatHex(sha1));
@@ -376,11 +386,7 @@ public final class ResourcePackManager {
                     output.closeEntry();
                 }
             }
-            try {
-                Files.move(temporaryZip, zip, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
-            } catch (AtomicMoveNotSupportedException exception) {
-                Files.move(temporaryZip, zip, StandardCopyOption.REPLACE_EXISTING);
-            }
+            replaceZip(temporaryZip, zip);
         } finally {
             Files.deleteIfExists(temporaryZip);
         }
@@ -525,151 +531,175 @@ public final class ResourcePackManager {
         texture(root, "demo_state_purple", 0xFFB84DFF);
     }
 
-    private static @NotNull Collection<GeneratedPack> generateSystemPacks(@NotNull ResourcePackConfig config) throws IOException {
+    private static Collection<GeneratedPack> generateSystemPacks(
+            ResourcePackConfig config, Map<Plugin, List<GeneratedItemModel>> contributions
+    ) {
         List<GeneratedPack> packs = new ArrayList<>();
-        for (Plugin plugin : Main.getInstance().getServer().getPluginManager().getPlugins()) {
-            if (!plugin.isEnabled()) {
-                continue;
+        for (var entry : contributions.entrySet()) {
+            Plugin plugin = entry.getKey();
+            try {
+                packs.add(generateSystemPack(config, plugin, (CustomBlockSystem) plugin, entry.getValue()));
+            } catch (IOException | RuntimeException exception) {
+                logPackFailure(plugin.getName(), exception);
             }
-            if (!(plugin instanceof CustomBlockSystem system)) {
-                continue;
-            }
-
-            String namespace = system.getNamespace();
-            String outputKey = "namespace-" + safeUrlEnding(namespace).replace('/', '_');
-            CustomBlockSystem.PackDetails details = new CustomBlockSystem.PackDetails();
-            details.urlEnding(namespace);
-            system.setPackDetails(details);
-
-            String ending = safeUrlEnding(details.urlEnding().isBlank() ? namespace : details.urlEnding());
-            Path root = Main.getInstance().getDataFolder().toPath()
-                    .resolve("generated-resource-pack")
-                    .resolve("packs")
-                    .resolve(outputKey);
-
-            delete(root);
-            Files.createDirectories(root);
-            Component title = blank(details.title())
-                    ? Component.text(plugin.getName())
-                    : details.title();
-            Component description = blank(details.description())
-                    ? Component.text(plugin.getName() + " BlockEngine resources")
-                    : details.description();
-            String fileName = safeFileName(blank(title) ? ending : legacy(title));
-            Path zip = Main.getInstance().getDataFolder().toPath()
-                    .resolve("generated-packs")
-                    .resolve("systems")
-                    .resolve(outputKey)
-                    .resolve(fileName);
-            packMeta(root, title, description);
-            copyIcon(root, details.icon());
-            copyAssets(root, details.assets());
-
-            Set<String> namespaces = new HashSet<>(details.assetNamespaces());
-            namespaces.add(namespace);
-            validateAssetNamespaces(plugin, namespace, namespaces);
-            for (dev.auto.blockengine.types.BlockDefinition registered : BlockRegistry.getBlocks()) {
-                if (namespaces.contains(registered.name().namespace())) {
-                    ItemModelGenerator.generateBlock(root, registered.apiDefinition());
-                }
-            }
-            writeCreativeTranslations(root, BlockRegistry.getBlocks().stream()
-                    .filter(registered -> namespaces.contains(registered.name().namespace()))
-                    .toList());
-            system.onItemModelGeneration(model -> {
-                try {
-                    ItemModelGenerator.generateItemModel(root, model);
-                } catch (IOException exception) {
-                    throw new RuntimeException(exception);
-                }
-            });
-
-            zip(root, zip);
-            byte[] sha1 = sha1(zip);
-            String packUrl = packUrl(config, "/packs/" + ending);
-            packs.add(new GeneratedPack(
-                    packId(packUrl),
-                    root,
-                    zip,
-                    fileName,
-                    sha1,
-                    packUrl,
-                    title,
-                    description,
-                    blank(details.prompt()) ? prompt(title, description) : details.prompt(),
-                    details.required()
-            ));
         }
         return packs;
     }
 
-    private static @NotNull Collection<GeneratedPack> generateDataPacks(@NotNull ResourcePackConfig config) throws IOException {
+    private static GeneratedPack generateSystemPack(
+            ResourcePackConfig config, Plugin plugin, CustomBlockSystem system, List<GeneratedItemModel> models
+    ) throws IOException {
+        String namespace = system.getNamespace();
+        String outputKey = "namespace-" + safeUrlEnding(namespace).replace('/', '_');
+        CustomBlockSystem.PackDetails details = new CustomBlockSystem.PackDetails();
+        details.urlEnding(namespace);
+        system.setPackDetails(details);
+
+        String ending = safeUrlEnding(details.urlEnding().isBlank() ? namespace : details.urlEnding());
+        Path root = Main.getInstance().getDataFolder().toPath()
+                .resolve("generated-resource-pack")
+                .resolve("packs")
+                .resolve(outputKey);
+
+        delete(root);
+        Files.createDirectories(root);
+        Component title = blank(details.title())
+                ? Component.text(plugin.getName())
+                : details.title();
+        Component description = blank(details.description())
+                ? Component.text(plugin.getName() + " BlockEngine resources")
+                : details.description();
+        String fileName = safeFileName(blank(title) ? ending : legacy(title));
+        Path zip = Main.getInstance().getDataFolder().toPath()
+                .resolve("generated-packs")
+                .resolve("systems")
+                .resolve(outputKey)
+                .resolve(fileName);
+        packMeta(root, title, description);
+        copyIcon(root, details.icon());
+        copyAssets(root, details.assets());
+
+        Set<String> namespaces = new HashSet<>(details.assetNamespaces());
+        namespaces.add(namespace);
+        validateAssetNamespaces(plugin, namespace, namespaces);
+        for (dev.auto.blockengine.types.BlockDefinition registered : BlockRegistry.getBlocks()) {
+            if (namespaces.contains(registered.name().namespace())) {
+                ItemModelGenerator.generateBlock(root, registered.apiDefinition());
+            }
+        }
+        writeCreativeTranslations(root, BlockRegistry.getBlocks().stream()
+                .filter(registered -> namespaces.contains(registered.name().namespace()))
+                .toList());
+        for (GeneratedItemModel model : models) {
+            ItemModelGenerator.generateItemModel(root, model);
+        }
+
+        zip(root, zip);
+        byte[] sha1 = sha1(zip);
+        String packUrl = packUrl(config, "/packs/" + ending);
+        return new GeneratedPack(
+                packId(packUrl),
+                root,
+                zip,
+                fileName,
+                sha1,
+                packUrl,
+                title,
+                description,
+                blank(details.prompt()) ? prompt(title, description) : details.prompt(),
+                details.required()
+        );
+    }
+
+    private static Collection<GeneratedPack> generateDataPacks(ResourcePackConfig config) {
         List<GeneratedPack> packs = new ArrayList<>();
         for (BlockPack blockPack : DataBlockPacks.loadedPacks()) {
-            String outputKey = "namespace-" + safeUrlEnding(blockPack.namespace()).replace('/', '_');
-            String ending = safeUrlEnding(blockPack.urlEnding().isBlank() ? blockPack.namespace() : blockPack.urlEnding());
-            Path root = Main.getInstance().getDataFolder().toPath()
-                    .resolve("generated-resource-pack")
-                    .resolve("data-packs")
-                    .resolve(outputKey);
-
-            delete(root);
-            Files.createDirectories(root);
-            Component title = blockPack.title().isBlank()
-                    ? Component.text(blockPack.namespace())
-                    : rich(blockPack.title());
-            Component description = blockPack.description().isBlank()
-                    ? Component.text(blockPack.namespace() + " BlockEngine resources")
-                    : rich(blockPack.description());
-            String fileName = safeFileName(blank(title) ? ending : legacy(title));
-            Path zip = Main.getInstance().getDataFolder().toPath()
-                    .resolve("generated-packs")
-                    .resolve("data-packs")
-                    .resolve(outputKey)
-                    .resolve(fileName);
-            packMeta(root, title, description);
-            copyIcon(root, blockPack.icon());
-            copyAssets(root, blockPack.assetRoots());
-
-            if (!NamespaceRegistry.loaded(blockPack.namespace())) {
-                throw new IllegalStateException("Data pack resource namespace is not loaded: " + blockPack.namespace());
+            try {
+                packs.add(generateDataPack(config, blockPack));
+            } catch (IOException | RuntimeException exception) {
+                logPackFailure(blockPack.namespace(), exception);
             }
-            for (dev.auto.blockengine.types.BlockDefinition registered : BlockRegistry.getBlocks()) {
-                if (blockPack.namespace().equals(registered.name().namespace())) {
-                    ItemModelGenerator.generateBlock(root, registered.apiDefinition());
-                }
-            }
-            writeCreativeTranslations(root, BlockRegistry.getBlocks().stream()
-                    .filter(registered -> blockPack.namespace().equals(registered.name().namespace()))
-                    .toList());
-
-            zip(root, zip);
-            byte[] sha1 = sha1(zip);
-            String packUrl = packUrl(config, "/data-packs/" + ending);
-            packs.add(new GeneratedPack(
-                    packId(packUrl),
-                    root,
-                    zip,
-                    fileName,
-                    sha1,
-                    packUrl,
-                    title,
-                    description,
-                    blockPack.prompt().isBlank() ? prompt(title, description) : rich(blockPack.prompt()),
-                    blockPack.required()
-            ));
         }
         return packs;
     }
 
-    private static @NotNull List<GeneratedItemModel> generatedItemModels() {
-        List<GeneratedItemModel> models = new ArrayList<>();
-        for (Plugin plugin : Main.getInstance().getServer().getPluginManager().getPlugins()) {
-            if (plugin instanceof CustomBlockSystem system) {
-                system.onItemModelGeneration(models::add);
+    private static GeneratedPack generateDataPack(ResourcePackConfig config, BlockPack blockPack) throws IOException {
+        String outputKey = "namespace-" + safeUrlEnding(blockPack.namespace()).replace('/', '_');
+        String ending = safeUrlEnding(blockPack.urlEnding().isBlank() ? blockPack.namespace() : blockPack.urlEnding());
+        Path root = Main.getInstance().getDataFolder().toPath()
+                .resolve("generated-resource-pack")
+                .resolve("data-packs")
+                .resolve(outputKey);
+
+        delete(root);
+        Files.createDirectories(root);
+        Component title = blockPack.title().isBlank()
+                ? Component.text(blockPack.namespace())
+                : rich(blockPack.title());
+        Component description = blockPack.description().isBlank()
+                ? Component.text(blockPack.namespace() + " BlockEngine resources")
+                : rich(blockPack.description());
+        String fileName = safeFileName(blank(title) ? ending : legacy(title));
+        Path zip = Main.getInstance().getDataFolder().toPath()
+                .resolve("generated-packs")
+                .resolve("data-packs")
+                .resolve(outputKey)
+                .resolve(fileName);
+        packMeta(root, title, description);
+        copyIcon(root, blockPack.icon());
+        copyAssets(root, blockPack.assetRoots());
+
+        if (!NamespaceRegistry.loaded(blockPack.namespace())) {
+            throw new IllegalStateException("Data pack resource namespace is not loaded: " + blockPack.namespace());
+        }
+        for (dev.auto.blockengine.types.BlockDefinition registered : BlockRegistry.getBlocks()) {
+            if (blockPack.namespace().equals(registered.name().namespace())) {
+                ItemModelGenerator.generateBlock(root, registered.apiDefinition());
             }
         }
-        return models;
+        writeCreativeTranslations(root, BlockRegistry.getBlocks().stream()
+                .filter(registered -> blockPack.namespace().equals(registered.name().namespace()))
+                .toList());
+
+        zip(root, zip);
+        byte[] sha1 = sha1(zip);
+        String packUrl = packUrl(config, "/data-packs/" + ending);
+        return new GeneratedPack(
+                packId(packUrl),
+                root,
+                zip,
+                fileName,
+                sha1,
+                packUrl,
+                title,
+                description,
+                blockPack.prompt().isBlank() ? prompt(title, description) : rich(blockPack.prompt()),
+                blockPack.required()
+        );
+    }
+
+    private static Map<Plugin, List<GeneratedItemModel>> generatedItemModels() {
+        Map<Plugin, List<GeneratedItemModel>> contributions = new LinkedHashMap<>();
+        for (Plugin plugin : Main.getInstance().getServer().getPluginManager().getPlugins()) {
+            if (!plugin.isEnabled() || !(plugin instanceof CustomBlockSystem system)) {
+                continue;
+            }
+            try {
+                if (NamespaceRegistry.loaded(system.getNamespace())) {
+                    List<GeneratedItemModel> models = new ArrayList<>();
+                    system.onItemModelGeneration(models::add);
+                    contributions.put(plugin, List.copyOf(models));
+                }
+            } catch (RuntimeException exception) {
+                logPackFailure(plugin.getName(), exception);
+            }
+        }
+        return contributions;
+    }
+
+    private static void logPackFailure(String contributor, Exception exception) {
+        Main.getInstance().getLogger().log(java.util.logging.Level.WARNING,
+                "Could not generate BlockEngine resources for " + contributor, exception);
     }
 
     private static void writeCreativeTranslations(
@@ -766,7 +796,24 @@ public final class ResourcePackManager {
 
     private static void zip(@NotNull Path root, @NotNull Path output) throws IOException {
         Files.createDirectories(output.getParent());
-        Files.deleteIfExists(output);
+        Path temporary = Files.createTempFile(output.getParent(), "blockengine-", ".zip.tmp");
+        try {
+            writeZip(root, temporary);
+            replaceZip(temporary, output);
+        } finally {
+            Files.deleteIfExists(temporary);
+        }
+    }
+
+    private static void replaceZip(Path temporary, Path output) throws IOException {
+        try {
+            Files.move(temporary, output, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+        } catch (AtomicMoveNotSupportedException exception) {
+            Files.move(temporary, output, StandardCopyOption.REPLACE_EXISTING);
+        }
+    }
+
+    private static void writeZip(@NotNull Path root, @NotNull Path output) throws IOException {
         try (ZipOutputStream zip = new ZipOutputStream(Files.newOutputStream(output));
              Stream<Path> files = Files.walk(root)) {
             for (Path file : files

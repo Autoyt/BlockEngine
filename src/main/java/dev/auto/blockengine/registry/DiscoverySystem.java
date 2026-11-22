@@ -41,7 +41,14 @@ public final class DiscoverySystem {
                 continue;
             }
 
-            String namespace = system.getNamespace();
+            String namespace;
+            try {
+                namespace = system.getNamespace();
+            } catch (RuntimeException exception) {
+                Main.getInstance().getLogger().log(java.util.logging.Level.SEVERE,
+                        "Failed to read BlockEngine namespace for " + plugin.getName(), exception);
+                continue;
+            }
             if (namespace == null || !NAMESPACE_PATTERN.matcher(namespace).matches()) {
                 Main.getInstance().getLogger().severe("Plugin " + plugin.getName()
                         + " declared invalid BlockEngine namespace: " + namespace);
@@ -63,26 +70,36 @@ public final class DiscoverySystem {
                 continue;
             }
 
+            List<BlockAdapter> adapters;
+            try {
+                adapters = entry.system().registerAdapters();
+            } catch (RuntimeException exception) {
+                Main.getInstance().getLogger().log(java.util.logging.Level.SEVERE,
+                        "Failed to discover BlockEngine adapters for " + entry.plugin().getName(), exception);
+                continue;
+            }
+
             registeredPlugins++;
             NamespaceRegistry.load(entry.namespace());
-
-            List<BlockAdapter> adapters = entry.system().registerAdapters();
             if (adapters == null || adapters.isEmpty()) {
                 Main.getInstance().getLogger()
                         .warning("Plugin " + entry.plugin().getName() + " did not provide any block adapters.");
                 continue;
             }
 
-            registeredBlocks += adapters.size();
-            discoveredAdapters.addAll(adapters);
-
             for (BlockAdapter adapter : adapters) {
+                if (adapter == null) {
+                    Main.getInstance().getLogger().warning("Ignoring a null block adapter from " + entry.plugin().getName());
+                    continue;
+                }
                 Main.getInstance().getLogger().fine(
                         "Discovered block adapter " + adapter.getClass().getName() + " from plugin " + entry.plugin().getName()
                 );
 
                 try {
                     BlockRegistry.registerBlock(adapter, entry.namespace(), entry.plugin());
+                    discoveredAdapters.add(adapter);
+                    registeredBlocks++;
                 } catch (Exception e) {
                     Main.getInstance().getLogger().severe("Failed to register block adapter " + adapter.getClass().getName() + " from plugin " + entry.plugin().getName());
                     Main.getInstance().getLogger().log(java.util.logging.Level.SEVERE, "Adapter registration failure", e);

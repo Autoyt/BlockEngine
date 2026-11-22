@@ -27,7 +27,12 @@ public final class PlacementVerificationEngine {
             switch (state) {
                 case START -> state = State.TARGET_REPLACEABLE;
                 case TARGET_REPLACEABLE -> {
-                    if (!replaceableTarget(request.target())) {
+                    Block target = request.target();
+                    if (target.getY() < target.getWorld().getMinHeight() || target.getY() >= target.getWorld().getMaxHeight()
+                            || !target.getWorld().getWorldBorder().isInside(target.getLocation().add(0.5, 0.5, 0.5))) {
+                        return Result.denied(State.TARGET_REPLACEABLE, DenialReason.OUTSIDE_WORLD);
+                    }
+                    if (!replaceableTarget(target)) {
                         return Result.denied(State.TARGET_REPLACEABLE, DenialReason.TARGET_NOT_REPLACEABLE);
                     }
                     if (waterloggedSolid(request.target())) {
@@ -162,6 +167,7 @@ public final class PlacementVerificationEngine {
     }
 
     public enum DenialReason {
+        OUTSIDE_WORLD,
         TARGET_NOT_REPLACEABLE,
         WATERLOGGED_TARGET,
         VANILLA_RULES_REJECTED,

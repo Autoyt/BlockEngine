@@ -50,9 +50,7 @@ public final class DemoStateBlockAdapter implements BlockAdapter {
 
     @Override
     public @NotNull BlockData createDefaultData(@NotNull BlockCreateContext context) {
-        BlockData data = context.createData();
-        data.stateId("red");
-        return data;
+        return context.createData();
     }
 
     @Override

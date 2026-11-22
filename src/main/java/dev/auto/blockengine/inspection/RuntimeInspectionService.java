@@ -6,7 +6,6 @@ import dev.auto.blockengine.api.inspection.BlockInspectionService;
 import dev.auto.blockengine.items.ItemManager;
 import dev.auto.blockengine.runtime.ChunkEngine;
 import dev.auto.blockengine.structure.SudoBlockManager;
-import dev.auto.blockengine.types.BlockLocationKey;
 import org.bukkit.block.Block;
 import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.NotNull;
@@ -25,8 +24,7 @@ public final class RuntimeInspectionService implements BlockInspectionService {
             throw new IllegalArgumentException("Inspection requires a loaded chunk");
         }
 
-        var location = new BlockLocationKey(world.getUID(), block.getX(), block.getY(), block.getZ());
-        var runtime = ChunkEngine.getBlock(location);
+        var runtime = ChunkEngine.inspectLoadedBlock(block);
         String material = block.getType().getKey().toString();
         if (runtime != null) {
             var stored = runtime.storedBlock();

@@ -126,11 +126,21 @@ public final class BlockIntegrityManager {
     }
 
     public void clearRecord(@NotNull Block block, @NotNull RuntimeBlockView customBlock, @NotNull BlockEngineModificationEvent.Action action) {
+        clearRecord(block, customBlock, action, null);
+    }
+
+    public void clearRecord(
+            @NotNull Block block, @NotNull RuntimeBlockView customBlock,
+            @NotNull BlockEngineModificationEvent.Action action, @Nullable Runnable replaceBackingBlock
+    ) {
         Objects.requireNonNull(block, "block");
         Objects.requireNonNull(customBlock, "customBlock");
         ChunkEngine.Data data = ChunkEngine.data(block.getChunk());
         data.removeBlock(block.getX() & 15, block.getY(), block.getZ() & 15);
         ManagedDisplayManager.getInstance().removeBlockAttached(location(block));
+        if (replaceBackingBlock != null) {
+            replaceBackingBlock.run();
+        }
         ChunkEngine.changed(block.getChunk());
         VisibilityManager.getInstance().refreshPlayersNear(ChunkEngine.Key.from(block.getChunk()));
         BlockEngineEvents.call(new BlockEngineBlockRemovedEvent(

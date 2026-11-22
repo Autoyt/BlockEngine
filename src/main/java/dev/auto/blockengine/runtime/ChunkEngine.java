@@ -9,6 +9,7 @@ import dev.auto.blockengine.api.event.BlockEngineChunkSaveEvent;
 import dev.auto.blockengine.api.event.BlockEngineChunkSavedEvent;
 import dev.auto.blockengine.entity.ManagedDisplayManager;
 import dev.auto.blockengine.event.BlockEngineEvents;
+import dev.auto.blockengine.placement.BlockOrientation;
 import dev.auto.blockengine.types.BlockLocationKey;
 import dev.auto.blockengine.visibility.VisibilityConfig;
 import dev.auto.blockengine.visibility.VisibilityManager;
@@ -18,6 +19,7 @@ import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.World;
 import org.bukkit.block.Block;
+import org.bukkit.block.BlockFace;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.persistence.PersistentDataAdapterContext;
 import org.bukkit.persistence.PersistentDataContainer;
@@ -34,6 +36,7 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -44,44 +47,96 @@ import java.util.Objects;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
+import java.util.logging.Level;
 
 public final class ChunkEngine {
-    private static final NamespacedKey CHUNK_DATA_KEY = new NamespacedKey(Main.getInstance(), "chunk_data");
+    static final int MAX_PAYLOAD_BYTES = 16 * 1024 * 1024;
+    private static final NamespacedKey CHUNK_DATA_KEY = new NamespacedKey("blockengine", "chunk_data");
     private static final Map<Key, LoadedChunk> chunks = new HashMap<>();
-    private static final Map<Key, ChunkEdit> pendingChunks = new HashMap<>();
+    private static final Set<Key> dirtyChunks = new HashSet<>();
+    private static final Map<Key, Data> failedSaves = new HashMap<>();
+    private static final Set<Key> saving = new HashSet<>();
+    private static final Set<BlockLocationKey> pendingExposure = new HashSet<>();
+    private static final List<BlockFace> SIDES = List.of(BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST);
+    private static final List<BlockFace> NEIGHBORS = List.of(
+            BlockFace.SELF, BlockFace.UP, BlockFace.DOWN, BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST
+    );
     private static final Map<BlockLocationKey, Block> changedBlocks = new HashMap<>();
     private static final List<Runnable> afterFlush = new ArrayList<>();
     private static boolean flushScheduled;
+    private static boolean flushing;
 
     private ChunkEngine() {
     }
 
     public static void load(@NotNull Chunk chunk, @NotNull VisibilityConfig config) {
-        long started = System.nanoTime();
         Key key = Key.from(chunk);
-        Data data = Data.load(chunk, CHUNK_DATA_KEY);
+        if (chunks.containsKey(key)) {
+            return;
+        }
 
-        LoadedChunk loaded = new LoadedChunk(key);
-        World world = chunk.getWorld();
-        for (StoredBlock block : data.blocks()) {
-            int worldX = (chunk.getX() << 4) + block.localX();
-            int worldZ = (chunk.getZ() << 4) + block.localZ();
-            BlockLocationKey location = new BlockLocationKey(world.getUID(), worldX, block.y(), worldZ);
-            boolean exposed = !config.exposureEnabled() || isExposed(world, worldX, block.y(), worldZ, config);
+        long started = System.nanoTime();
+        Data data = failedSaves.get(key);
+        if (data == null) {
+            try {
+                data = Data.load(chunk, CHUNK_DATA_KEY);
+            } catch (RuntimeException exception) {
+                Main.getInstance().getLogger().log(Level.SEVERE, "Cannot load BlockEngine chunk " + key
+                        + ". Its stored data has been preserved.", exception);
+                return;
+            }
+        } else {
+            dirtyChunks.add(key);
+            scheduleFlush();
+        }
+        LoadedChunk loaded = new LoadedChunk(chunk, data);
+        chunks.put(key, loaded);
+        index(loaded, config);
+        queueNeighborEdges(key);
+        PerformanceMetrics.record(PerformanceMetrics.CHUNK_LOAD, System.nanoTime() - started, data.blocks().size(), 0);
+    }
+
+    private static void index(@NotNull LoadedChunk loaded, @NotNull VisibilityConfig config) {
+        Key key = loaded.key();
+        World world = loaded.chunk.getWorld();
+        for (StoredBlock block : loaded.data.blocks()) {
+            int worldX = (key.x() << 4) + block.localX();
+            int worldZ = (key.z() << 4) + block.localZ();
+            BlockLocationKey location = new BlockLocationKey(key.worldId(), worldX, block.y(), worldZ);
+            boolean exposed = isExposed(world, worldX, block.y(), worldZ, config);
             loaded.add(new RuntimeBlockView(key, location, block.fallbackBlock(), block, exposed));
         }
 
-        chunks.put(key, loaded);
         BlockTicker.getInstance().loadChunk(key, loaded);
-        ManagedDisplayManager.getInstance().loadChunk(key, data);
-        PerformanceMetrics.record(PerformanceMetrics.CHUNK_LOAD, System.nanoTime() - started, data.blocks().size(), 0);
+        ManagedDisplayManager.getInstance().loadChunk(key, loaded.data);
     }
 
     public static void unload(@NotNull Chunk chunk) {
         Key key = Key.from(chunk);
+        LoadedChunk loaded = chunks.get(key);
+        if (loaded == null) {
+            return;
+        }
+
+        boolean needsSave = dirtyChunks.remove(key);
+        try {
+            if ((needsSave || failedSaves.containsKey(key)) && !saving.contains(key)) {
+                save(loaded);
+            }
+            // Save listeners may stage one last edit, or unload the chunk during its own save.
+            if (dirtyChunks.remove(key) || saving.contains(key)) {
+                Data.save(chunk, CHUNK_DATA_KEY, loaded.data);
+                failedSaves.remove(key);
+            }
+        } catch (RuntimeException exception) {
+            // Keep only data when the chunk leaves memory. Retry when it next loads.
+            failedSave(loaded, exception);
+        }
         chunks.remove(key);
+        changedBlocks.keySet().removeIf(key::contains);
         BlockTicker.getInstance().unloadChunk(key);
         ManagedDisplayManager.getInstance().unloadChunk(key);
+        queueNeighborEdges(key);
     }
 
     public static @Nullable LoadedChunk get(@NotNull Key key) {
@@ -97,29 +152,39 @@ public final class ChunkEngine {
 
         int localX = location.x() & 15;
         int localZ = location.z() & 15;
-        ChunkEdit pending = pendingChunks.get(key);
-        if (pending == null) {
-            return chunk.block(localX, location.y(), localZ);
-        }
-
-        // Mutations are staged until the next flush. Movement and placement can
-        // perform several reads in that window, so the staged data must be the
-        // authoritative view or the same source block can be moved twice.
-        StoredBlock stored = pending.data().blockAt(localX, location.y(), localZ);
+        StoredBlock stored = chunk.data.blockAt(localX, location.y(), localZ);
         if (stored == null) {
             return null;
         }
 
-        RuntimeBlockView loaded = chunk.block(localX, location.y(), localZ);
-        boolean exposed = loaded != null && loaded.storedBlock() == stored
-                ? loaded.exposed()
-                : isExposed(
-                        pending.chunk().getWorld(),
-                        location.x(),
-                        location.y(),
-                        location.z(),
-                        VisibilityManager.getInstance().config()
-                );
+        RuntimeBlockView indexed = chunk.block(localX, location.y(), localZ);
+        if (indexed != null && indexed.storedBlock() == stored) {
+            return indexed;
+        }
+
+        boolean exposed = isExposed(chunk.chunk.getWorld(), location.x(), location.y(), location.z(),
+                VisibilityManager.getInstance().config());
+        return new RuntimeBlockView(key, location, stored.fallbackBlock(), stored, exposed);
+    }
+
+    /** Reads persisted data if Paper has loaded the chunk but has not fired its load event yet. */
+    public static @Nullable RuntimeBlockView inspectLoadedBlock(@NotNull Block block) {
+        BlockLocationKey location = location(block);
+        Key key = new Key(location.worldId(), location.x() >> 4, location.z() >> 4);
+        if (chunks.containsKey(key)) {
+            return getBlock(location);
+        }
+        World world = block.getWorld();
+        if (!world.isChunkLoaded(key.x(), key.z())) {
+            return null;
+        }
+
+        Data data = Data.load(world.getChunkAt(key.x(), key.z(), false), CHUNK_DATA_KEY);
+        StoredBlock stored = data.blockAt(location.x() & 15, location.y(), location.z() & 15);
+        if (stored == null) {
+            return null;
+        }
+        boolean exposed = isExposed(world, location.x(), location.y(), location.z(), VisibilityManager.getInstance().config());
         return new RuntimeBlockView(key, location, stored.fallbackBlock(), stored, exposed);
     }
 
@@ -132,17 +197,26 @@ public final class ChunkEngine {
     }
 
     public static @NotNull Data data(@NotNull Chunk chunk) {
-        return edit(chunk).data();
+        Key key = Key.from(chunk);
+        LoadedChunk loaded = chunks.get(key);
+        if (loaded == null) {
+            load(chunk, VisibilityManager.getInstance().config());
+            loaded = chunks.get(key);
+            if (loaded == null) {
+                throw new IllegalStateException("Cannot edit unreadable BlockEngine chunk " + key);
+            }
+        }
+        return loaded.data;
     }
 
     public static void changed(@NotNull Block block) {
         changedBlocks.put(location(block), block);
-        edit(block.getChunk());
-        scheduleFlush();
+        changed(block.getChunk());
     }
 
     public static void changed(@NotNull Chunk chunk) {
-        edit(chunk);
+        data(chunk);
+        dirtyChunks.add(Key.from(chunk));
         scheduleFlush();
     }
 
@@ -152,67 +226,142 @@ public final class ChunkEngine {
     }
 
     public static void flushNow() {
-        if (pendingChunks.isEmpty() && changedBlocks.isEmpty() && afterFlush.isEmpty()) {
-            flushScheduled = false;
+        if (flushing) {
             return;
         }
+        flushing = true;
+        try {
+            flushBatch();
+        } finally {
+            flushing = false;
+            if (hasWork()) {
+                scheduleFlush();
+            }
+        }
+    }
+
+    private static void flushBatch() {
+        // Mark the current batch before firing events or physics. New edits must survive this pass.
+        Set<Key> batch = Set.copyOf(dirtyChunks);
+        List<Block> updates = List.copyOf(changedBlocks.values());
+        changedBlocks.clear();
+        List<Runnable> callbacks = List.copyOf(afterFlush);
+        afterFlush.clear();
 
         Set<Key> touched = new HashSet<>();
-        for (Map.Entry<Key, ChunkEdit> entry : pendingChunks.entrySet()) {
-            long started = System.nanoTime();
-            ChunkEdit edit = entry.getValue();
-            int blockCount = edit.data().blocks().size();
-            int displayCount = edit.data().displays().size();
-            boolean empty = edit.data().isEmpty();
-            BlockEngineEvents.call(new BlockEngineChunkSaveEvent(edit.chunk(), blockCount, displayCount, empty));
-            Data.save(edit.chunk(), dataKey(), edit.data());
-            PerformanceMetrics.record(PerformanceMetrics.CHUNK_SAVE, System.nanoTime() - started, blockCount, 0);
-            BlockEngineEvents.call(new BlockEngineChunkSavedEvent(edit.chunk(), blockCount, displayCount, empty));
-            load(edit.chunk(), VisibilityManager.getInstance().config());
-            touched.add(entry.getKey());
+        for (Key key : batch) {
+            LoadedChunk loaded = chunks.get(key);
+            if (loaded != null && dirtyChunks.remove(key)) {
+                try {
+                    save(loaded);
+                    touched.add(key);
+                } catch (RuntimeException exception) {
+                    failedSave(loaded, exception);
+                }
+            }
         }
 
-        for (Block block : changedBlocks.values()) {
-            BlockUpdates.update(block);
+        for (Block block : updates) {
+            if (chunks.containsKey(new Key(block.getWorld().getUID(), block.getX() >> 4, block.getZ() >> 4))) {
+                BlockUpdates.update(block);
+                queueExposureAround(block);
+            }
         }
+        refreshExposure(touched);
 
         if (!touched.isEmpty()) {
             VisibilityManager.getInstance().refreshPlayersNear(touched);
         }
-
-        pendingChunks.clear();
-        changedBlocks.clear();
-        flushScheduled = false;
-
-        List<Runnable> callbacks = new ArrayList<>(afterFlush);
-        afterFlush.clear();
         for (Runnable callback : callbacks) {
             runAfterFlush(callback);
         }
     }
 
+    private static void save(@NotNull LoadedChunk loaded) {
+        Key key = loaded.key();
+        Chunk chunk = loaded.chunk;
+        Data data = loaded.data;
+        saving.add(key);
+        try {
+            long started = System.nanoTime();
+            BlockEngineEvents.call(new BlockEngineChunkSaveEvent(chunk, data.blocks().size(), data.displayCount(), data.isEmpty()));
+            if (chunks.get(key) != loaded) {
+                return;
+            }
+
+            // Edits made by the pre-save listener are included in this write.
+            dirtyChunks.remove(key);
+            Data.save(chunk, CHUNK_DATA_KEY, data);
+            failedSaves.remove(key);
+            PerformanceMetrics.record(PerformanceMetrics.CHUNK_SAVE, System.nanoTime() - started, data.blocks().size(), 0);
+            LoadedChunk indexed = new LoadedChunk(chunk, data);
+            chunks.put(key, indexed);
+            index(indexed, VisibilityManager.getInstance().config());
+            BlockEngineEvents.call(new BlockEngineChunkSavedEvent(chunk, data.blocks().size(), data.displayCount(), data.isEmpty()));
+        } finally {
+            saving.remove(key);
+        }
+    }
+
+    private static void failedSave(@NotNull LoadedChunk loaded, @NotNull RuntimeException exception) {
+        failedSaves.put(loaded.key(), loaded.data);
+        Main.getInstance().getLogger().log(Level.SEVERE, "Failed to save BlockEngine chunk " + loaded.key(), exception);
+    }
+
+    public static void saveWorld(@NotNull World world) {
+        flushNow();
+        // A post-save callback can stage more edits in this world. Include them in Paper's imminent
+        // disk save, while leaving them queued for the normal index refresh and notifications.
+        Set<Key> remaining = new HashSet<>(dirtyChunks);
+        remaining.addAll(failedSaves.keySet());
+        for (Key key : remaining) {
+            if (key.worldId().equals(world.getUID())) {
+                persistLatest(key);
+            }
+        }
+    }
+
+    private static void persistLatest(@NotNull Key key) {
+        LoadedChunk loaded = chunks.get(key);
+        if (loaded != null) {
+            try {
+                Data.save(loaded.chunk, CHUNK_DATA_KEY, loaded.data);
+                failedSaves.remove(key);
+            } catch (RuntimeException exception) {
+                failedSave(loaded, exception);
+            }
+        }
+    }
+
     public static void clear() {
-        pendingChunks.clear();
+        // A final callback during disable can still edit a chunk after the regular flush.
+        Set<Key> remaining = new HashSet<>(dirtyChunks);
+        remaining.addAll(failedSaves.keySet());
+        remaining.forEach(ChunkEngine::persistLatest);
+        chunks.clear();
+        dirtyChunks.clear();
+        failedSaves.clear();
+        saving.clear();
+        pendingExposure.clear();
         changedBlocks.clear();
         afterFlush.clear();
         flushScheduled = false;
         BlockTicker.getInstance().clear();
     }
 
-    private static @NotNull ChunkEdit edit(@NotNull Chunk chunk) {
-        Key key = Key.from(chunk);
-        return pendingChunks.computeIfAbsent(key, ignored -> new ChunkEdit(
-                chunk,
-                Data.load(chunk, dataKey())
-        ));
+    private static boolean hasWork() {
+        return !dirtyChunks.isEmpty() || !changedBlocks.isEmpty() || !afterFlush.isEmpty() || !pendingExposure.isEmpty();
     }
 
     private static void scheduleFlush() {
-        if (flushScheduled) {
+        if (flushScheduled || flushing || !Main.getInstance().isEnabled()) {
             return;
         }
         flushScheduled = true;
-        Bukkit.getScheduler().runTask(Main.getInstance(), ChunkEngine::flushNow);
+        Bukkit.getScheduler().runTask(Main.getInstance(), () -> {
+            flushScheduled = false;
+            flushNow();
+        });
     }
 
     private static void runAfterFlush(@NotNull Runnable callback) {
@@ -232,16 +381,88 @@ public final class ChunkEngine {
         );
     }
 
-    private static boolean isExposed(@NotNull World world, int x, int y, int z, @NotNull VisibilityConfig config) {
-        return isOpen(world.getBlockAt(x + 1, y, z), config)
-                || isOpen(world.getBlockAt(x - 1, y, z), config)
-                || isOpen(world.getBlockAt(x, y + 1, z), config)
-                || isOpen(world.getBlockAt(x, y - 1, z), config)
-                || isOpen(world.getBlockAt(x, y, z + 1), config)
-                || isOpen(world.getBlockAt(x, y, z - 1), config);
+    public static void queueExposureAround(@NotNull Block changed) {
+        UUID worldId = changed.getWorld().getUID();
+        int localX = changed.getX() & 15;
+        int localZ = changed.getZ() & 15;
+        if (localX > 0 && localX < 15 && localZ > 0 && localZ < 15) {
+            LoadedChunk center = chunks.get(new Key(worldId, changed.getX() >> 4, changed.getZ() >> 4));
+            if (center == null || !center.hasBlocks()) {
+                return;
+            }
+        }
+
+        for (BlockFace face : NEIGHBORS) {
+            int x = changed.getX() + face.getModX();
+            int y = changed.getY() + face.getModY();
+            int z = changed.getZ() + face.getModZ();
+            LoadedChunk chunk = chunks.get(new Key(worldId, x >> 4, z >> 4));
+            if (chunk != null && chunk.block(x & 15, y, z & 15) != null) {
+                pendingExposure.add(new BlockLocationKey(worldId, x, y, z));
+            }
+        }
+        if (!pendingExposure.isEmpty()) {
+            scheduleFlush();
+        }
     }
 
-    private static boolean isOpen(@NotNull Block block, @NotNull VisibilityConfig config) {
+    private static void queueNeighborEdges(@NotNull Key key) {
+        for (BlockFace face : SIDES) {
+            int dx = face.getModX();
+            int dz = face.getModZ();
+            LoadedChunk neighbor = chunks.get(new Key(key.worldId(), key.x() + dx, key.z() + dz));
+            if (neighbor == null) {
+                continue;
+            }
+
+            for (RuntimeBlockView view : neighbor.blocks()) {
+                int localX = view.storedBlock().localX();
+                int localZ = view.storedBlock().localZ();
+                if (dx == 1 && localX == 0 || dx == -1 && localX == 15
+                        || dz == 1 && localZ == 0 || dz == -1 && localZ == 15) {
+                    pendingExposure.add(view.location());
+                }
+            }
+        }
+        if (!pendingExposure.isEmpty()) {
+            scheduleFlush();
+        }
+    }
+
+    private static void refreshExposure(@NotNull Set<Key> touched) {
+        for (BlockLocationKey location : pendingExposure) {
+            Key key = new Key(location.worldId(), location.x() >> 4, location.z() >> 4);
+            LoadedChunk loaded = chunks.get(key);
+            if (loaded == null) {
+                continue;
+            }
+            RuntimeBlockView view = loaded.block(location.x() & 15, location.y(), location.z() & 15);
+            if (view == null) {
+                continue;
+            }
+
+            boolean exposed = isExposed(loaded.chunk.getWorld(), location.x(), location.y(), location.z(),
+                    VisibilityManager.getInstance().config());
+            if (view.exposed() != exposed) {
+                loaded.add(new RuntimeBlockView(key, location, view.displayMaterial(), view.storedBlock(), exposed));
+                touched.add(key);
+            }
+        }
+        pendingExposure.clear();
+    }
+
+    private static boolean isExposed(@NotNull World world, int x, int y, int z, @NotNull VisibilityConfig config) {
+        return !config.exposureEnabled()
+                || isOpen(world, x + 1, y, z, config) || isOpen(world, x - 1, y, z, config)
+                || isOpen(world, x, y + 1, z, config) || isOpen(world, x, y - 1, z, config)
+                || isOpen(world, x, y, z + 1, config) || isOpen(world, x, y, z - 1, config);
+    }
+
+    private static boolean isOpen(@NotNull World world, int x, int y, int z, @NotNull VisibilityConfig config) {
+        if (y < world.getMinHeight() || y >= world.getMaxHeight() || !world.isChunkLoaded(x >> 4, z >> 4)) {
+            return true;
+        }
+        Block block = world.getBlockAt(x, y, z);
         Material material = block.getType();
         if (material.isAir()) {
             return true;
@@ -253,9 +474,6 @@ public final class ChunkEngine {
             return true;
         }
         return config.treatNonSolidAsExposed() && !material.isSolid();
-    }
-
-    private record ChunkEdit(@NotNull Chunk chunk, @NotNull Data data) {
     }
 
     public record Key(@NotNull UUID worldId, int x, int z) {
@@ -270,32 +488,41 @@ public final class ChunkEngine {
 
     public static final class LoadedChunk {
         private final @NotNull Key key;
-        private final @NotNull List<RuntimeBlockView> blocks = new ArrayList<>();
-        private final @NotNull List<RuntimeBlockView> exposedBlocks = new ArrayList<>();
-        private final @NotNull Map<Long, RuntimeBlockView> byLocalPosition = new HashMap<>();
+        private final @NotNull Chunk chunk;
+        private final @NotNull Data data;
+        private final Map<Long, RuntimeBlockView> byLocalPosition = new LinkedHashMap<>();
+        private final Map<Long, RuntimeBlockView> exposedBlocks = new LinkedHashMap<>();
 
-        public LoadedChunk(@NotNull Key key) {
-            this.key = key;
+        private LoadedChunk(@NotNull Chunk chunk, @NotNull Data data) {
+            this.key = Key.from(chunk);
+            this.chunk = chunk;
+            this.data = data;
         }
 
         public @NotNull Key key() {
             return key;
         }
 
-        public void add(@NotNull RuntimeBlockView block) {
-            blocks.add(block);
-            byLocalPosition.put(localKey(block.location().x() & 15, block.location().y(), block.location().z() & 15), block);
+        public boolean hasBlocks() {
+            return !data.blocks().isEmpty();
+        }
+
+        private void add(@NotNull RuntimeBlockView block) {
+            long position = localKey(block.location().x() & 15, block.location().y(), block.location().z() & 15);
+            byLocalPosition.put(position, block);
             if (block.exposed()) {
-                exposedBlocks.add(block);
+                exposedBlocks.put(position, block);
+            } else {
+                exposedBlocks.remove(position);
             }
         }
 
-        public @NotNull List<RuntimeBlockView> blocks() {
-            return Collections.unmodifiableList(blocks);
+        public @NotNull Collection<RuntimeBlockView> blocks() {
+            return Collections.unmodifiableCollection(byLocalPosition.values());
         }
 
-        public @NotNull List<RuntimeBlockView> exposedBlocks() {
-            return Collections.unmodifiableList(exposedBlocks);
+        public @NotNull Collection<RuntimeBlockView> exposedBlocks() {
+            return Collections.unmodifiableCollection(exposedBlocks.values());
         }
 
         public @Nullable RuntimeBlockView block(int localX, int y, int localZ) {
@@ -310,8 +537,9 @@ public final class ChunkEngine {
     }
 
     public static final class Data {
-        public static final int VERSION = 6;
+        public static final int VERSION = 7;
         private static final int MIN_VERSION = 2;
+        private static final int VERSION_BEFORE_ORIENTATION = 6;
         public static final PersistentDataType<byte[], Data> TYPE = new DataType();
 
         private final @NotNull Map<Integer, StoredBlock> blocks = new LinkedHashMap<>();
@@ -325,12 +553,20 @@ public final class ChunkEngine {
             return Collections.unmodifiableCollection(blocks.values());
         }
 
+        public int displayCount() {
+            int count = displays.size();
+            for (StoredBlock block : blocks.values()) {
+                count += block.displays().size();
+            }
+            return count;
+        }
+
         public @NotNull Collection<StoredDisplay> displays() {
             return Collections.unmodifiableCollection(displays.values());
         }
 
         public @Nullable StoredBlock blockAt(int localX, int y, int localZ) {
-            return blocks.get(packBlockKey(localX, y, localZ));
+            return y < -2048 || y > 2047 ? null : blocks.get(packBlockKey(localX, y, localZ));
         }
 
         public void setBlock(@NotNull StoredBlock block) {
@@ -409,12 +645,26 @@ public final class ChunkEngine {
             boolean dropInCreative,
             @NotNull SimpleBlockData data,
             byte @NotNull [] payload,
-            @NotNull List<StoredDisplay> displays
+            @NotNull List<StoredDisplay> displays,
+            @NotNull BlockOrientation orientation
     ) {
+        public StoredBlock(
+                int localX, int y, int localZ, @NotNull Material fallbackBlock, float hardness, float miningSpeed,
+                boolean unbreakable, boolean dropsItem, boolean dropInCreative, @NotNull SimpleBlockData data,
+                byte @Nullable [] payload, @NotNull List<StoredDisplay> displays
+        ) {
+            this(localX, y, localZ, fallbackBlock, hardness, miningSpeed, unbreakable,
+                    dropsItem, dropInCreative, data, payload, displays, BlockOrientation.IDENTITY);
+        }
+
         public StoredBlock {
             validateLocal(localX, y, localZ);
             Objects.requireNonNull(fallbackBlock, "fallbackBlock");
+            Objects.requireNonNull(orientation, "orientation");
             Objects.requireNonNull(data, "data");
+            if (payload != null && payload.length > MAX_PAYLOAD_BYTES) {
+                throw new IllegalArgumentException("Adapter payload exceeds " + MAX_PAYLOAD_BYTES + " bytes");
+            }
             payload = payload == null ? new byte[0] : payload.clone();
             displays = List.copyOf(displays);
         }
@@ -432,8 +682,17 @@ public final class ChunkEngine {
             return payload.clone();
         }
 
+        boolean matchesPayload(byte @Nullable [] candidate) {
+            return candidate == null ? payload.length == 0 : Arrays.equals(payload, candidate);
+        }
+
         public int payloadBytes() {
             return payload.length;
+        }
+
+        public @NotNull StoredBlock withOrientation(@NotNull BlockOrientation next) {
+            return orientation == next ? this : new StoredBlock(localX, y, localZ, fallbackBlock, hardness, miningSpeed,
+                    unbreakable, dropsItem, dropInCreative, data, payload, displays, next);
         }
 
         public @NotNull StoredBlock withDisplay(@NotNull StoredDisplay display) {
@@ -451,14 +710,14 @@ public final class ChunkEngine {
                 updated.add(display);
             }
             return new StoredBlock(localX, y, localZ, fallbackBlock, hardness, miningSpeed, unbreakable,
-                    dropsItem, dropInCreative, data, payload, updated);
+                    dropsItem, dropInCreative, data, payload, updated, orientation);
         }
 
         public @NotNull StoredBlock withoutDisplay(@NotNull UUID id) {
             return new StoredBlock(localX, y, localZ, fallbackBlock, hardness, miningSpeed, unbreakable,
                     dropsItem, dropInCreative, data, payload, displays.stream()
                     .filter(display -> !display.id().equals(id))
-                    .toList());
+                    .toList(), orientation);
         }
 
         public static @NotNull StoredBlock from(
@@ -472,8 +731,16 @@ public final class ChunkEngine {
             Objects.requireNonNull(source, "source");
             Objects.requireNonNull(definition, "definition");
 
+            return from(localX, y, localZ, source, definition, payload, List.of(), BlockOrientation.IDENTITY);
+        }
+
+        public static @NotNull StoredBlock from(
+                int localX, int y, int localZ, @NotNull BlockData source,
+                @NotNull dev.auto.blockengine.api.blocks.BlockDefinition definition,
+                byte @Nullable [] payload, @NotNull List<StoredDisplay> displays,
+                @NotNull BlockOrientation orientation
+        ) {
             dev.auto.blockengine.api.blocks.BlockDefinition.State state = definition.state(source.stateId());
-            SimpleBlockData data = SimpleBlockData.copyOf(source);
             return new StoredBlock(
                     localX,
                     y,
@@ -484,17 +751,15 @@ public final class ChunkEngine {
                     state.unbreakable(),
                     state.dropsItem(),
                     state.dropInCreative(),
-                    data,
+                    SimpleBlockData.copyOf(source),
                     payload,
-                    List.of()
+                    displays,
+                    orientation
             );
         }
 
         public @NotNull StoredBlock refreshSnapshot(@NotNull dev.auto.blockengine.api.blocks.BlockDefinition definition) {
-            StoredBlock refreshed = from(localX, y, localZ, data, definition, payload);
-            return new StoredBlock(localX, y, localZ, refreshed.fallbackBlock(), refreshed.hardness(), refreshed.miningSpeed(),
-                    refreshed.unbreakable(), refreshed.dropsItem(), refreshed.dropInCreative(), refreshed.data(),
-                    refreshed.payload(), displays);
+            return from(localX, y, localZ, data, definition, payload, displays, orientation);
         }
 
         public @Nullable SimpleBlockData loadData(@NotNull dev.auto.blockengine.types.BlockDefinition definition) {
@@ -638,10 +903,12 @@ public final class ChunkEngine {
                 ByteArrayOutputStream bytes = new ByteArrayOutputStream();
                 DataOutputStream out = new DataOutputStream(bytes);
 
-                out.writeInt(Data.VERSION);
+                boolean rotated = complex.blocks.values().stream().anyMatch(block -> block.orientation() != BlockOrientation.IDENTITY);
+                int version = rotated ? Data.VERSION : Data.VERSION_BEFORE_ORIENTATION;
+                out.writeInt(version);
                 out.writeInt(complex.blocks.size());
                 for (StoredBlock block : complex.blocks.values()) {
-                    writeBlock(out, block);
+                    writeBlock(out, block, version);
                 }
                 out.writeInt(complex.displays.size());
                 for (StoredDisplay display : complex.displays.values()) {
@@ -672,16 +939,19 @@ public final class ChunkEngine {
                 }
 
                 Data data = new Data();
-                int blockCount = in.readInt();
+                int blockCount = readCount(in, 1);
                 for (int i = 0; i < blockCount; i++) {
                     StoredBlock block = readBlock(in, version);
                     data.setBlock(block);
                 }
                 if (version >= 6) {
-                    int displayCount = in.readInt();
+                    int displayCount = readCount(in, 16);
                     for (int i = 0; i < displayCount; i++) {
                         data.setDisplay(readDisplay(in));
                     }
+                }
+                if (in.available() != 0) {
+                    throw new IOException("Unexpected trailing bytes in BlockEngine chunk data");
                 }
                 PerformanceMetrics.record(PerformanceMetrics.CHUNK_DECODE, System.nanoTime() - started,
                         data.blocks.size(), primitive.length);
@@ -691,7 +961,16 @@ public final class ChunkEngine {
             }
         }
 
-        private static void writeBlock(@NotNull DataOutputStream out, @NotNull StoredBlock block) throws IOException {
+        // This stream is always backed by the chunk's in-memory byte array.
+        private static int readCount(DataInputStream in, int minimumBytesPerEntry) throws IOException {
+            int count = in.readInt();
+            if (count < 0 || count > in.available() / minimumBytesPerEntry) {
+                throw new IOException("Invalid entry count or byte length in chunk data: " + count);
+            }
+            return count;
+        }
+
+        private static void writeBlock(@NotNull DataOutputStream out, @NotNull StoredBlock block, int version) throws IOException {
             long started = System.nanoTime();
             out.writeByte(block.localX());
             out.writeInt(block.y());
@@ -702,6 +981,9 @@ public final class ChunkEngine {
             out.writeBoolean(block.unbreakable());
             out.writeBoolean(block.dropsItem());
             out.writeBoolean(block.dropInCreative());
+            if (version > Data.VERSION_BEFORE_ORIENTATION) {
+                out.writeUTF(block.orientation().name());
+            }
             writeBlockData(out, block.data());
 
             byte[] payload = block.payload();
@@ -729,9 +1011,12 @@ public final class ChunkEngine {
             boolean unbreakable = version >= 3 && in.readBoolean();
             boolean dropsItem = version < 3 || in.readBoolean();
             boolean dropInCreative = version >= 4 && in.readBoolean();
+            BlockOrientation orientation = version > Data.VERSION_BEFORE_ORIENTATION
+                    ? BlockOrientation.valueOf(in.readUTF())
+                    : BlockOrientation.IDENTITY;
             SimpleBlockData data = readBlockData(in);
             int payloadLength = in.readInt();
-            if (payloadLength < 0 || payloadLength > 16 * 1024 * 1024) {
+            if (payloadLength < 0 || payloadLength > MAX_PAYLOAD_BYTES || payloadLength > in.available()) {
                 throw new IOException("Invalid adapter payload length: " + payloadLength);
             }
             byte[] payload = in.readNBytes(payloadLength);
@@ -740,14 +1025,14 @@ public final class ChunkEngine {
             }
             List<StoredDisplay> displays = new ArrayList<>();
             if (version >= 6) {
-                int displayCount = in.readInt();
+                int displayCount = readCount(in, 16);
                 for (int i = 0; i < displayCount; i++) {
                     displays.add(readDisplay(in));
                 }
             }
 
             StoredBlock block = new StoredBlock(localX, y, localZ, fallbackBlock, hardness, miningSpeed,
-                    unbreakable, dropsItem, dropInCreative, data, payload, displays);
+                    unbreakable, dropsItem, dropInCreative, data, payload, displays, orientation);
             PerformanceMetrics.record(PerformanceMetrics.BLOCK_READ, System.nanoTime() - started, 1, payload.length);
             return block;
         }
@@ -854,7 +1139,7 @@ public final class ChunkEngine {
                     .invisible(in.readBoolean())
                     .glowColorOverride(in.readInt());
             DisplayAudience.Mode mode = DisplayAudience.Mode.valueOf(in.readUTF());
-            int audienceSize = in.readInt();
+            int audienceSize = readCount(in, 16);
             Set<UUID> audiencePlayers = new HashSet<>();
             for (int i = 0; i < audienceSize; i++) {
                 audiencePlayers.add(new UUID(in.readLong(), in.readLong()));
@@ -890,7 +1175,7 @@ public final class ChunkEngine {
         }
 
         private static @NotNull ItemStack readItemStack(@NotNull DataInputStream in) throws IOException {
-            byte[] encoded = in.readNBytes(in.readInt());
+            byte[] encoded = in.readNBytes(readCount(in, 1));
             try (BukkitObjectInputStream objectIn = new BukkitObjectInputStream(new ByteArrayInputStream(encoded))) {
                 Object object = objectIn.readObject();
                 return object instanceof ItemStack stack ? stack : new ItemStack(Material.AIR);
@@ -929,8 +1214,8 @@ public final class ChunkEngine {
         }
 
         private static @NotNull Map<String, String> readStringMap(@NotNull DataInputStream in) throws IOException {
-            int size = in.readInt();
-            Map<String, String> map = new LinkedHashMap<>(size);
+            int size = readCount(in, 4);
+            Map<String, String> map = new LinkedHashMap<>();
             for (int i = 0; i < size; i++) {
                 map.put(in.readUTF(), in.readUTF());
             }
@@ -946,8 +1231,8 @@ public final class ChunkEngine {
         }
 
         private static @NotNull Map<String, Integer> readIntMap(@NotNull DataInputStream in) throws IOException {
-            int size = in.readInt();
-            Map<String, Integer> map = new LinkedHashMap<>(size);
+            int size = readCount(in, 6);
+            Map<String, Integer> map = new LinkedHashMap<>();
             for (int i = 0; i < size; i++) {
                 map.put(in.readUTF(), in.readInt());
             }
@@ -963,8 +1248,8 @@ public final class ChunkEngine {
         }
 
         private static @NotNull Map<String, Boolean> readBooleanMap(@NotNull DataInputStream in) throws IOException {
-            int size = in.readInt();
-            Map<String, Boolean> map = new LinkedHashMap<>(size);
+            int size = readCount(in, 3);
+            Map<String, Boolean> map = new LinkedHashMap<>();
             for (int i = 0; i < size; i++) {
                 map.put(in.readUTF(), in.readBoolean());
             }

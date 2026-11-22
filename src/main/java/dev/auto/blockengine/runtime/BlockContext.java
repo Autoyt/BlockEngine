@@ -13,6 +13,7 @@ import java.util.List;
 public final class BlockContext extends dev.auto.blockengine.api.blocks.BlockContext {
     private final @NotNull Block block;
     private final @Nullable Player player;
+    private final @Nullable ChunkEngine.StoredBlock source;
 
     public BlockContext(
             @NotNull BlockAdapter adapter,
@@ -20,9 +21,21 @@ public final class BlockContext extends dev.auto.blockengine.api.blocks.BlockCon
             @NotNull Block block,
             @Nullable Player player
     ) {
+        this(adapter, data, block, player, null);
+    }
+
+    BlockContext(
+            @NotNull BlockAdapter adapter, @NotNull BlockData data, @NotNull Block block,
+            @Nullable Player player, @Nullable ChunkEngine.StoredBlock source
+    ) {
         super(adapter, data);
+        this.source = source;
         this.block = block;
         this.player = player;
+    }
+
+    boolean matches(@Nullable RuntimeBlockView view) {
+        return view != null && (source == null || source.data() == view.storedBlock().data());
     }
 
     @Override

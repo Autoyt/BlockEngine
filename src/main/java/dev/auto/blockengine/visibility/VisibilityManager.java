@@ -63,17 +63,22 @@ public final class VisibilityManager {
         if (sameChunk(event.getFrom(), event.getTo())) {
             return;
         }
-        recalculateOnceThisTick(event.getPlayer());
+        scheduleRecalculate(event.getPlayer(), false);
     }
 
-    public void recalculateOnceThisTick(@NotNull Player player) {
-        int tick = Bukkit.getCurrentTick();
-        PlayerVisibility state = state(player);
-        if (state.lastRecalcTick() == tick) {
-            return;
+    public void scheduleRecalculate(@NotNull Player player, boolean resetClient) {
+        if (resetClient) {
+            cleanup(player);
         }
-        state.lastRecalcTick(tick);
-        recalculate(player, state, false);
+        PlayerVisibility state = state(player);
+        if (state.queueRecalculation()) {
+            Bukkit.getScheduler().runTask(Main.getInstance(), () -> {
+                state.finishRecalculation();
+                if (player.isOnline() && players.get(player.getUniqueId()) == state) {
+                    recalculate(player, state, false);
+                }
+            });
+        }
     }
 
     public void forceRecalculate(@NotNull Player player) {
@@ -124,11 +129,15 @@ public final class VisibilityManager {
             @NotNull ItemStack itemStack,
             int durationTicks
     ) {
-        if (!from.worldId().equals(to.worldId())) {
+        if (!Main.getInstance().isEnabled() || !config().enabled() || !from.worldId().equals(to.worldId())) {
+            return;
+        }
+        RuntimeBlockView landed = ChunkEngine.getBlock(to);
+        if (landed == null || !landed.exposed()) {
             return;
         }
 
-        DesiredDisplay base = ManagedDisplayManager.getInstance().defaultBlockDisplay(to, itemStack);
+        DesiredDisplay base = ManagedDisplayManager.getInstance().defaultBlockDisplay(landed, itemStack);
         double dx = from.x() - to.x();
         double dy = from.y() - to.y();
         double dz = from.z() - to.z();
@@ -171,6 +180,10 @@ public final class VisibilityManager {
         }
 
         Bukkit.getScheduler().runTask(Main.getInstance(), () -> {
+            RuntimeBlockView current = ChunkEngine.getBlock(to);
+            if (current == null || !current.exposed() || current.storedBlock() != landed.storedBlock()) {
+                return;
+            }
             for (Player player : Bukkit.getOnlinePlayers()) {
                 PlayerVisibility state = players.get(player.getUniqueId());
                 if (state == null) {
@@ -227,6 +240,10 @@ public final class VisibilityManager {
     private void recalculate(@NotNull Player player, @NotNull PlayerVisibility state, boolean force) {
         long started = System.nanoTime();
         VisibilityConfig visibilityConfig = config();
+        if (!visibilityConfig.enabled()) {
+            cleanup(player);
+            return;
+        }
         int radius = visibilityConfig.effectiveChunkRadius();
         Chunk chunk = player.getLocation().getChunk();
         ChunkEngine.Key center = ChunkEngine.Key.from(chunk);
@@ -271,7 +288,7 @@ public final class VisibilityManager {
 
                 for (RuntimeBlockView block : loadedChunk.exposedBlocks()) {
                     DesiredDisplay display = ManagedDisplayManager.getInstance()
-                            .defaultBlockDisplay(block.location(), ItemManager.display(block));
+                            .defaultBlockDisplay(block, ItemManager.display(block));
                     desired.put(display.id(), display);
                 }
             }
@@ -286,8 +303,8 @@ public final class VisibilityManager {
             }
             int chunkX = floor(display.spec().x()) >> 4;
             int chunkZ = floor(display.spec().z()) >> 4;
-            int dx = chunkX - center.x();
-            int dz = chunkZ - center.z();
+            long dx = (long) chunkX - center.x();
+            long dz = (long) chunkZ - center.z();
             if (dx * dx + dz * dz <= radiusSquared) {
                 DesiredDisplay desiredDisplay = ManagedDisplayManager.getInstance().desired(display);
                 desired.put(desiredDisplay.id(), desiredDisplay);
@@ -317,7 +334,12 @@ public final class VisibilityManager {
         for (DesiredDisplay desiredDisplay : desired.values()) {
             VirtualItemDisplay activeDisplay = state.active().get(desiredDisplay.id());
             if (activeDisplay != null) {
+                Location previous = activeDisplay.getLocation();
                 configure(activeDisplay, desiredDisplay);
+                Location next = activeDisplay.getLocation();
+                if (next != null && !next.equals(previous)) {
+                    activeDisplay.teleport(player, next);
+                }
                 activeDisplay.updateMetadata(player);
                 continue;
             }
@@ -364,8 +386,8 @@ public final class VisibilityManager {
 
         int radius = config().effectiveChunkRadius();
         Chunk center = player.getLocation().getChunk();
-        int dx = chunkKey.x() - center.getX();
-        int dz = chunkKey.z() - center.getZ();
+        long dx = (long) chunkKey.x() - center.getX();
+        long dz = (long) chunkKey.z() - center.getZ();
         return dx * dx + dz * dz <= radius * radius;
     }
 

@@ -1,5 +1,6 @@
 package dev.auto.blockengine.listeners;
 
+import dev.auto.blockengine.Main;
 import dev.auto.blockengine.runtime.ChunkEngine;
 import dev.auto.blockengine.runtime.RuntimeBlockView;
 import dev.auto.blockengine.types.BlockLocationKey;
@@ -26,12 +27,37 @@ final class ExplosionImpactCalculator {
         }
 
         double radius = radius(origin, blocks);
+        if (!nearCustomBlocks(world, origin, radius)) {
+            return Set.of();
+        }
         Set<BlockLocationKey> affected = affectedByExplosion(origin, radius);
-        affected.addAll(storedCustomBlocksInRange(origin, radius));
+
         dev.auto.blockengine.runtime.PerformanceMetrics.record(
                 dev.auto.blockengine.runtime.PerformanceMetrics.EXPLOSION,
                 System.nanoTime() - started, affected.size(), 0);
         return affected;
+    }
+
+    private static boolean nearCustomBlocks(World world, Location origin, double radius) {
+        int minX = floor(origin.getX() - radius) >> 4;
+        int maxX = floor(origin.getX() + radius) >> 4;
+        int minZ = floor(origin.getZ() - radius) >> 4;
+        int maxZ = floor(origin.getZ() + radius) >> 4;
+        long searchArea = (long) (maxX - minX + 1) * (maxZ - minZ + 1);
+        if (searchArea > ChunkEngine.chunks().size()) {
+            return ChunkEngine.chunks().stream().anyMatch(chunk -> chunk.key().worldId().equals(world.getUID())
+                    && chunk.key().x() >= minX && chunk.key().x() <= maxX
+                    && chunk.key().z() >= minZ && chunk.key().z() <= maxZ && chunk.hasBlocks());
+        }
+        for (int x = minX; x <= maxX; x++) {
+            for (int z = minZ; z <= maxZ; z++) {
+                ChunkEngine.LoadedChunk chunk = ChunkEngine.get(new ChunkEngine.Key(world.getUID(), x, z));
+                if (chunk != null && chunk.hasBlocks()) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private static double radius(@NotNull Location origin, @NotNull List<Block> blocks) {
@@ -66,41 +92,6 @@ final class ExplosionImpactCalculator {
         return affected;
     }
 
-    private static @NotNull Set<BlockLocationKey> storedCustomBlocksInRange(@NotNull Location origin, double radius) {
-        Set<BlockLocationKey> affected = new HashSet<>();
-        World world = origin.getWorld();
-        if (world == null) {
-            return affected;
-        }
-
-        double radiusSquared = radius * radius;
-        for (ChunkEngine.LoadedChunk chunk : ChunkEngine.chunks()) {
-            if (!chunk.key().worldId().equals(world.getUID())) {
-                continue;
-            }
-            int chunkCenterX = (chunk.key().x() << 4) + 8;
-            int chunkCenterZ = (chunk.key().z() << 4) + 8;
-            double chunkDx = chunkCenterX - origin.getX();
-            double chunkDz = chunkCenterZ - origin.getZ();
-            double chunkReach = radius + 12.0;
-            if (chunkDx * chunkDx + chunkDz * chunkDz > chunkReach * chunkReach) {
-                continue;
-            }
-            for (RuntimeBlockView block : chunk.blocks()) {
-                BlockLocationKey location = block.location();
-                double dx = location.x() + 0.5 - origin.getX();
-                double dy = location.y() + 0.5 - origin.getY();
-                double dz = location.z() + 0.5 - origin.getZ();
-                if (dx * dx + dy * dy + dz * dz <= radiusSquared) {
-                    if (!blockedByWater(origin, world, location)) {
-                        affected.add(location);
-                    }
-                }
-            }
-        }
-        return affected;
-    }
-
     private static void ray(
             @NotNull Location origin,
             @NotNull World world,
@@ -124,13 +115,20 @@ final class ExplosionImpactCalculator {
             int blockX = floor(x);
             int blockY = floor(y);
             int blockZ = floor(z);
+            if (blockY < world.getMinHeight() || blockY >= world.getMaxHeight()
+                    || !world.isChunkLoaded(blockX >> 4, blockZ >> 4)) {
+                return;
+            }
             Block block = world.getBlockAt(blockX, blockY, blockZ);
             if (protectedByWater(block)) {
                 return;
             }
 
             BlockLocationKey location = new BlockLocationKey(world.getUID(), blockX, blockY, blockZ);
-            RuntimeBlockView customBlock = ChunkEngine.getBlock(location);
+            RuntimeBlockView customBlock = block.getType() == Main.getBackingBlock() ? ChunkEngine.getBlock(location) : null;
+            if (customBlock != null && customBlock.storedBlock().unbreakable()) {
+                return;
+            }
             float resistance = customBlock == null
                     ? block.getType().getBlastResistance()
                     : Math.max(0.05f, customBlock.storedBlock().hardness());
@@ -138,7 +136,7 @@ final class ExplosionImpactCalculator {
                 power -= (resistance + 0.3f) * 0.3f;
             }
 
-            if (power > 0.0) {
+            if (power > 0.0 && customBlock != null) {
                 affected.add(location);
             }
 
@@ -152,39 +150,6 @@ final class ExplosionImpactCalculator {
     private static boolean protectedByWater(@NotNull Block block) {
         return block.getType() == Material.WATER
                 || block.getBlockData() instanceof Waterlogged waterlogged && waterlogged.isWaterlogged();
-    }
-
-    private static boolean blockedByWater(
-            @NotNull Location origin,
-            @NotNull World world,
-            @NotNull BlockLocationKey target
-    ) {
-        double targetX = target.x() + 0.5;
-        double targetY = target.y() + 0.5;
-        double targetZ = target.z() + 0.5;
-        double dx = targetX - origin.getX();
-        double dy = targetY - origin.getY();
-        double dz = targetZ - origin.getZ();
-        double distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
-        if (distance <= 0.0) {
-            return false;
-        }
-
-        dx /= distance;
-        dy /= distance;
-        dz /= distance;
-        for (double traveled = 0.0; traveled < distance; traveled += 0.2) {
-            int blockX = floor(origin.getX() + dx * traveled);
-            int blockY = floor(origin.getY() + dy * traveled);
-            int blockZ = floor(origin.getZ() + dz * traveled);
-            if (blockX == target.x() && blockY == target.y() && blockZ == target.z()) {
-                return false;
-            }
-            if (protectedByWater(world.getBlockAt(blockX, blockY, blockZ))) {
-                return true;
-            }
-        }
-        return false;
     }
 
     private static double dir(int value, int samples) {

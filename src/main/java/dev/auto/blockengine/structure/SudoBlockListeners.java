@@ -3,6 +3,7 @@ package dev.auto.blockengine.structure;
 import dev.auto.blockengine.Main;
 import dev.auto.blockengine.chat.BlockEngineChat;
 import dev.auto.blockengine.items.ItemManager;
+import dev.auto.blockengine.placement.BlockOrientation;
 import dev.auto.blockengine.registry.BlockRegistry;
 import dev.auto.blockengine.runtime.ChunkEngine;
 import dev.auto.blockengine.runtime.RuntimeBlockView;
@@ -21,6 +22,7 @@ import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.block.BlockRedstoneEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.world.AsyncStructureGenerateEvent;
+import org.bukkit.event.world.ChunkLoadEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.util.BoundingBox;
@@ -50,16 +52,25 @@ public final class SudoBlockListeners implements Listener {
         if (definition == null) {
             event.setCancelled(true);
             BlockEngineChat.error(player, "Unknown placeholder block '" + blockId + "'.");
-            return;
         }
-
-        manager.placeMarker(event.getBlockPlaced(), definition.id(), ItemManager.sudoStateId(event.getItemInHand()));
-        player.swingHand(event.getHand());
     }
 
-    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = false)
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onMarkerPlaced(@NotNull BlockPlaceEvent event) {
+        String blockId = ItemManager.sudoBlockId(event.getItemInHand());
+        BlockDefinition definition = BlockRegistry.getBlock(blockId);
+        if (definition != null && event.canBuild()) {
+            var face = event.getBlockAgainst().getFace(event.getBlockPlaced());
+            var orientation = BlockOrientation.forPlacement(definition.apiDefinition().placement(), event.getPlayer().getFacing(), face);
+            manager.placeMarker(event.getBlockPlaced(), blockId, ItemManager.sudoStateId(event.getItemInHand()), orientation);
+            event.getPlayer().swingHand(event.getHand());
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST)
     public void onWandInteract(@NotNull PlayerInteractEvent event) {
-        if (event.getHand() != EquipmentSlot.HAND || !ItemManager.wand(event.getItem())) {
+        if (event.getHand() != EquipmentSlot.HAND || !ItemManager.wand(event.getItem())
+                || event.useInteractedBlock() == org.bukkit.event.Event.Result.DENY) {
             return;
         }
         if (event.getAction() != Action.LEFT_CLICK_BLOCK && event.getAction() != Action.RIGHT_CLICK_BLOCK) {
@@ -116,7 +127,7 @@ public final class SudoBlockListeners implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onMarkerInteract(@NotNull PlayerInteractEvent event) {
-        if (event.getHand() != EquipmentSlot.HAND || event.getAction() != Action.RIGHT_CLICK_BLOCK) {
+        if (event.getAction() != Action.RIGHT_CLICK_BLOCK) {
             return;
         }
         Block clicked = event.getClickedBlock();
@@ -135,6 +146,11 @@ public final class SudoBlockListeners implements Listener {
     @EventHandler
     public void onStructureGenerate(@NotNull AsyncStructureGenerateEvent event) {
         event.setBlockTransformer(SudoBlockManager.transformerKey(), manager.structureBlockTransformer());
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onChunkLoad(@NotNull ChunkLoadEvent event) {
+        manager.convertGeneratedMarkers(event.getChunk());
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
@@ -181,7 +197,8 @@ public final class SudoBlockListeners implements Listener {
         long[] delays = {1L, 10L, 40L, 100L, 200L};
         for (long delay : delays) {
             Main.getInstance().getServer().getScheduler().runTaskLater(Main.getInstance(), () -> {
-                if (structureBlock.getType() != Material.STRUCTURE_BLOCK) {
+                if (!structureBlock.getWorld().isChunkLoaded(structureBlock.getX() >> 4, structureBlock.getZ() >> 4)
+                        || structureBlock.getType() != Material.STRUCTURE_BLOCK) {
                     return;
                 }
                 BoundingBox area = manager.structureLoadArea(structureBlock);

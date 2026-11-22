@@ -6,6 +6,7 @@ import dev.auto.blockengine.api.display.DisplaySpec;
 import dev.auto.blockengine.api.display.ManagedDisplayHandle;
 import dev.auto.blockengine.api.display.ManagedDisplayService;
 import dev.auto.blockengine.runtime.ChunkEngine;
+import dev.auto.blockengine.runtime.RuntimeBlockView;
 import dev.auto.blockengine.types.BlockLocationKey;
 import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
@@ -24,10 +25,12 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 
 public final class ManagedDisplayManager implements ManagedDisplayService {
@@ -51,11 +54,12 @@ public final class ManagedDisplayManager implements ManagedDisplayService {
         }
 
         ManagedDisplay display = new ManagedDisplay(UUID.randomUUID(), persistence, null, null, spec);
-        displays.put(display.id(), display);
         if (persistence == DisplayPersistence.PERSISTENT_WORLD) {
-            ChunkEngine.data(chunk(spec)).setDisplay(ChunkEngine.StoredDisplay.from(display));
-            ChunkEngine.changed(chunk(spec));
+            Chunk storage = chunk(spec);
+            ChunkEngine.data(storage).setDisplay(ChunkEngine.StoredDisplay.from(display));
+            ChunkEngine.changed(storage);
         }
+        displays.put(display.id(), display);
         refresh(display);
         return display;
     }
@@ -74,6 +78,15 @@ public final class ManagedDisplayManager implements ManagedDisplayService {
         BlockLocationKey owner = location(block);
         ManagedDisplay display = new ManagedDisplay(UUID.randomUUID(), DisplayPersistence.PERSISTENT_BLOCK_ATTACHED, owner, key, spec);
         ChunkEngine.Data data = ChunkEngine.data(block.getChunk());
+        ChunkEngine.StoredBlock stored = data.blockAt(owner.x() & 15, owner.y(), owner.z() & 15);
+        if (stored == null) {
+            throw new IllegalArgumentException("An attached display requires a custom block at " + owner);
+        }
+        for (ChunkEngine.StoredDisplay existing : stored.displays()) {
+            if (key.equals(existing.ownerKey())) {
+                remove(existing.id());
+            }
+        }
         data.setBlockDisplay(owner.x() & 15, owner.y(), owner.z() & 15, ChunkEngine.StoredDisplay.from(display));
         displays.put(display.id(), display);
         ChunkEngine.changed(block);
@@ -124,9 +137,9 @@ public final class ManagedDisplayManager implements ManagedDisplayService {
     }
 
     public void loadChunk(@NotNull ChunkEngine.Key chunkKey, @NotNull ChunkEngine.Data data) {
-        removeLoadedForChunk(chunkKey);
+        Set<UUID> restored = new HashSet<>();
         for (ChunkEngine.StoredDisplay stored : data.displays()) {
-            displays.put(stored.id(), ManagedDisplay.from(stored));
+            restore(stored, restored);
         }
         for (ChunkEngine.StoredBlock block : data.blocks()) {
             BlockLocationKey owner = new BlockLocationKey(
@@ -136,8 +149,21 @@ public final class ManagedDisplayManager implements ManagedDisplayService {
                     (chunkKey.z() << 4) + block.localZ()
             );
             for (ChunkEngine.StoredDisplay stored : block.displays()) {
-                displays.put(stored.id(), ManagedDisplay.from(stored.withOwner(owner)));
+                restore(stored.withOwner(owner), restored);
             }
+        }
+        displays.values().removeIf(display -> display.persistence() != DisplayPersistence.TRANSIENT
+                && storedIn(display, chunkKey) && !restored.contains(display.id()));
+    }
+
+    private void restore(@NotNull ChunkEngine.StoredDisplay stored, @NotNull Set<UUID> restored) {
+        restored.add(stored.id());
+        ManagedDisplay current = displays.get(stored.id());
+        if (current != null && current.persistence() == stored.persistence()
+                && Objects.equals(current.owner(), stored.owner()) && Objects.equals(current.ownerKey(), stored.ownerKey())) {
+            current.spec = stored.spec();
+        } else {
+            displays.put(stored.id(), ManagedDisplay.from(stored));
         }
     }
 
@@ -147,6 +173,9 @@ public final class ManagedDisplayManager implements ManagedDisplayService {
             ManagedDisplay display = iterator.next();
             if (!storedIn(display, chunkKey)) {
                 continue;
+            }
+            if (!chunkKey.equals(chunkKey(display.spec()))) {
+                refresh(display);
             }
             display.invalidate();
             iterator.remove();
@@ -161,7 +190,8 @@ public final class ManagedDisplayManager implements ManagedDisplayService {
         return new DesiredDisplay(display.id(), display.spec());
     }
 
-    public @NotNull DesiredDisplay defaultBlockDisplay(@NotNull BlockLocationKey location, @NotNull ItemStack itemStack) {
+    public @NotNull DesiredDisplay defaultBlockDisplay(@NotNull RuntimeBlockView block, @NotNull ItemStack itemStack) {
+        BlockLocationKey location = block.location();
         World world = Bukkit.getWorld(location.worldId());
         if (world == null) {
             throw new IllegalStateException("Cannot create default display for unloaded world " + location.worldId());
@@ -169,6 +199,7 @@ public final class ManagedDisplayManager implements ManagedDisplayService {
         UUID id = UUID.nameUUIDFromBytes(("blockengine:default:"
                 + location.worldId() + ":" + location.x() + ":" + location.y() + ":" + location.z())
                 .getBytes(StandardCharsets.UTF_8));
+        var rotation = block.storedBlock().orientation().rotation();
         DisplaySpec spec = DisplaySpec.builder(new Location(
                         world,
                         location.x() + 0.5,
@@ -178,6 +209,7 @@ public final class ManagedDisplayManager implements ManagedDisplayService {
                         0.0f
                 ))
                 .itemStack(itemStack)
+                .leftRotation(rotation.x(), rotation.y(), rotation.z(), rotation.w())
                 .scale(2.0f, 2.0f, 2.0f)
                 .displayContext(DisplaySpec.DISPLAY_CONTEXT_FIXED)
                 .build();
@@ -236,11 +268,6 @@ public final class ManagedDisplayManager implements ManagedDisplayService {
         for (ManagedDisplay display : attached) {
             display.remove();
         }
-    }
-
-    private void removeLoadedForChunk(@NotNull ChunkEngine.Key chunkKey) {
-        displays.values().removeIf(display ->
-                display.persistence() != DisplayPersistence.TRANSIENT && storedIn(display, chunkKey));
     }
 
     private void refresh(@NotNull ManagedDisplay display) {
@@ -401,7 +428,17 @@ public final class ManagedDisplayManager implements ManagedDisplayService {
             if (!valid()) {
                 return false;
             }
-            this.spec = Objects.requireNonNull(spec, "spec");
+            Objects.requireNonNull(spec, "spec");
+            ChunkEngine.Key previousAnchor = chunkKey(this.spec);
+            if (!previousAnchor.equals(chunkKey(spec))) {
+                if (persistence == DisplayPersistence.PERSISTENT_WORLD) {
+                    // Resolve the new storage before releasing the old record.
+                    ChunkEngine.data(chunk(spec));
+                    removeStored(this);
+                }
+                dev.auto.blockengine.visibility.VisibilityManager.getInstance().refreshPlayersNear(previousAnchor);
+            }
+            this.spec = spec;
             markDirty(this);
             return true;
         }

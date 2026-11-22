@@ -8,12 +8,18 @@ import dev.auto.blockengine.api.blocks.BlockDefinition;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.Listener;
+import org.bukkit.event.inventory.InventoryAction;
+import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.inventory.Inventory;
+import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.jetbrains.annotations.NotNull;
 
-public final class DemoInventoryBlockAdapter implements BlockAdapter {
+public final class DemoInventoryBlockAdapter implements BlockAdapter, Listener {
     @Override
     public @NotNull String name() {
         return "demo_inventory";
@@ -53,11 +59,45 @@ public final class DemoInventoryBlockAdapter implements BlockAdapter {
         int opens = context.data().integer("opens") == null ? 0 : context.data().integer("opens");
         context.data().integer("opens", opens + 1);
 
-        Inventory inventory = Bukkit.createInventory(player, 9, "BlockEngine Demo Inventory");
+        Inventory inventory = new DemoMenu().getInventory();
         inventory.setItem(3, item(Material.CHEST, "Open count: " + (opens + 1)));
-        inventory.setItem(5, item(Material.BLUE_STAINED_GLASS_PANE, "Demo storage slot"));
+        inventory.setItem(5, item(Material.BLUE_STAINED_GLASS_PANE, "Demo display slot"));
         player.openInventory(inventory);
         return true;
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onClick(@NotNull InventoryClickEvent event) {
+        Inventory top = event.getView().getTopInventory();
+        if (top.getHolder(false) instanceof DemoMenu && (top.equals(event.getClickedInventory())
+                || event.isShiftClick() || event.getAction() == InventoryAction.COLLECT_TO_CURSOR)) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onDrag(@NotNull InventoryDragEvent event) {
+        Inventory top = event.getView().getTopInventory();
+        if (top.getHolder(false) instanceof DemoMenu && event.getRawSlots().stream().anyMatch(slot -> slot < top.getSize())) {
+            event.setCancelled(true);
+        }
+    }
+
+    public static void closeMenus() {
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            if (player.getOpenInventory().getTopInventory().getHolder(false) instanceof DemoMenu) {
+                player.closeInventory();
+            }
+        }
+    }
+
+    private static final class DemoMenu implements InventoryHolder {
+        private final Inventory inventory = Bukkit.createInventory(this, 9, "BlockEngine Demo Inventory");
+
+        @Override
+        public @NotNull Inventory getInventory() {
+            return inventory;
+        }
     }
 
     private static @NotNull ItemStack item(@NotNull Material material, @NotNull String name) {

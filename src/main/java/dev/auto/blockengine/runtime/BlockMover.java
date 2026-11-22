@@ -16,7 +16,6 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 
@@ -40,20 +39,11 @@ public final class BlockMover {
         }
 
         BlockContext context = BlockDataManager.getInstance().context(from, customBlock, null);
-        return context != null && context.adapter().canMove(context, from, to, cause);
+        return context != null && context.adapter().canMove(context, from, to, cause)
+                && isCurrentSource(from, customBlock) && canOccupy(to);
     }
 
     public static boolean move(
-            @NotNull Block from,
-            @NotNull RuntimeBlockView customBlock,
-            @NotNull Block to,
-            @NotNull BlockAdapter.MoveCause cause
-    ) {
-        PendingMove pending = beginMove(from, customBlock, to, cause);
-        return pending != null && finishMove(pending);
-    }
-
-    public static @Nullable PendingMove beginMove(
             @NotNull Block from,
             @NotNull RuntimeBlockView customBlock,
             @NotNull Block to,
@@ -65,28 +55,35 @@ public final class BlockMover {
         Objects.requireNonNull(cause, "cause");
 
         if (!isCurrentSource(from, customBlock) || !canOccupy(to)) {
-            return null;
+            return false;
         }
 
         BlockDefinition definition = BlockRegistry.getBlock(customBlock.storedBlock().blockId());
         if (definition == null) {
-            return null;
+            return false;
         }
 
         BlockContext context = BlockDataManager.getInstance().context(from, customBlock, null);
-        if (context == null || !context.adapter().canMove(context, from, to, cause)) {
-            return null;
+        if (context == null || !context.adapter().canMove(context, from, to, cause)
+                || !isCurrentSource(from, customBlock) || !canOccupy(to)) {
+            return false;
         }
 
-        context.adapter().onMove(context, from, to, cause);
         byte[] payload = definition.adapter().save(context.data());
         ChunkEngine.StoredBlock moved = movedBlock(from, customBlock.storedBlock(), to, context.data(), definition, payload);
 
+        if (!isCurrentSource(from, customBlock) || !canOccupy(to)) {
+            return false;
+        }
         ChunkEngine.Data sourceData = ChunkEngine.data(from.getChunk());
+        ChunkEngine.Data targetData = ChunkEngine.data(to.getChunk());
         sourceData.removeBlock(from.getX() & 15, from.getY(), from.getZ() & 15);
+        targetData.setBlock(moved);
 
         from.setType(Material.AIR, false);
+        to.setType(Main.getBackingBlock(), false);
         ChunkEngine.changed(from);
+        ChunkEngine.changed(to);
         BlockEngineEvents.modification(
                 BlockEngineModificationEvent.Action.REMOVE_CUSTOM_BLOCK,
                 from,
@@ -95,32 +92,39 @@ public final class BlockMover {
                 null,
                 null
         );
-        return new PendingMove(from, to, moved);
-    }
-
-    public static boolean finishMove(@NotNull PendingMove pending) {
-        Objects.requireNonNull(pending, "pending");
-        if (!canOccupy(pending.to())) {
-            return false;
+        RuntimeBlockView landed = ChunkEngine.getBlock(location(to));
+        if (landed == null || landed.storedBlock().data() != moved.data()) {
+            return true;
         }
-
-        ChunkEngine.Data targetData = ChunkEngine.data(pending.to().getChunk());
-        targetData.setBlock(pending.moved());
-        pending.to().setType(Main.getBackingBlock(), false);
-        ChunkEngine.changed(pending.to());
         BlockIntegrityManager.getInstance().callEvent(
                 BlockEngineModificationEvent.Action.SET_CUSTOM_BLOCK,
-                pending.to(),
+                to,
                 null,
                 null,
-                pending.moved().blockId(),
-                pending.moved().stateId()
+                moved.blockId(),
+                moved.stateId()
         );
+
+        // Notify the adapter at the destination after both mutations are visible.
+        // A modification listener may already have replaced the landed block.
+        BlockContext landedContext = new BlockContext(definition.adapter(), context.data(), to, null, moved);
+        if (landedContext.matches(ChunkEngine.getBlock(location(to)))) {
+            ChunkEngine.SimpleBlockData before = ChunkEngine.SimpleBlockData.copyOf(landedContext.data());
+            try {
+                definition.adapter().onMove(landedContext, from, to, cause);
+                BlockDataManager.getInstance().saveIfChanged(to, landedContext, landed, before);
+            } catch (RuntimeException exception) {
+                Main.getInstance().getLogger().log(java.util.logging.Level.WARNING,
+                        "Movement callback failed for " + definition.id() + " at " + location(to), exception);
+            }
+        }
         return true;
     }
 
     public static boolean canOccupy(@NotNull Block target) {
-        if (ChunkEngine.getBlock(location(target)) != null) {
+        if (target.getY() < target.getWorld().getMinHeight() || target.getY() >= target.getWorld().getMaxHeight()
+                || !target.getWorld().isChunkLoaded(target.getX() >> 4, target.getZ() >> 4)
+                || ChunkEngine.getBlock(location(target)) != null) {
             return false;
         }
         return target.getType().isAir() || target.isReplaceable() || target.isLiquid();
@@ -128,15 +132,8 @@ public final class BlockMover {
 
     private static boolean isCurrentSource(@NotNull Block from, @NotNull RuntimeBlockView expected) {
         RuntimeBlockView current = ChunkEngine.getBlock(location(from));
-        if (current == null) {
-            return false;
-        }
-
-        ChunkEngine.StoredBlock actual = current.storedBlock();
-        ChunkEngine.StoredBlock snapshot = expected.storedBlock();
-        return actual.blockId().equals(snapshot.blockId())
-                && actual.stateId().equals(snapshot.stateId())
-                && Arrays.equals(actual.payload(), snapshot.payload());
+        return current != null && current.storedBlock() == expected.storedBlock()
+                && from.getType() == Main.getBackingBlock();
     }
 
     public static @NotNull ChunkEngine.StoredBlock movedBlock(
@@ -147,27 +144,15 @@ public final class BlockMover {
             @NotNull BlockDefinition definition,
             byte @Nullable [] payload
     ) {
-        ChunkEngine.StoredBlock snapshot = ChunkEngine.StoredBlock.from(
+        return ChunkEngine.StoredBlock.from(
                 to.getX() & 15,
                 to.getY(),
                 to.getZ() & 15,
                 data,
                 definition.apiDefinition(),
-                payload
-        );
-        return new ChunkEngine.StoredBlock(
-                snapshot.localX(),
-                snapshot.y(),
-                snapshot.localZ(),
-                snapshot.fallbackBlock(),
-                snapshot.hardness(),
-                snapshot.miningSpeed(),
-                snapshot.unbreakable(),
-                snapshot.dropsItem(),
-                snapshot.dropInCreative(),
-                snapshot.data(),
-                snapshot.payload(),
-                movedDisplays(from, source.displays(), to)
+                payload,
+                movedDisplays(from, source.displays(), to),
+                source.orientation()
         );
     }
 
@@ -205,10 +190,4 @@ public final class BlockMover {
         return new BlockLocationKey(block.getWorld().getUID(), block.getX(), block.getY(), block.getZ());
     }
 
-    public record PendingMove(
-            @NotNull Block from,
-            @NotNull Block to,
-            @NotNull ChunkEngine.StoredBlock moved
-    ) {
-    }
 }

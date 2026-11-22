@@ -14,7 +14,7 @@ final class PlayerVisibility {
     private final @NotNull Map<UUID, VirtualItemDisplay> active = new HashMap<>();
     private final @NotNull ArrayDeque<VirtualItemDisplay> pool = new ArrayDeque<>();
 
-    private int lastRecalcTick = -1;
+    private boolean recalculationQueued;
     private @Nullable ChunkEngine.Key centerChunk;
     private int radius = -1;
 
@@ -26,12 +26,16 @@ final class PlayerVisibility {
         return pool;
     }
 
-    int lastRecalcTick() {
-        return lastRecalcTick;
+    boolean queueRecalculation() {
+        if (recalculationQueued) {
+            return false;
+        }
+        recalculationQueued = true;
+        return true;
     }
 
-    void lastRecalcTick(int lastRecalcTick) {
-        this.lastRecalcTick = lastRecalcTick;
+    void finishRecalculation() {
+        recalculationQueued = false;
     }
 
     @Nullable ChunkEngine.Key centerChunk() {

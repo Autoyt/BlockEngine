@@ -79,17 +79,17 @@ public final class BlockTicker {
         long started = System.nanoTime();
         int processed = 0;
         int changed = 0;
-        for (var iterator = tickingBlocks.iterator(); iterator.hasNext();) {
-            BlockLocationKey location = iterator.next();
+        // An adapter may load or unload a chunk synchronously while ticking.
+        for (BlockLocationKey location : List.copyOf(tickingBlocks)) {
             processed++;
             RuntimeBlockView view = ChunkEngine.getBlock(location);
             if (view == null) {
-                iterator.remove();
+                tickingBlocks.remove(location);
                 continue;
             }
             BlockDefinition definition = BlockRegistry.getBlock(view.storedBlock().blockId());
             if (definition == null || !definition.adapter().ticking()) {
-                iterator.remove();
+                tickingBlocks.remove(location);
                 continue;
             }
             World world = Bukkit.getWorld(view.location().worldId());
@@ -97,23 +97,20 @@ public final class BlockTicker {
                 continue;
             }
             Block block = world.getBlockAt(view.location().x(), view.location().y(), view.location().z());
-            BlockContext context = BlockDataManager.getInstance().context(block, view, null);
-            if (context == null) {
-                continue;
-            }
-            ChunkEngine.SimpleBlockData before = ChunkEngine.SimpleBlockData.copyOf(context.data());
             try {
+                BlockContext context = BlockDataManager.getInstance().context(block, view, null);
+                if (context == null) {
+                    continue;
+                }
+                ChunkEngine.SimpleBlockData before = ChunkEngine.SimpleBlockData.copyOf(context.data());
                 definition.adapter().onTick(context);
+
+                if (BlockDataManager.getInstance().saveIfChanged(block, context, view, before)) {
+                    changed++;
+                }
             } catch (RuntimeException exception) {
                 Main.getInstance().getLogger().warning("BlockEngine tick failed for "
                         + view.storedBlock().blockId() + " at " + view.location() + ": " + exception.getMessage());
-                continue;
-            }
-
-            RuntimeBlockView current = ChunkEngine.getBlock(view.location());
-            if (!before.equalsData(context.data()) && current != null && current.storedBlock().blockId().equals(context.blockId())) {
-                BlockDataManager.getInstance().save(block, context);
-                changed++;
             }
         }
         PerformanceMetrics.record(PerformanceMetrics.TICKER, System.nanoTime() - started, processed, changed);

@@ -1,5 +1,6 @@
 package dev.auto.blockengine.runtime;
 
+import dev.auto.blockengine.Main;
 import dev.auto.blockengine.items.ItemManager;
 import dev.auto.blockengine.entity.ManagedDisplayManager;
 import dev.auto.blockengine.api.event.BlockEngineBlockRemovedEvent;
@@ -75,7 +76,10 @@ public final class BlockRemover {
         if (drop && customBlock.storedBlock().dropsItem() && !customBlock.storedBlock().unbreakable()) {
             BlockDefinition definition = BlockRegistry.getBlock(customBlock.storedBlock().blockId());
             if (definition != null) {
-                drops = List.of(ItemManager.create(definition));
+                String stateId = customBlock.storedBlock().stateId();
+                drops = List.of(definition.apiDefinition().states().containsKey(stateId)
+                        ? ItemManager.create(definition, stateId)
+                        : ItemManager.create(definition));
             }
         }
 
@@ -90,6 +94,18 @@ public final class BlockRemover {
             @NotNull Material replacement,
             boolean applyPhysics,
             @NotNull BlockEngineBlockRemovedEvent.Reason reason
+    ) {
+        return removeWithDrops(block, customBlock, drops, replacement, applyPhysics, reason, block);
+    }
+
+    static @NotNull RemovalResult removeWithDrops(
+            @NotNull Block block,
+            @NotNull RuntimeBlockView customBlock,
+            @NotNull List<ItemStack> drops,
+            @NotNull Material replacement,
+            boolean applyPhysics,
+            @NotNull BlockEngineBlockRemovedEvent.Reason reason,
+            @NotNull Block dropAt
     ) {
         if (customBlock.storedBlock().unbreakable()) {
             return new RemovalResult(false, List.of());
@@ -108,21 +124,20 @@ public final class BlockRemover {
                 || current.storedBlock() != customBlock.storedBlock()) {
             return new RemovalResult(false, List.of());
         }
+        if (block.getType() != Main.getBackingBlock()) {
+            BlockIntegrityManager.getInstance().reconcileBlock(block, BlockEngineModificationEvent.Action.RECONCILE_STALE_BLOCK);
+            return new RemovalResult(false, List.of());
+        }
 
         ChunkEngine.Data data = ChunkEngine.data(block.getChunk());
         data.removeBlock(block.getX() & 15, block.getY(), block.getZ() & 15);
-        ManagedDisplayManager.getInstance().removeBlockAttached(new BlockLocationKey(
-                block.getWorld().getUID(),
-                block.getX(),
-                block.getY(),
-                block.getZ()
-        ));
+        ManagedDisplayManager.getInstance().removeBlockAttached(location);
 
         block.setType(replacement, applyPhysics);
         ChunkEngine.changed(block);
         sound(block, customBlock);
 
-        List<ItemStack> spawned = spawn(block, prepared);
+        List<ItemStack> spawned = spawn(dropAt, prepared);
         BlockEngineEvents.call(new BlockEngineBlockRemovedEvent(
                 block,
                 customBlock.storedBlock().blockId(),

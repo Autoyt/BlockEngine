@@ -24,8 +24,9 @@ public final class CreativeInventoryListeners implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onCreative(@NotNull InventoryCreativeEvent event) {
-        ItemStack converted = CreativeInventoryManager.convertCreativeStack(event.getCursor());
-        if (converted != event.getCursor()) {
+        ItemStack cursor = event.getCursor();
+        ItemStack converted = CreativeInventoryManager.convertCreativeStack(cursor);
+        if (converted != cursor) {
             event.setCursor(converted);
             placeCreativeItem(event, converted);
         }
@@ -35,14 +36,15 @@ public final class CreativeInventoryListeners implements Listener {
         }
     }
 
-    @EventHandler
+    @EventHandler(ignoreCancelled = true)
     public void onClick(@NotNull InventoryClickEvent event) {
-        if (!(event.getWhoClicked() instanceof Player player)) {
+        if (event instanceof InventoryCreativeEvent || !(event.getWhoClicked() instanceof Player player)) {
             return;
         }
-        ItemStack cursor = CreativeInventoryManager.convertCreativeStack(event.getCursor());
-        if (cursor != event.getCursor()) {
-            event.setCursor(cursor);
+        ItemStack cursor = event.getCursor();
+        ItemStack converted = CreativeInventoryManager.convertCreativeStack(cursor);
+        if (converted != cursor) {
+            event.setCursor(converted);
         }
         convertCurrentItem(event);
         scanSoon(player);
@@ -55,10 +57,11 @@ public final class CreativeInventoryListeners implements Listener {
         }
     }
 
-    @EventHandler
+    @EventHandler(ignoreCancelled = true)
     public void onDrop(@NotNull PlayerDropItemEvent event) {
-        ItemStack converted = CreativeInventoryManager.convertCreativeStack(event.getItemDrop().getItemStack());
-        if (converted != event.getItemDrop().getItemStack()) {
+        ItemStack original = event.getItemDrop().getItemStack();
+        ItemStack converted = CreativeInventoryManager.convertCreativeStack(original);
+        if (converted != original) {
             event.getItemDrop().setItemStack(converted);
         }
     }
@@ -84,9 +87,10 @@ public final class CreativeInventoryListeners implements Listener {
     }
 
     private static void scan(@NotNull Player player) {
-        ItemStack cursor = CreativeInventoryManager.convertCreativeStack(player.getItemOnCursor());
-        if (cursor != player.getItemOnCursor()) {
-            player.setItemOnCursor(cursor);
+        ItemStack cursor = player.getItemOnCursor();
+        ItemStack converted = CreativeInventoryManager.convertCreativeStack(cursor);
+        if (converted != cursor) {
+            player.setItemOnCursor(converted);
         }
 
         InventoryView view = player.getOpenInventory();
