@@ -5,6 +5,7 @@ import dev.auto.blockengine.api.blocks.BlockAdapter;
 import dev.auto.blockengine.items.ItemManager;
 import dev.auto.blockengine.types.BlockDefinition;
 import dev.auto.blockengine.types.BlockName;
+import org.bukkit.plugin.Plugin;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.HashMap;
@@ -21,11 +22,32 @@ public class BlockRegistry {
     private static final Map<BlockName, BlockDefinition> blocks = new HashMap<>();
     private static final Map<String, BlockDefinition> blocksById = new HashMap<>();
     private static final Map<BlockAdapter, BlockDefinition> blocksByAdapter = new IdentityHashMap<>();
+    private static final Map<BlockName, Plugin> owners = new HashMap<>();
 
     public static void clear() {
+        ItemManager.clearRegistrations();
         blocks.clear();
         blocksById.clear();
         blocksByAdapter.clear();
+        owners.clear();
+    }
+
+    public static void removeAll(@NotNull Plugin owner) {
+        for (BlockDefinition block : java.util.List.copyOf(blocks.values())) {
+            if (owners.get(block.name()) != owner) {
+                continue;
+            }
+
+            ItemManager.unregister(block);
+            blocks.remove(block.name());
+            blocksById.remove(block.id());
+            blocksByAdapter.remove(block.adapter());
+            owners.remove(block.name());
+        }
+    }
+
+    public static boolean hasBlocks(@NotNull Plugin owner) {
+        return owners.values().stream().anyMatch(registeredOwner -> registeredOwner == owner);
     }
 
     public static BlockDefinition getBlock(String namespace, String name) {
@@ -58,6 +80,14 @@ public class BlockRegistry {
     }
 
     public static BlockDefinition registerBlock(@NotNull BlockAdapter adapter, @NotNull String namespace) {
+        return registerBlock(adapter, namespace, Main.getInstance());
+    }
+
+    public static BlockDefinition registerBlock(
+            @NotNull BlockAdapter adapter,
+            @NotNull String namespace,
+            @NotNull Plugin owner
+    ) {
         if (!NAMESPACE_PATTERN.matcher(namespace).matches()) {
             throw new IllegalArgumentException("Invalid namespace: " + namespace);
         }
@@ -76,8 +106,10 @@ public class BlockRegistry {
         blocks.put(definition.name(), definition);
         blocksById.put(definition.id(), definition);
         blocksByAdapter.put(adapter, definition);
+        owners.put(definition.name(), owner);
 
         try {
+            ItemManager.register(definition);
             adapter.onRegistered(ItemManager.create(definition));
         } catch (RuntimeException exception) {
             Main.getInstance().getLogger().log(Level.WARNING,

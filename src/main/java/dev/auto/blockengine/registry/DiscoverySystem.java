@@ -82,7 +82,7 @@ public final class DiscoverySystem {
                 );
 
                 try {
-                    BlockRegistry.registerBlock(adapter, entry.namespace());
+                    BlockRegistry.registerBlock(adapter, entry.namespace(), entry.plugin());
                 } catch (Exception e) {
                     Main.getInstance().getLogger().severe("Failed to register block adapter " + adapter.getClass().getName() + " from plugin " + entry.plugin().getName());
                     Main.getInstance().getLogger().log(java.util.logging.Level.SEVERE, "Adapter registration failure", e);

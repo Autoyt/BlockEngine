@@ -10,20 +10,81 @@ import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
+import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.function.Consumer;
+import java.util.function.Supplier;
+import java.util.logging.Level;
+
 public final class ItemManager {
-    private static final NamespacedKey BLOCK_ID_KEY = new NamespacedKey(Main.getInstance(), "block_id");
-    private static final NamespacedKey STATE_ID_KEY = new NamespacedKey(Main.getInstance(), "state_id");
-    private static final NamespacedKey SUDO_BLOCK_ID_KEY = new NamespacedKey(Main.getInstance(), "sudo_block_id");
-    private static final NamespacedKey SUDO_STATE_ID_KEY = new NamespacedKey(Main.getInstance(), "sudo_state_id");
-    private static final NamespacedKey WAND_KEY = new NamespacedKey(Main.getInstance(), "block_engine_wand");
+    private static final NamespacedKey BLOCK_ID_KEY = new NamespacedKey("blockengine", "block_id");
+    private static final NamespacedKey STATE_ID_KEY = new NamespacedKey("blockengine", "state_id");
+    private static final NamespacedKey SUDO_BLOCK_ID_KEY = new NamespacedKey("blockengine", "sudo_block_id");
+    private static final NamespacedKey SUDO_STATE_ID_KEY = new NamespacedKey("blockengine", "sudo_state_id");
+    private static final NamespacedKey WAND_KEY = new NamespacedKey("blockengine", "block_engine_wand");
+    private static SharedCustomItems shared;
 
     private ItemManager() {
+    }
+
+    public static void initialize(Main plugin) {
+        shutdown();
+        if (!plugin.getServer().getPluginManager().isPluginEnabled("AutoLib")) {
+            return;
+        }
+
+        try {
+            shared = AutoLibItemBridge.connect(plugin);
+            if (shared != null) {
+                plugin.getLogger().info("Using AutoLib for BlockEngine custom items.");
+            }
+        } catch (LinkageError | RuntimeException exception) {
+            plugin.getLogger().log(Level.WARNING,
+                    "AutoLib item API is unavailable. Using BlockEngine's standalone items.", exception);
+        }
+    }
+
+    public static boolean isUsingSharedItems() {
+        return shared != null;
+    }
+
+    public static void clearRegistrations() {
+        if (shared != null) {
+            shared.clear();
+        }
+    }
+
+    public static void shutdown() {
+        SharedCustomItems previous = shared;
+        shared = null;
+        if (previous != null) {
+            previous.close();
+        }
+    }
+
+    public static void register(BlockDefinition block) {
+        if (shared == null) {
+            return;
+        }
+        for (String stateId : block.apiDefinition().states().keySet()) {
+            create(block, stateId);
+            createSudo(block, stateId);
+        }
+    }
+
+    public static void unregister(BlockDefinition block) {
+        if (shared == null) {
+            return;
+        }
+        for (String stateId : block.apiDefinition().states().keySet()) {
+            shared.remove(customItemId(block, stateId, false));
+            shared.remove(customItemId(block, stateId, true));
+        }
     }
 
     public static @NotNull ItemStack create(@NotNull BlockDefinition block) {
@@ -32,6 +93,11 @@ public final class ItemManager {
 
     public static @NotNull ItemStack create(@NotNull BlockDefinition block, @NotNull String stateId) {
         block.apiDefinition().state(stateId);
+        return registered(customItemId(block, stateId, false), () -> build(block, stateId),
+                meta -> blockIdentity(meta, block.id(), stateId, false));
+    }
+
+    private static ItemStack build(BlockDefinition block, String stateId) {
         var item = block.apiDefinition().item();
         ItemStack stack = new ItemStack(item.material());
         ItemMeta meta = stack.getItemMeta();
@@ -59,7 +125,11 @@ public final class ItemManager {
     public static @NotNull ItemStack createSudo(@NotNull BlockDefinition block, @Nullable String stateId) {
         String resolvedState = stateId == null || stateId.isBlank() ? block.apiDefinition().defaultState() : stateId;
         block.apiDefinition().state(resolvedState);
+        return registered(customItemId(block, resolvedState, true), () -> buildSudo(block, resolvedState),
+                meta -> blockIdentity(meta, block.id(), resolvedState, true));
+    }
 
+    private static ItemStack buildSudo(BlockDefinition block, String resolvedState) {
         ItemStack stack = new ItemStack(Material.CHEST);
         ItemMeta meta = stack.getItemMeta();
         meta.getPersistentDataContainer().set(SUDO_BLOCK_ID_KEY, PersistentDataType.STRING, block.id());
@@ -85,6 +155,13 @@ public final class ItemManager {
     }
 
     public static @NotNull ItemStack createWand() {
+        return registered("blockengine:wand", ItemManager::buildWand, meta -> {
+            clearIdentity(meta.getPersistentDataContainer());
+            meta.getPersistentDataContainer().set(WAND_KEY, PersistentDataType.BOOLEAN, true);
+        });
+    }
+
+    private static ItemStack buildWand() {
         ItemStack stack = new ItemStack(Material.STICK);
         ItemMeta meta = stack.getItemMeta();
         meta.getPersistentDataContainer().set(WAND_KEY, PersistentDataType.BOOLEAN, true);
@@ -100,6 +177,39 @@ public final class ItemManager {
         meta.setMaxStackSize(1);
         stack.setItemMeta(meta);
         return stack;
+    }
+
+    public static @NotNull String customItemId(BlockDefinition block, String stateId, boolean placeholder) {
+        return customItemId(block.name().namespace(), block.name().name(), stateId, placeholder);
+    }
+
+    static String customItemId(String namespace, String name, String stateId, boolean placeholder) {
+        return "blockengine:" + (placeholder ? "placeholder/" : "block/")
+                + namespace + "/" + idSegment(name) + "/" + idSegment(stateId);
+    }
+
+    private static String idSegment(String value) {
+        // Keep block paths and state paths in separate, reversible key segments.
+        return value.replace(".", "..").replace("/", ".s");
+    }
+
+    private static ItemStack registered(String id, Supplier<ItemStack> template, Consumer<ItemMeta> identity) {
+        return shared == null ? template.get() : shared.create(id, template, identity);
+    }
+
+    private static void blockIdentity(ItemMeta meta, String blockId, String stateId, boolean placeholder) {
+        PersistentDataContainer data = meta.getPersistentDataContainer();
+        clearIdentity(data);
+        data.set(placeholder ? SUDO_BLOCK_ID_KEY : BLOCK_ID_KEY, PersistentDataType.STRING, blockId);
+        data.set(placeholder ? SUDO_STATE_ID_KEY : STATE_ID_KEY, PersistentDataType.STRING, stateId);
+    }
+
+    private static void clearIdentity(PersistentDataContainer data) {
+        data.remove(BLOCK_ID_KEY);
+        data.remove(STATE_ID_KEY);
+        data.remove(SUDO_BLOCK_ID_KEY);
+        data.remove(SUDO_STATE_ID_KEY);
+        data.remove(WAND_KEY);
     }
 
     public static @Nullable String blockId(@Nullable ItemStack stack) {

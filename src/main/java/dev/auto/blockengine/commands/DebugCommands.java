@@ -605,9 +605,16 @@ public final class DebugCommands implements BasicCommand, Listener {
             return;
         }
         ItemStack stack = ItemManager.create(block, stateId);
-        stack.setAmount(64);
-        player.getInventory().addItem(stack).values()
-                .forEach(leftover -> player.getWorld().dropItemNaturally(player.getLocation(), leftover));
+        int remaining = 64;
+        while (remaining > 0) {
+            int amount = Math.min(remaining, stack.getMaxStackSize());
+            ItemStack batch = stack.clone();
+            batch.setAmount(amount);
+            player.getInventory().addItem(batch).values()
+                    .forEach(leftover -> player.getWorld().dropItemNaturally(player.getLocation(), leftover));
+            remaining -= amount;
+        }
+
         BlockEngineChat.send(sender, DebugStyle.status("gave", true)
                 .append(Component.space())
                 .append(DebugStyle.value("64x"))

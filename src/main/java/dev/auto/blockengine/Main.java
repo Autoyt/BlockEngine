@@ -15,6 +15,7 @@ import dev.auto.blockengine.defaultadapters.DebugBlocks;
 import dev.auto.blockengine.entity.ManagedDisplayManager;
 import dev.auto.blockengine.integrity.BlockIntegrityManager;
 import dev.auto.blockengine.inspection.RuntimeInspectionService;
+import dev.auto.blockengine.items.ItemManager;
 import dev.auto.blockengine.listeners.GameListener;
 import dev.auto.blockengine.registry.BlockRegistry;
 import dev.auto.blockengine.registry.DiscoverySystem;
@@ -31,9 +32,12 @@ import org.bukkit.Chunk;
 import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.Listener;
+import org.bukkit.event.server.PluginDisableEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 
-public final class Main extends JavaPlugin {
+public final class Main extends JavaPlugin implements Listener {
     @Getter
     private static Main instance;
     @Getter
@@ -55,6 +59,8 @@ public final class Main extends JavaPlugin {
         BlockEngine.setInspectionService(new RuntimeInspectionService());
 
         configSave(false);
+        ItemManager.initialize(this);
+        getServer().getPluginManager().registerEvents(this, this);
         ResourcePackManager.getInstance().prepare();
         VisibilityManager.getInstance().register(this);
         BlockIntegrityManager.getInstance().register(this);
@@ -105,6 +111,8 @@ public final class Main extends JavaPlugin {
         }
 
         CatalogListeners.cleanup();
+        BlockRegistry.clear();
+        ItemManager.shutdown();
         ResourcePackManager.getInstance().stop();
         BlockIntegrityManager.getInstance().stop();
         BlockTicker.getInstance().stop();
@@ -113,6 +121,19 @@ public final class Main extends JavaPlugin {
         BlockEngine.clearManagedWorldFactory();
         BlockEngine.clearInspectionService();
         ChunkEngine.clear();
+    }
+
+    @EventHandler
+    public void onPluginDisable(PluginDisableEvent event) {
+        if (BlockRegistry.hasBlocks(event.getPlugin())) {
+            // Pending structure conversions still need this contributor's definitions.
+            SudoBlockManager.getInstance().flushPendingNow();
+        }
+
+        if (event.getPlugin().getName().equals("AutoLib")) {
+            ItemManager.shutdown();
+        }
+        BlockRegistry.removeAll(event.getPlugin());
     }
 
     public void configSave(boolean overwriteFromJar) {
